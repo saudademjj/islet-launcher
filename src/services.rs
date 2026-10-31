@@ -1939,7 +1939,13 @@ impl AppServices {
         .await?;
         let launch_config = instance.launch.over(&settings.launch);
         let mut jvm_args = launch::split_args(&launch_config.jvm_args)?;
-        if account.provider == AccountProvider::Yggdrasil {
+        if let Some(server_id) = account.server.as_deref().filter(|_| account.provider == AccountProvider::Yggdrasil).and_then(yggdrasil::nide8_server_id) {
+            // 统一通行证 brings its own agent in place of authlib-injector.
+            let agent = yggdrasil::ensure_nide8_agent(&http, &self.paths).await?;
+            let mut agent_args = yggdrasil::nide8_args(&agent, server_id);
+            agent_args.append(&mut jvm_args);
+            jvm_args = agent_args;
+        } else if account.provider == AccountProvider::Yggdrasil {
             // authlib-injector first, so the player's own arguments still come last.
             let agent = yggdrasil::ensure_agent(&http, &self.paths).await?;
             let metadata = match account.server.as_deref() {

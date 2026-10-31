@@ -59,7 +59,7 @@ export function AccountsPage() {
   const thirdParty = {
     icon: "globe" as IconName,
     title: t("外置登录", "Third-party sign-in"),
-    text: t("LittleSkin 等皮肤站账号，用它们的皮肤和服务器验证", "Accounts on skin sites like LittleSkin, with their skins and server verification"),
+    text: t("LittleSkin 等皮肤站、统一通行证账号，用它们的皮肤和服务器验证", "Skin sites like LittleSkin, or 统一通行证, with their skins and server verification"),
     primary: false,
     pending: false,
     disabled: false,

@@ -3,6 +3,10 @@
 //! Java agent that sends its logins and skins to that server instead of
 //! Mojang's. The password goes to the server once and is never stored; the
 //! access and client tokens live in the system keychain.
+//!
+//! 统一通行证 (Nide8) servers speak the same API under
+//! `auth.mc-user.com:233/<server id>/`, but the game is hooked up through
+//! their own agent, `nide8auth.jar`, instead of authlib-injector.
 use std::{path::PathBuf, time::Duration};
 
 use base64::Engine;
@@ -52,14 +56,36 @@ fn fail(message: impl Into<String>) -> AppError {
     AppError::new("yggdrasil", message)
 }
 
-/// `littleskin.cn`, a full URL, or a URL that points elsewhere through the
-/// `X-Authlib-Injector-API-Location` header (API Location Indication).
+/// Where every 统一通行证 server's API lives, followed by its server id.
+const NIDE8_API: &str = "https://auth.mc-user.com:233/";
+const NIDE8_AGENT: &str = "https://login.mc-user.com:233/download/nide8auth.jar";
+
+/// The 统一通行证 server id an API address belongs to, if it is one.
+pub fn nide8_server_id(api: &str) -> Option<&str> {
+    let id = api.strip_prefix(NIDE8_API)?.trim_end_matches('/');
+    is_nide8_id(id).then_some(id)
+}
+
+/// Server ids are 32 hex digits.
+fn is_nide8_id(id: &str) -> bool {
+    id.len() == 32 && id.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+/// `littleskin.cn`, a full URL, a URL that points elsewhere through the
+/// `X-Authlib-Injector-API-Location` header (API Location Indication), or a
+/// bare 统一通行证 server id.
 pub async fn resolve(client: &reqwest::Client, address: &str) -> AppResult<Server> {
     let address = address.trim();
     if address.is_empty() || address.len() > 300 {
         return Err(fail(crate::core::i18n::pick("请填写认证服务器地址。", "Enter the authentication server address.")));
     }
-    let mut url = if address.contains("://") { address.to_string() } else { format!("https://{address}") };
+    let mut url = if is_nide8_id(address) {
+        format!("{NIDE8_API}{}", address.to_ascii_lowercase())
+    } else if address.contains("://") {
+        address.to_string()
+    } else {
+        format!("https://{address}")
+    };
     let parsed = url::Url::parse(&url).map_err(|_| fail(crate::core::i18n::pick("认证服务器地址无效。", "Invalid authentication server address.")))?;
     check_scheme(&parsed)?;
     let response = client.get(parsed.clone()).timeout(Duration::from_secs(15)).send().await?;
@@ -435,6 +461,46 @@ pub fn agent_args(agent: &std::path::Path, account: &Account, metadata: Option<&
     args
 }
 
+/// 统一通行证's own agent, downloaded once and refreshed weekly in the
+/// background like authlib-injector. The site publishes no checksum, so a
+/// download is only kept if it is a plausible jar.
+pub async fn ensure_nide8_agent(client: &reqwest::Client, paths: &AppPaths) -> AppResult<PathBuf> {
+    let dir = paths.cache.join("nide8auth");
+    std::fs::create_dir_all(&dir)?;
+    let target = dir.join("nide8auth.jar");
+    if target.is_file() {
+        let fresh = std::fs::metadata(&target).and_then(|m| m.modified()).ok().and_then(|at| at.elapsed().ok()).is_some_and(|age| age < AGENT_CHECK_EVERY * 7);
+        if !fresh {
+            let (client, target) = (client.clone(), target.clone());
+            tokio::spawn(async move {
+                if let Err(error) = download_nide8_agent(&client, &target).await {
+                    tracing::info!(%error, "nide8auth update check failed; keeping the cached one");
+                }
+            });
+        }
+        return Ok(target);
+    }
+    download_nide8_agent(client, &target).await?;
+    Ok(target)
+}
+
+async fn download_nide8_agent(client: &reqwest::Client, target: &std::path::Path) -> AppResult<()> {
+    let failed = || fail(crate::core::i18n::pick("无法下载统一通行证的 nide8auth.jar，请稍后再试。", "Couldn't download 统一通行证's nide8auth.jar; try again later."));
+    let bytes = client.get(NIDE8_AGENT).timeout(Duration::from_secs(60)).send().await?.error_for_status().map_err(|_| failed())?.bytes().await?;
+    if bytes.len() < 1024 || bytes.len() > 16 * 1024 * 1024 || !bytes.starts_with(b"PK\x03\x04") {
+        return Err(failed());
+    }
+    let temporary = target.with_extension("jar.part");
+    std::fs::write(&temporary, &bytes)?;
+    std::fs::rename(&temporary, target)?;
+    Ok(())
+}
+
+/// The JVM arguments for a 统一通行证 account.
+pub fn nide8_args(agent: &std::path::Path, server_id: &str) -> Vec<String> {
+    vec![format!("-javaagent:{}={server_id}", agent.to_string_lossy()), "-Dnide8auth.client=true".into()]
+}
+
 /// The server's metadata, for the prefetch argument; none when unreachable
 /// (authlib-injector then fetches it itself).
 pub async fn metadata(client: &reqwest::Client, api: &str) -> Option<String> {
@@ -468,5 +534,17 @@ mod tests {
         let args = agent_args(std::path::Path::new("/a/authlib.jar"), &account, Some("{}"));
         assert_eq!(args[0], "-javaagent:/a/authlib.jar=https://littleskin.cn/api/yggdrasil");
         assert_eq!(args[1], "-Dauthlibinjector.yggdrasil.prefetched=e30=");
+    }
+
+    #[test]
+    fn nide8_servers_are_recognised_by_their_api_address() {
+        let id = "aa9441c0487a11e88feb525400b59b6a";
+        assert_eq!(nide8_server_id(&format!("https://auth.mc-user.com:233/{id}")), Some(id));
+        assert_eq!(nide8_server_id(&format!("https://auth.mc-user.com:233/{id}/")), Some(id));
+        assert_eq!(nide8_server_id("https://auth.mc-user.com:233/short"), None);
+        assert_eq!(nide8_server_id("https://littleskin.cn/api/yggdrasil"), None);
+        assert!(is_nide8_id(id) && !is_nide8_id("littleskin.cn"));
+        let args = nide8_args(std::path::Path::new("/a/nide8auth.jar"), id);
+        assert_eq!(args, vec![format!("-javaagent:/a/nide8auth.jar={id}"), "-Dnide8auth.client=true".to_string()]);
     }
 }

@@ -15,24 +15,34 @@ const SERVERS = [
   { label: t("Blessing Skin 自建", "Self-hosted Blessing Skin"), address: "" },
 ];
 
+/** 统一通行证 servers all live here, told apart by a 32-digit server id. */
+const NIDE8_API = "https://auth.mc-user.com:233/";
+
 /** Signing in to a third-party (Yggdrasil) server, played through
-    authlib-injector. The password goes to that server only. */
+    authlib-injector, or to a 统一通行证 server through its own agent. The
+    password goes to that server only. */
 export function AddYggdrasil() {
   const s = usePick((s) => ({ closeModal: s.closeModal, toast: s.toast }));
-  const [server, setServer] = useState("littleskin.cn");
+  const [kind, setKind] = useState<"skin" | "nide8">("skin");
+  const [address, setAddress] = useState("littleskin.cn");
+  const [serverId, setServerId] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [profiles, setProfiles] = useState<{ id: string; name: string }[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const nide8 = kind === "nide8";
+  const idValid = /^[0-9a-f]{32}$/i.test(serverId.trim());
+  const server = nide8 ? (idValid ? NIDE8_API + serverId.trim().toLowerCase() : "") : address.trim();
+  const locked = busy || profiles != null;
 
   const login = async (profile?: string) => {
-    if (!server.trim() || !username.trim() || !password) return;
+    if (!server || !username.trim() || !password) return;
     setBusy(true);
     setError(null);
     try {
       const result = await call<{ profiles: { id: string; name: string }[] | null; snapshot: Snapshot }>("login_yggdrasil", {
-        server: server.trim(),
+        server,
         username: username.trim(),
         password,
         profile: profile ?? null,
@@ -53,7 +63,7 @@ export function AddYggdrasil() {
   return (
     <Modal
       title={t("外置登录", "Third-party sign-in")}
-      subtitle={t("LittleSkin 等皮肤站的账号；游戏通过 authlib-injector 使用它们的皮肤和正版验证", "Accounts on skin sites like LittleSkin; the game uses their skins and verification through authlib-injector")}
+      subtitle={nide8 ? t("统一通行证（Nide8）服务器的账号；游戏通过 nide8auth 使用它的皮肤和验证", "Accounts on 统一通行证 (Nide8) servers; the game uses their skins and verification through nide8auth") : t("LittleSkin 等皮肤站的账号；游戏通过 authlib-injector 使用它们的皮肤和正版验证", "Accounts on skin sites like LittleSkin; the game uses their skins and verification through authlib-injector")}
       onClose={s.closeModal}
       footer={
         <>
@@ -61,7 +71,7 @@ export function AddYggdrasil() {
             {t("取消", "Cancel")}
           </Button>
           {!profiles && (
-            <Button variant="primary" icon="check" busy={busy} disabled={!server.trim() || !username.trim() || !password} onClick={() => void login()}>
+            <Button variant="primary" icon="check" busy={busy} disabled={!server || !username.trim() || !password} onClick={() => void login()}>
               {t("登录", "Sign in")}
             </Button>
           )}
@@ -76,23 +86,46 @@ export function AddYggdrasil() {
           void login();
         }}
       >
-        <Field label={t("认证服务器", "Authentication server")} hint={t("皮肤站首页或 API 地址都可以，例如 littleskin.cn", "The skin site's home page or API address, e.g. littleskin.cn")}>
-          <div className="row" style={{ flexWrap: "wrap" }}>
-            <div style={{ flex: 1, minWidth: 220 }}>
-              <Input mono value={server} disabled={busy || profiles != null} placeholder="https://skin.example.com" onChange={(e) => setServer(e.target.value)} />
+        <div>
+          <Segmented
+            value={kind}
+            disabled={locked}
+            options={[
+              { value: "skin", label: t("皮肤站", "Skin site") },
+              { value: "nide8", label: t("统一通行证", "统一通行证 (Nide8)") },
+            ]}
+            onChange={(v) => {
+              setKind(v);
+              setError(null);
+            }}
+          />
+        </div>
+        {nide8 ? (
+          <Field
+            label={t("服务器 ID", "Server ID")}
+            hint={serverId.trim() && !idValid ? t("服务器 ID 是 32 位的数字和字母，请对照服务器给的再检查一下", "A server ID is 32 letters and digits; check it against the one the server gave you") : t("服务器的公告、官网或群里会给出，32 位数字和字母", "The server's announcement, website or group gives it: 32 letters and digits")}
+          >
+            <Input mono value={serverId} disabled={locked} placeholder="aa9441c0487a11e88feb525400b59b6a" onChange={(e) => setServerId(e.target.value)} />
+          </Field>
+        ) : (
+          <Field label={t("认证服务器", "Authentication server")} hint={t("皮肤站首页或 API 地址都可以，例如 littleskin.cn", "The skin site's home page or API address, e.g. littleskin.cn")}>
+            <div className="row" style={{ flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <Input mono value={address} disabled={locked} placeholder="https://skin.example.com" onChange={(e) => setAddress(e.target.value)} />
+              </div>
+              {SERVERS.filter((item) => item.address).map((item) => (
+                <button key={item.label} type="button" className="filter-chip" aria-pressed={address === item.address} onClick={() => setAddress(item.address)}>
+                  {item.label}
+                </button>
+              ))}
             </div>
-            {SERVERS.filter((item) => item.address).map((item) => (
-              <button key={item.label} type="button" className="filter-chip" aria-pressed={server === item.address} onClick={() => setServer(item.address)}>
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </Field>
+          </Field>
+        )}
         <Field label={t("邮箱或用户名", "Email or username")}>
-          <Input autoFocus value={username} disabled={busy || profiles != null} autoComplete="username" onChange={(e) => setUsername(e.target.value)} />
+          <Input autoFocus value={username} disabled={locked} autoComplete="username" onChange={(e) => setUsername(e.target.value)} />
         </Field>
         <Field label={t("密码", "Password")} hint={t("只发给这个认证服务器，启动器不保存密码，只保存登录凭据", "Sent only to this server; the launcher keeps the sign-in token, never the password")}>
-          <Input type="password" value={password} disabled={busy || profiles != null} autoComplete="current-password" onChange={(e) => setPassword(e.target.value)} />
+          <Input type="password" value={password} disabled={locked} autoComplete="current-password" onChange={(e) => setPassword(e.target.value)} />
         </Field>
         {/* Submitting with Enter. */}
         <button type="submit" hidden />
