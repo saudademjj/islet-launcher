@@ -1,0 +1,310 @@
+/* Solid colour tokens: a forest-to-grass green family on sage paper.
+   Forest frames the window (sidebar, status bar, hero); grass green marks
+   "go", the current item and progress; earth tones appear only in the pixel
+   terrain. Red is reserved for destructive actions and failures, ochre for
+   warnings. No gradients, no translucent materials; raised controls get a
+   solid bottom edge instead of a soft shadow. */
+
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei UI", "Helvetica Neue", sans-serif;
+  --font-mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  /* Fusion Pixel (OFL), subset to the launcher's own strings. Only for small
+     labels and numbers, always at 12px or 24px so its pixels stay whole. */
+  --font-pixel: "Fusion Pixel", var(--font-ui);
+
+  /* Near-square corners: soft enough for the system UI, hard enough to sit
+     beside the pixel art. */
+  --radius-sm: 2px;
+  --radius: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
+
+  --dur-fast: 120ms;
+  --dur: 200ms;
+  --dur-slow: 300ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+  --sidebar-w: 232px;
+  --toolbar-h: 68px;
+  --status-h: 28px;
+  --titlebar-h: 32px;
+
+  /* Pixel terrain: the same in both themes, dimmed slightly in dark. */
+  --t-grass: #7fb238;
+  --t-grass-dark: #64952a;
+  --t-grass-light: #9ccb52;
+  --t-dirt: #8b5a33;
+  --t-dirt-dark: #74482a;
+  --t-dirt-light: #a06b40;
+  --t-wood: #6b4423;
+  --t-leaf: #3f7d31;
+  --t-leaf-dark: #326827;
+  --t-flower: #f2cf4a;
+  /* Underground: stone, its shade, a cave, and ores. */
+  --t-stone: #4f5a4c;
+  --t-stone-dark: #414b3f;
+  --t-cave: #2c2e2a;
+  --t-coal: #2f302d;
+  --t-iron: #d6ad8d;
+  --t-gem: #62d8d0;
+  /* The notice signpost: pale boards, marks painted on. */
+  --sign-edge: #5b3b20;
+  --sign-light: #efe2b8;
+  --sign-face: #e3d19c;
+  --sign-shade: #cdb67d;
+  --sign-ink: #4c5e4f;
+  --sign-danger: #c2412d;
+  --sign-warn: #b35f08;
+  --sign-ok: #3d7216;
+}
+
+@font-face {
+  font-family: "Fusion Pixel";
+  src: url("../assets/fonts/fusion-pixel-12.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* paper */
+  --bg: #edf1e4;
+  --surface: #fbfcf7;
+  --surface-2: #f3f6ec;
+  --surface-3: #e5ebda;
+  --border: #dae2cc;
+  --border-strong: #c3cfb1;
+  --text: #142418;
+  --muted: #4c5e4f;
+  /* At least 4.5:1 on every paper surface, for 12px text. */
+  --faint: #5b6c5c;
+
+  /* forest frame */
+  --frame: #17321f;
+  --frame-2: #1f3f28;
+  --frame-3: #2a5034;
+  --frame-line: #26472f;
+  --hero: #1e4027;
+  --hero-2: #2a5234;
+  --hero-3: #335f3e;
+  --hero-edge: #12291a;
+  --hero-cloud: #24492d;
+  --on-dark: #eef4e4;
+  --on-dark-muted: #abc0a6;
+  --on-dark-faint: #94ad90;
+  --on-dark-accent: #a3d35d;
+  --on-dark-warn: #ebbd55;
+  --on-dark-danger: #f5a697;
+
+  /* grass accent */
+  --accent: #7fb238;
+  --accent-hover: #8bbe43;
+  --accent-edge: #5b8a22;
+  --accent-ink: #0f230c;
+  --accent-text: #3d7216;
+  --accent-soft: #e2eecd;
+  --accent-soft-2: #d2e5b4;
+
+  --danger: #c2412d;
+  --danger-hover: #ce4b36;
+  --danger-edge: #93301f;
+  --danger-text: #b03a26;
+  --danger-soft: #f8e4de;
+  --warn: #925e10;
+  --warn-soft: #f5ead2;
+
+  --selection: #cfe3ad;
+  --scrim: rgba(12, 28, 17, 0.52);
+  --console-bg: #0d1910;
+  --console-text: #cfe0c8;
+  --console-dim: #50684f;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #0f1711;
+  --surface: #162118;
+  --surface-2: #1b281e;
+  --surface-3: #233326;
+  --border: #223024;
+  --border-strong: #32453a;
+  --text: #e3ecdc;
+  --muted: #a2b39e;
+  --faint: #8a9c86;
+
+  /* The frame stays forest green, a step lighter and greener than the
+     paper, so sidebar and content read as two layers here too. */
+  --frame: #13271a;
+  --frame-2: #1a3222;
+  --frame-3: #234029;
+  --frame-line: #1d3524;
+  --hero: #18311f;
+  --hero-2: #224029;
+  --hero-3: #2b4e32;
+  --hero-edge: #0b1a0f;
+  --hero-cloud: #1c3823;
+  --on-dark: #eaf2e1;
+  --on-dark-muted: #a6bba1;
+  --on-dark-faint: #87a083;
+  --on-dark-accent: #a3d35d;
+  --on-dark-warn: #ebbd55;
+  --on-dark-danger: #f2907e;
+
+  --accent: #86bb3c;
+  --accent-hover: #93c849;
+  --accent-edge: #557f22;
+  --accent-ink: #0d1f0a;
+  --accent-text: #a0d158;
+  --accent-soft: #1d2f1c;
+  --accent-soft-2: #263f22;
+
+  --danger: #c84632;
+  --danger-hover: #d5513c;
+  --danger-edge: #8a2c1d;
+  --danger-text: #f2907e;
+  --danger-soft: #2c1814;
+  --warn: #e0ad44;
+  --warn-soft: #2b2312;
+
+  --selection: #33502a;
+  --scrim: rgba(3, 8, 5, 0.62);
+  --console-bg: #08100a;
+  --console-text: #c7d8c0;
+  --console-dim: #4a6049;
+
+  --t-grass: #6f9f30;
+  --t-grass-dark: #5a8526;
+  --t-grass-light: #86b73f;
+  --t-dirt: #74492a;
+  --t-dirt-dark: #5f3b22;
+  --t-dirt-light: #855634;
+  --t-wood: #5a3a1e;
+  --t-leaf: #346a29;
+  --t-leaf-dark: #2a5822;
+  --t-flower: #d9b83f;
+  --sign-edge: #4e3219;
+  --sign-light: #ddd0a4;
+  --sign-face: #cfbe8b;
+  --sign-shade: #b9a572;
+  --sign-ink: #45564a;
+  --sign-danger: #b93a26;
+  --sign-warn: #9c5004;
+  --sign-ok: #3a6c16;
+}
+
+/* Pixel type sizes; lib/pixelScale.ts rewrites them on screens where 12px
+   would land between device pixels (150% scaling becomes 16px = 24 device
+   pixels). */
+:root {
+  --px-font: 12px;
+  --px-font-2: 24px;
+}
+
+/* ---------- scene palette ----------
+   Sky, sun and moon, hills, night skies, the low sun at dawn and dusk, and
+   the fixed colours of the theme previews. Biomes override the sky family
+   inline (lib/biome.ts). */
+
+/* Theme previews use their own fixed colours, not the active theme's. */
+.theme-preview.light,
+.theme-preview.system {
+  --tp-bg: #edf1e4;
+  --tp-side: #17321f;
+  --tp-hero: #1e4027;
+  --tp-line: #d2dcc3;
+  --tp-card: #fbfcf7;
+}
+
+.theme-preview.dark,
+.theme-preview-half {
+  --tp-bg: #0f1711;
+  --tp-side: #13271a;
+  --tp-hero: #18311f;
+  --tp-line: #263428;
+  --tp-card: #162118;
+}
+
+.theme-preview {
+  --tp-grass: #7fb238;
+  --tp-dirt: #8b5a33;
+  --tp-stone: #4f5a4c;
+  --tp-cream: #eef4e4;
+}
+
+/* ---------- sky: square sun by day, moon and stars by night ---------- */
+
+:root {
+  --sun: #efc63f;
+  --sun-light: #f7dc6a;
+  --moon: #e4ead6;
+  --moon-dark: #c1cbb0;
+  --star: #4f7a57;
+  --star-bright: #d3e6b4;
+  /* hill silhouettes: darker than the sky, darkest nearest */
+  --hill-far: #1a3a23;
+  --hill-near: #132d1a;
+}
+
+:root[data-theme="dark"] {
+  --hill-far: #142a1a;
+  --hill-near: #102415;
+}
+
+.hero.night {
+  --hero: #173521;
+  --hero-cloud: #1d3c26;
+  --hill-far: #142f1c;
+  --hill-near: #102818;
+}
+
+:root[data-theme="dark"] .hero.night {
+  --hero: #13291a;
+  --hero-cloud: #183220;
+  --hill-far: #102316;
+  --hill-near: #0d1d12;
+}
+
+.stage.night {
+  --hero: #173521;
+  --hero-cloud: #1d3c26;
+  --hill-far: #142f1c;
+  --hill-near: #102818;
+}
+
+:root[data-theme="dark"] .stage.night {
+  --hero: #13291a;
+  --hero-cloud: #183220;
+  --hill-far: #102316;
+  --hill-near: #0d1d12;
+}
+
+.stage.dusk,
+.enter.dusk {
+  --sun: #ef9a45;
+  --sun-light: #f7c27a;
+}
+
+.stage.dawn,
+.enter.dawn {
+  --sun: #f3b25a;
+  --sun-light: #f9d48f;
+}
+
+/* Solid-colour helpers used in a few places. */
+:root {
+  --on-solid: #ffffff;
+  --knob: #ffffff;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 15px;
+  --text-lg: 18px;
+  --text-xl: 24px;
+  --text-2xl: 34px;
+  --text-hero: 52px;
+}
+

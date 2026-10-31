@@ -1,0 +1,45 @@
+name: Windows build
+on:
+  workflow_dispatch:
+  # release.yml calls this for tagged releases.
+  workflow_call:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # Optional signing: a base64 .pfx in the WINDOWS_CERTIFICATE secret and
+      # its password in WINDOWS_CERTIFICATE_PASSWORD. Pull requests from forks
+      # get no secrets and build unsigned.
+      - name: Certificate
+        shell: pwsh
+        env:
+          CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+        run: |
+          if ($env:CERTIFICATE) {
+            $Path = Join-Path $env:RUNNER_TEMP "sign.pfx"
+            [IO.File]::WriteAllBytes($Path, [Convert]::FromBase64String($env:CERTIFICATE))
+            "WINDOWS_SIGN_CERT=$Path" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          }
+      - name: Test and package
+        shell: pwsh
+        env:
+          MC_LAUNCHER_CLIENT_ID: ${{ vars.MC_LAUNCHER_CLIENT_ID }}
+          # The manifest release.yml attaches to the latest release.
+          MC_LAUNCHER_UPDATE_URL: ${{ vars.MC_LAUNCHER_UPDATE_URL || format('https://github.com/{0}/releases/latest/download/latest.json', github.repository) }}
+          WINDOWS_SIGN_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: ./scripts/package-windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Islet-Windows-x64
+          # The installer and the portable exe from package-windows.ps1.
+          path: build/windows/*.exe
+          if-no-files-found: error

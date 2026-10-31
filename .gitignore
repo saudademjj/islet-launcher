@@ -1,0 +1,20 @@
+/target
+/build
+/legacy
+node_modules/
+/dist
+/src-tauri/gen
+.DS_Store
+
+# Local agent configuration and working notes
+/.claude/
+/notes/
+
+# Local environment files (templates stay tracked)
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# Local logs
+*.log

@@ -1,0 +1,61 @@
+name: 问题反馈 / Bug report
+description: 启动器出错、游戏启动失败或崩溃 / Something in the launcher is broken
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！提交前请先搜索一下[已有的 Issue](https://github.com/saudademjj/islet-launcher/issues)。
+        Thanks for the report! Please search [existing issues](https://github.com/saudademjj/islet-launcher/issues) first.
+  - type: textarea
+    id: what
+    attributes:
+      label: 发生了什么 / What happened
+      description: 你做了什么、期望看到什么、实际看到了什么 / What you did, what you expected, what happened instead
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤 / Steps to reproduce
+      placeholder: |
+        1. 新建一个 1.21.4 + Fabric 世界
+        2. 点「开始」
+        3. ...
+  - type: input
+    id: version
+    attributes:
+      label: 启动器版本 / Launcher version
+      description: 窗口右下角或「设置 → 关于」/ Bottom-right corner or Settings → About
+      placeholder: "0.4.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: 系统 / System
+      options:
+        - Windows 11
+        - Windows 10
+        - macOS (Apple 芯片 / Apple silicon)
+        - macOS (Intel)
+        - Linux
+    validations:
+      required: true
+  - type: input
+    id: game
+    attributes:
+      label: 游戏版本与加载器 / Game version and loader
+      placeholder: "1.21.4 Fabric 0.16.10"
+  - type: input
+    id: log
+    attributes:
+      label: 日志链接 / Log link
+      description: |
+        游戏相关的问题：在日志面板点「上传日志求助」，把链接贴在这里（用户目录和令牌会被自动隐去）。
+        启动器本身的问题：附上数据目录下 `logs/` 里最新的日志文件。
+        For game problems, use "Upload log for help" in the log panel and paste the link. For launcher problems, attach the newest file from `logs/` in the data folder.
+  - type: textarea
+    id: extra
+    attributes:
+      label: 截图或其他信息 / Screenshots or anything else

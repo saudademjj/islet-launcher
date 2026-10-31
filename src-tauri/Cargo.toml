@@ -1,0 +1,32 @@
+[package]
+name = "islet-app"
+version = "0.4.0"
+description = "Islet desktop shell: Tauri window around the launcher core"
+authors = ["saudade"]
+license = "GPL-3.0-only"
+repository = "https://github.com/saudademjj/islet-launcher"
+edition = "2024"
+rust-version = "1.96"
+
+[[bin]]
+name = "islet"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+islet = { path = ".." }
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-opener = "2"
+# One launcher at a time: a second start (a desktop shortcut) hands its
+# arguments to the running one.
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+async-channel = "2"
+tokio = { version = "1", features = ["time", "macros"] }
+tokio-util = "0.7"
+tracing = "0.1"

@@ -1,0 +1,13 @@
+Generated with the built-in imagegen tool.
+Transparent background: true
+
+Use case: logo-brand.
+Asset type: one finished premium macOS/Windows application icon for a Minecraft launcher, square 1024 x 1024.
+
+Create a beautiful, meticulously art-directed pixel-art icon: a small floating grass-and-earth voxel supporting an upright glowing portal, as a single bold, centered emblem. The portal is a thick, stepped arch of dark jade stone blocks, with a luminous aquamarine interior and a very simple bright opening that suggests entering a world. The top grass is moss green with a few golden-lime pixel highlights; the earthy side is warm brown. A few deep shadow pixels make the grass cube tangible. Keep the whole emblem large, compact, and exceptionally legible at 32 and 64 pixels.
+
+Place the emblem on a dark forest-green rounded-square app tile with stepped, pixel-cut corners, a restrained lighter upper rim and darker lower rim, carefully spaced to avoid touching the edges. Outside the app tile, the canvas must be genuinely transparent. The portal is the focal point, with controlled mint/cyan light expressed ONLY as discrete square pixel clusters. One tiny four-point pixel sparkle is enough.
+
+Style: authentic crisp handcrafted 16-bit game pixel art, as if drawn on a disciplined 64 x 64 logical pixel grid and enlarged with nearest-neighbor scaling. Sharp, chunky, coherent pixel sizes, clean stair-step diagonals, deliberate pixel clusters, a limited harmonious palette, strong silhouette, subtle asymmetric lighting. Gently isometric grass block and upright portal, elegantly balanced proportions. A polished application icon, not a busy illustration. Friendly, calm, adventurous, distinctive.
+
+No lettering, no MC initials, no typography, no watermark, no UI, no mockup, no surrounding scenery. Avoid photorealism, smooth vector curves, airbrushed gradients, blurred glow, excessive tiny noise, busy grass detail, extra objects, thick cartoon outlines, or an image of a monitor. Deliver exactly one isolated icon, centered and fully visible.

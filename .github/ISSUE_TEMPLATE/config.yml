@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全问题 / Security vulnerability
+    url: https://github.com/saudademjj/islet-launcher/security/advisories/new
+    about: 请私下报告，不要公开提交 / Please report privately, not in a public issue.
+  - name: 模组或整合包本身的问题 / Problems in a mod or modpack
+    url: https://modrinth.com/
+    about: 模组自身的崩溃和兼容问题请反馈给模组作者 / Crashes caused by a mod itself belong with its author.

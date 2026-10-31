@@ -1,0 +1,68 @@
+name: Release
+# Pushing a v* tag builds every platform and opens a draft release with the
+# packages and latest.json. Installed launchers see the new version once the
+# draft is published (releases/latest skips drafts).
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  windows:
+    uses: ./.github/workflows/windows.yml
+    secrets: inherit
+  linux:
+    uses: ./.github/workflows/linux.yml
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Package
+        env:
+          MC_LAUNCHER_CLIENT_ID: ${{ vars.MC_LAUNCHER_CLIENT_ID }}
+          MC_LAUNCHER_UPDATE_URL: ${{ vars.MC_LAUNCHER_UPDATE_URL || format('https://github.com/{0}/releases/latest/download/latest.json', github.repository) }}
+          JOBS: 3
+        run: |
+          npm ci
+          ./scripts/package-macos.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Islet-macOS-arm64
+          path: build/*.dmg
+          if-no-files-found: error
+  publish:
+    needs: [windows, linux, macos]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="$(awk -F'"' '/^version = / { print $2; exit }' src-tauri/Cargo.toml)"
+          if [ "$TAG" != "v$version" ]; then
+            echo "tag $TAG does not match version $version in src-tauri/Cargo.toml" >&2
+            exit 1
+          fi
+          mkdir release
+          find dist -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.deb' \) -exec mv {} release/ \;
+          ls -l release
+          python3 scripts/update-manifest.py release/latest.json --version "$version" \
+            --page "https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" \
+            --base-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/" \
+            "windows-x86_64=release/Islet-$version-x64-setup.exe" \
+            "linux-x86_64=release/Islet-$version-x86_64.AppImage" \
+            "macos-aarch64=release/Islet-$version-arm64.dmg"
+          (cd release && sha256sum -- * > SHA256SUMS.txt)
+          gh release create "$TAG" release/* --draft --title "Islet $version" --generate-notes
