@@ -93,6 +93,9 @@ try {
     }
 
     $Version = (Select-String -Path src-tauri\Cargo.toml -Pattern '^version = "([^"]+)"' | Select-Object -First 1).Matches.Groups[1].Value
+    # The machine's own architecture: the build is native, not cross-compiled.
+    $Arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "x64" }
+    $Platform = if ($Arch -eq "arm64") { "windows-aarch64" } else { "windows-x86_64" }
     $Out = Join-Path $ProjectRoot "build\windows"
     New-Item -ItemType Directory -Force $Out | Out-Null
     Remove-Item (Join-Path $Out "*.exe") -ErrorAction SilentlyContinue
@@ -100,8 +103,8 @@ try {
     # The newest one: an earlier build under another name may still be there.
     $Setup = Get-ChildItem "target\release\bundle\nsis\*-setup.exe" | Sort-Object LastWriteTime | Select-Object -Last 1
     if (-not $Setup) { throw "No installer was built." }
-    Copy-Item $Setup.FullName (Join-Path $Out "Islet-$Version-x64-setup.exe") -Force
-    Copy-Item "target\release\islet.exe" (Join-Path $Out "Islet-$Version-portable.exe") -Force
+    Copy-Item $Setup.FullName (Join-Path $Out "Islet-$Version-$Arch-setup.exe") -Force
+    Copy-Item "target\release\islet.exe" (Join-Path $Out "Islet-$Version-$Arch-portable.exe") -Force
     if ($SignArgs) {
         foreach ($File in Get-ChildItem $Out -Filter *.exe) {
             # Tauri signs the exe it bundles; sign anything it left alone.
@@ -112,8 +115,8 @@ try {
         }
     }
     if ($env:RELEASE_BASE_URL -and $env:RELEASE_PAGE) {
-        $Installer = Join-Path $Out "Islet-$Version-x64-setup.exe"
-        python scripts\update-manifest.py build\latest.json --version $Version --page $env:RELEASE_PAGE --base-url $env:RELEASE_BASE_URL --notes "$env:RELEASE_NOTES" "windows-x86_64=$Installer"
+        $Installer = Join-Path $Out "Islet-$Version-$Arch-setup.exe"
+        python scripts\update-manifest.py build\latest.json --version $Version --page $env:RELEASE_PAGE --base-url $env:RELEASE_BASE_URL --notes "$env:RELEASE_NOTES" "$Platform=$Installer"
         if ($LASTEXITCODE -ne 0) { throw "Update manifest failed." }
     }
     Get-ChildItem $Out | Format-Table Name, Length

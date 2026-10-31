@@ -8,7 +8,15 @@ permissions:
   contents: read
 jobs:
   windows:
-    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2022
+            arch: x64
+          - runner: windows-11-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -39,7 +47,7 @@ jobs:
         run: ./scripts/package-windows.ps1
       - uses: actions/upload-artifact@v4
         with:
-          name: Islet-Windows-x64
+          name: Islet-Windows-${{ matrix.arch }}
           # The installer and the portable exe from package-windows.ps1.
           path: build/windows/*.exe
           if-no-files-found: error

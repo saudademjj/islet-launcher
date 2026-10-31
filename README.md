@@ -34,7 +34,7 @@ A Rust core on the WebView your system already has. The Windows installer is 5&n
 <td width="33%" valign="top">
 <img src="docs/images/icons/signal.svg" width="40" alt=""><br>
 <b>Play together</b><br>
-Open your world to LAN and share a room code. Friends join over an encrypted peer-to-peer link, no port forwarding.
+Open your world to LAN and share a room code. Friends join over an encrypted peer-to-peer link, no port forwarding, and rooms work with HMCL and PCL CE too.
 </td>
 <td width="33%" valign="top">
 <img src="docs/images/icons/mod.svg" width="40" alt=""><br>
@@ -90,9 +90,12 @@ Each world keeps its own version, loader, mods and saves, and gets a pixel lands
 
 | System | Package |
 | :-- | :-- |
-| **Windows** 10 / 11 · x64 | `Islet-<version>-x64-setup.exe` installer<br>`Islet-<version>-portable.exe` portable |
+| **Windows** 10 / 11 · x64 | `Islet-<version>-x64-setup.exe` installer<br>`Islet-<version>-x64-portable.exe` portable |
+| **Windows** 11 · ARM | `Islet-<version>-arm64-setup.exe` · `Islet-<version>-arm64-portable.exe` |
 | **macOS** 12+ · Apple silicon | `Islet-<version>-arm64.dmg` |
+| **macOS** 12+ · Intel | `Islet-<version>-x86_64.dmg` |
 | **Linux** x64 · experimental | `Islet-<version>-x86_64.AppImage` · `Islet-<version>-amd64.deb` |
+| **Linux** ARM64 · experimental | `Islet-<version>-aarch64.AppImage` · `Islet-<version>-arm64.deb` |
 
 Get them from the **[latest release](https://github.com/saudademjj/islet-launcher/releases/latest)**. The packages aren't code-signed yet, so Windows and macOS will check with you before the first launch; the [install guide](docs/INSTALL.en.md) shows what to click.
 
@@ -102,11 +105,12 @@ Get them from the **[latest release](https://github.com/saudademjj/islet-launche
 ## Everything else
 
 - **Loaders**: Fabric, Quilt, Forge, NeoForge, OptiFine, Legacy Fabric, LiteLoader, Cleanroom
-- **Modpacks**: browse Modrinth and CurseForge, import `.mrpack` and `.zip`, export your own
+- **Modpacks and servers**: browse Modrinth and CurseForge, import `.mrpack` and `.zip`; export a world as a modpack, or as a server ready to run (client-only mods left out)
 - **Packs and shaders**: reorder resource packs; Islet tells you when a shader needs Iris or Oculus
-- **Saves**: back up, restore, import, export, and jump straight into one on 1.20+
+- **Saves and maps**: automatic backups after you play, plus manual backup, restore, import and export; maps from CurseForge; jump straight into a save on 1.20+
+- **Mod configs**: edit the files in `config/` inside the launcher, with the previous version kept on every save
 - **Servers**: the game's own list, with live ping and one-click join
-- **Accounts**: offline with local skins, authlib-injector servers such as LittleSkin, and Microsoft
+- **Accounts**: offline with local skins, authlib-injector servers such as LittleSkin, 统一通行证 (Nide8), and Microsoft
 - **Moving in**: bring worlds over from the official launcher, HMCL, PCL, Prism and MultiMC
 - **Shortcuts**: ⌘K / Ctrl+K command palette, drag-and-drop installs, desktop shortcuts, Discord status
 - **Private**: no telemetry, and sign-in tokens stay in your system keychain

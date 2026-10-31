@@ -34,7 +34,7 @@ Rust 内核，界面用系统自带的 WebView。Windows 安装包只有 5&nbsp;
 <td width="33%" valign="top">
 <img src="docs/images/icons/signal.svg" width="40" alt=""><br>
 <b>一码联机</b><br>
-在游戏里「对局域网开放」，把房间码发给好友就能一起玩。点对点加密，不用公网 IP，也不用端口转发。
+在游戏里「对局域网开放」，把房间码发给好友就能一起玩。点对点加密，不用公网 IP，也不用端口转发；和 HMCL、PCL CE 的联机房间互通。
 </td>
 <td width="33%" valign="top">
 <img src="docs/images/icons/mod.svg" width="40" alt=""><br>
@@ -90,9 +90,12 @@ Modrinth、CurseForge 一起搜，中文名也认得。前置自动带上，全�
 
 | 系统 | 安装包 |
 | :-- | :-- |
-| **Windows** 10 / 11 · x64 | `Islet-<版本>-x64-setup.exe` 安装版<br>`Islet-<版本>-portable.exe` 免安装版 |
+| **Windows** 10 / 11 · x64 | `Islet-<版本>-x64-setup.exe` 安装版<br>`Islet-<版本>-x64-portable.exe` 免安装版 |
+| **Windows** 11 · ARM | `Islet-<版本>-arm64-setup.exe` · `Islet-<版本>-arm64-portable.exe` |
 | **macOS** 12+ · Apple 芯片 | `Islet-<版本>-arm64.dmg` |
+| **macOS** 12+ · Intel | `Islet-<版本>-x86_64.dmg` |
 | **Linux** x64 · 实验性 | `Islet-<版本>-x86_64.AppImage` · `Islet-<版本>-amd64.deb` |
+| **Linux** ARM64 · 实验性 | `Islet-<版本>-aarch64.AppImage` · `Islet-<版本>-arm64.deb` |
 
 到[最新版本](https://github.com/saudademjj/islet-launcher/releases/latest)下载。安装包暂时没有代码签名，Windows 和 macOS 首次打开时会弹出安全提示，照着[安装说明](docs/INSTALL.md)操作即可。
 
@@ -102,11 +105,12 @@ Modrinth、CurseForge 一起搜，中文名也认得。前置自动带上，全�
 ## 还有这些
 
 - **加载器**：Fabric、Quilt、Forge、NeoForge、OptiFine、Legacy Fabric、LiteLoader、Cleanroom
-- **整合包**：浏览 Modrinth 和 CurseForge，导入 `.mrpack` / `.zip`，也能把自己的世界导出成整合包
+- **整合包与开服**：浏览 Modrinth 和 CurseForge，导入 `.mrpack` / `.zip`；把自己的世界导出成整合包，或一键生成能直接运行的服务端（自动去掉只在客户端运行的模组）
 - **资源包与光影**：调整资源包顺序；光影缺 Iris / Oculus 时会提醒
-- **存档**：备份、恢复、导入导出，1.20 以上可以直接进入某个存档
+- **存档与地图**：玩完自动备份，也能手动备份、恢复、导入导出；从 CurseForge 下载地图；1.20 以上可以直接进入某个存档
+- **模组配置**：在启动器里直接改 `config/` 里的配置文件，每次保存前自动留一份旧版
 - **服务器**：和游戏里同一份列表，实时显示延迟，一键进服
-- **账号**：离线账号（可用本地皮肤）、LittleSkin 等外置登录、微软正版
+- **账号**：离线账号（可用本地皮肤）、LittleSkin 等外置登录、统一通行证、微软正版
 - **搬家**：把官方启动器、HMCL、PCL、Prism、MultiMC 里的游戏直接导进来
 - **顺手**：⌘K / Ctrl+K 命令面板、拖入文件安装、桌面快捷方式、Discord 状态
 - **隐私**：没有任何遥测，登录令牌只存在系统钥匙串里

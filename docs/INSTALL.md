@@ -16,10 +16,10 @@ shasum -a 256 Islet-0.4.0-arm64.dmg                        # macOS / Linux
 
 ## Windows
 
-系统要求：64 位 Windows 10 或 11。
+系统要求：64 位 Windows 10 或 11。ARM 电脑（骁龙等）请下载文件名里带 `arm64` 的版本。
 
 - **安装版** `Islet-<版本>-x64-setup.exe`：双击安装，不需要管理员权限。之后可以在启动器里直接更新。
-- **免安装版** `Islet-<版本>-portable.exe`：放到任意文件夹双击运行；数据仍然保存在 `%APPDATA%\com.saudade.mclauncher`。
+- **免安装版** `Islet-<版本>-x64-portable.exe`：放到任意文件夹双击运行；数据仍然保存在 `%APPDATA%\com.saudade.mclauncher`。
 
 如果出现「Windows 已保护你的电脑」，点「更多信息 → 仍要运行」。
 
@@ -27,16 +27,16 @@ shasum -a 256 Islet-0.4.0-arm64.dmg                        # macOS / Linux
 
 ## macOS
 
-系统要求：macOS 12 或更新，Apple 芯片。
+系统要求：macOS 12 或更新。Apple 芯片下载 `arm64`，Intel 芯片下载 `x86_64`。
 
-1. 打开 `Islet-<版本>-arm64.dmg`，把「Islet」拖进「应用程序」。
+1. 打开 `Islet-<版本>-arm64.dmg`（Intel 为 `Islet-<版本>-x86_64.dmg`），把「Islet」拖进「应用程序」。
 2. 第一次打开如果提示「无法验证开发者」：在「应用程序」里右键点它 →「打开」→「打开」。较新的 macOS 上需要到「系统设置 → 隐私与安全性」底部点「仍要打开」。
 
 从「应用程序」运行时可以在启动器里直接更新。
 
 ## Linux（实验性）
 
-需要 x86_64 系统和 WebKitGTK 4.1（Ubuntu 22.04 / Debian 12 及更新的发行版自带）。
+需要 x86_64 或 ARM64 系统和 WebKitGTK 4.1（Ubuntu 22.04 / Debian 12 及更新的发行版自带）。ARM64 请把下面文件名里的 `x86_64` 换成 `aarch64`、`amd64` 换成 `arm64`。
 
 - **AppImage**：`chmod +x Islet-<版本>-x86_64.AppImage` 后运行。以 AppImage 运行时可以在启动器里直接更新。
 - **deb**：`sudo apt install ./Islet-<版本>-amd64.deb`。

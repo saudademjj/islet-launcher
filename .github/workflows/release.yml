@@ -14,7 +14,15 @@ jobs:
   linux:
     uses: ./.github/workflows/linux.yml
   macos:
-    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -32,7 +40,7 @@ jobs:
           ./scripts/package-macos.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: Islet-macOS-arm64
+          name: Islet-macOS-${{ matrix.arch }}
           path: build/*.dmg
           if-no-files-found: error
   publish:
@@ -62,7 +70,10 @@ jobs:
             --page "https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" \
             --base-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/" \
             "windows-x86_64=release/Islet-$version-x64-setup.exe" \
+            "windows-aarch64=release/Islet-$version-arm64-setup.exe" \
             "linux-x86_64=release/Islet-$version-x86_64.AppImage" \
-            "macos-aarch64=release/Islet-$version-arm64.dmg"
+            "linux-aarch64=release/Islet-$version-aarch64.AppImage" \
+            "macos-aarch64=release/Islet-$version-arm64.dmg" \
+            "macos-x86_64=release/Islet-$version-x86_64.dmg"
           (cd release && sha256sum -- * > SHA256SUMS.txt)
           gh release create "$TAG" release/* --draft --title "Islet $version" --generate-notes
