@@ -392,6 +392,8 @@ const emptySettings: Settings = {
   language: "system",
   proxyMode: "system",
   proxyUrl: "",
+  autoBackup: true,
+  autoBackupKeep: 5,
 };
 
 let toastSeq = 0;

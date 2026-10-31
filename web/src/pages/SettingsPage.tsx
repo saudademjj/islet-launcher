@@ -360,6 +360,30 @@ export function SettingsPage() {
             </div>
             <div className="setting-row">
               <div className="col">
+                <span className="setting-name">{t("游戏退出后自动备份存档", "Back up saves after playing")}</span>
+                <span className="field-hint">
+                  {t(
+                    `只备份这次玩过的存档，不用等；每个存档保留最近 ${s.settings.autoBackupKeep} 份自动备份，手动备份不会被删`,
+                    `Only the saves you just played, in the background. The newest ${s.settings.autoBackupKeep} automatic backups of each save are kept; ones you make yourself never go`,
+                  )}
+                </span>
+              </div>
+              {s.settings.autoBackup && (
+                <Presets
+                  values={[3, 5, 10, 20]}
+                  current={s.settings.autoBackupKeep}
+                  label={(n) => t(`${n} 份`, `${n}`)}
+                  onPick={(autoBackupKeep) => void s.mutate("update_settings", { settings: { ...s.settings, autoBackupKeep } }, t(`每个存档保留 ${autoBackupKeep} 份自动备份`, `Keeping ${autoBackupKeep} automatic backups per save`))}
+                />
+              )}
+              <Switch
+                label={t("游戏退出后自动备份存档", "Back up saves after playing")}
+                checked={s.settings.autoBackup}
+                onChange={(autoBackup) => void s.mutate("update_settings", { settings: { ...s.settings, autoBackup } }, autoBackup ? t("游戏退出后会自动备份玩过的存档", "Saves you play will be backed up after the game exits") : t("不再自动备份存档", "Saves are no longer backed up automatically"))}
+              />
+            </div>
+            <div className="setting-row">
+              <div className="col">
                 <span className="setting-name">{t("游戏启动后隐藏启动器", "Hide the launcher while playing")}</span>
                 <span className="field-hint">{t("游戏窗口出现后才收起，可从托盘、任务栏或程序坞恢复；游戏退出后自动回来", "Steps aside once the game's window is up. Restore it from the tray, taskbar or Dock; it returns when the game exits")}</span>
               </div>

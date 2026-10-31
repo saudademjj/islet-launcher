@@ -1,8 +1,9 @@
 //! Removing and moving things inside a world. Mods, packs, saves and
 //! datapacks go to the launcher's recycle folder rather than being deleted;
 //! only emptying the recycle bin deletes for good. Single saves can be backed
-//! up, restored, imported, exported and renamed; the launcher's shared
-//! caches can be measured and cleaned.
+//! up (by hand, or automatically after the game exits), restored, imported,
+//! exported and renamed; the launcher's shared caches can be measured and
+//! cleaned.
 use std::{
     collections::HashSet,
     fs,
@@ -321,6 +322,9 @@ pub struct SaveBackup {
     pub path: String,
     pub bytes: u64,
     pub created_ms: i64,
+    /// Made after a game session rather than by the player; only these are
+    /// rotated out.
+    pub auto: bool,
 }
 
 fn save_backup_dir(paths: &AppPaths, id: &str, folder: &str) -> PathBuf {
@@ -363,16 +367,67 @@ pub fn save_backups(paths: &AppPaths, id: &str, folder: &str) -> AppResult<Vec<S
         .flatten()
         .filter_map(|entry| {
             let name = entry.file_name().to_string_lossy().into_owned();
-            let created_ms = name.strip_suffix(".zip")?.parse().ok()?;
+            let stem = name.strip_suffix(".zip")?;
+            let (stem, auto) = match stem.strip_suffix(".auto") {
+                Some(stem) => (stem, true),
+                None => (stem, false),
+            };
             Some(SaveBackup {
                 path: entry.path().to_string_lossy().into_owned(),
                 bytes: entry.metadata().ok()?.len(),
-                created_ms,
+                created_ms: stem.parse().ok()?,
+                auto,
             })
         })
         .collect();
     list.sort_by(|a, b| b.created_ms.cmp(&a.created_ms));
     Ok(list)
+}
+
+/// Backs up every save the game wrote to since `since_ms` (the session's
+/// start), then keeps only the newest `keep` automatic backups of each.
+/// Backing up after the session costs the player no waiting, and the
+/// previous session's backup is the state this one started from.
+pub fn auto_backup_saves(paths: &AppPaths, id: &str, since_ms: i64, keep: usize) -> AppResult<Vec<String>> {
+    AppPaths::validate_instance_id(id)?;
+    let saves = paths.instance_game_dir(id).join("saves");
+    let Ok(entries) = fs::read_dir(&saves) else {
+        return Ok(Vec::new());
+    };
+    let mut done = Vec::new();
+    for entry in entries.flatten() {
+        let folder = entry.file_name().to_string_lossy().into_owned();
+        if folder.starts_with('.') || !entry.path().join("level.dat").is_file() {
+            continue;
+        }
+        if !written_since(&entry.path().join("level.dat"), since_ms) {
+            continue;
+        }
+        let output = save_backup_dir(paths, id, &folder).join(format!("{}.auto.zip", now_millis()));
+        zip_world(&entry.path(), &folder, &output)?;
+        prune_auto_backups(paths, id, &folder, keep)?;
+        done.push(folder);
+    }
+    Ok(done)
+}
+
+fn written_since(file: &Path, since_ms: i64) -> bool {
+    let Ok(modified) = fs::metadata(file).and_then(|m| m.modified()) else {
+        return false;
+    };
+    modified
+        .duration_since(std::time::UNIX_EPOCH)
+        .is_ok_and(|age| age.as_millis() as i64 >= since_ms)
+}
+
+/// Deletes all but the newest `keep` automatic backups of one save. Backups
+/// the player made by hand are never touched.
+fn prune_auto_backups(paths: &AppPaths, id: &str, folder: &str, keep: usize) -> AppResult<()> {
+    let autos: Vec<SaveBackup> = save_backups(paths, id, folder)?.into_iter().filter(|b| b.auto).collect();
+    for old in autos.iter().skip(keep.max(1)) {
+        fs::remove_file(&old.path)?;
+    }
+    Ok(())
 }
 
 /// Exports one save as a zip the game and other launchers can import.
@@ -480,8 +535,8 @@ pub fn restore_save(paths: &AppPaths, id: &str, folder: &str, backup: &Path) -> 
 // ---------- recycle bin ----------
 
 /// Empties the recycle bin: one recycled world, or everything (worlds,
-/// removed mods, packs, saves and screenshots). This is the one place the
-/// launcher deletes for good.
+/// removed mods, packs, saves and screenshots). This and rotating automatic
+/// save backups are the only places the launcher deletes for good.
 pub fn purge_recycle(paths: &AppPaths, only: Option<&str>) -> AppResult<()> {
     let root = recycle_root(paths);
     match only {
@@ -736,6 +791,30 @@ mod tests {
         let again = import_save(&paths, &instance.id, &exported).unwrap();
         assert_eq!(again, "Base (2)");
         assert!(paths.instance_game_dir(&instance.id).join("saves/Base (2)/region/r.0.0.mca").is_file());
+    }
+
+    #[test]
+    fn played_saves_are_backed_up_and_only_automatic_backups_rotate() {
+        let (_dir, paths, instance) = world();
+        let saves = paths.instance_game_dir(&instance.id).join("saves");
+        for name in ["played", "untouched"] {
+            fs::create_dir_all(saves.join(name)).unwrap();
+            fs::write(saves.join(name).join("level.dat"), level_dat(name)).unwrap();
+        }
+        let old = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
+        fs::File::options().write(true).open(saves.join("untouched/level.dat")).unwrap().set_modified(old).unwrap();
+        let session = now_millis() - 60_000;
+
+        backup_save(&paths, &instance.id, "played").unwrap();
+        for round in 0..4 {
+            let done = auto_backup_saves(&paths, &instance.id, session, 2).unwrap();
+            assert_eq!(done, vec!["played".to_string()], "round {round}");
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+        let backups = save_backups(&paths, &instance.id, "played").unwrap();
+        assert_eq!(backups.iter().filter(|b| b.auto).count(), 2);
+        assert_eq!(backups.iter().filter(|b| !b.auto).count(), 1);
+        assert!(save_backups(&paths, &instance.id, "untouched").unwrap().is_empty());
     }
 
     #[test]

@@ -29,6 +29,10 @@ export interface Settings {
   language: "system" | "zh" | "en";
   proxyMode: "system" | "none" | "custom";
   proxyUrl: string;
+  /** Back up each save the game changed, after it exits. */
+  autoBackup: boolean;
+  /** Automatic backups kept per save. */
+  autoBackupKeep: number;
 }
 
 export type AccountProvider = "microsoft" | "offline" | "yggdrasil";
@@ -485,6 +489,8 @@ export interface SaveBackup {
   path: string;
   bytes: number;
   createdMs: number;
+  /** Made after a game session; only these rotate out. */
+  auto: boolean;
 }
 
 export interface JavaUsage {

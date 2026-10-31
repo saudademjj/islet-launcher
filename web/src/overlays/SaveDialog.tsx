@@ -208,7 +208,7 @@ export function SaveDialog({ id, folder }: { id: string; folder: string }) {
               {backups && backups.length > 0 && <span className="mono faint">{backups.length}{t(" 个", " more")}</span>}
             </div>
             {backups == null ? null : backups.length === 0 ? (
-              <div className="saves-empty muted">{t("还没有备份。点上面的「备份」把这个存档打包保存一份。", "No backups yet. Use Back up above to keep a copy of this save.")}</div>
+              <div className="saves-empty muted">{t("还没有备份。点上面的「备份」把这个存档打包保存一份；打开「设置 → 游戏退出后自动备份存档」后，每次玩完会自动备份。", "No backups yet. Use Back up above to keep a copy of this save, or turn on Settings → Back up saves after playing.")}</div>
             ) : (
               <div className="list">
                 {backups.map((backup) => (
@@ -216,8 +216,9 @@ export function SaveDialog({ id, folder }: { id: string; folder: string }) {
                     <Icon name="archive" size={15} className="faint" />
                     <div className="col" style={{ flex: 1, minWidth: 0, gap: 2 }}>
                       <span style={{ fontWeight: 600 }}>{new Date(backup.createdMs).toLocaleString(isEnglish ? "en-US" : "zh-CN", { hour12: false })}</span>
-                      <span className="faint mono" style={{ fontSize: "var(--text-xs)" }}>
-                        {formatBytes(backup.bytes)}
+                      <span className="faint" style={{ fontSize: "var(--text-xs)" }}>
+                        <span className="mono">{formatBytes(backup.bytes)}</span>
+                        {backup.auto ? t(" · 玩完自动备份", " · after playing") : t(" · 手动备份", " · by hand")}
                       </span>
                     </div>
                     <Button

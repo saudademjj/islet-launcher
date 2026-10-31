@@ -2088,6 +2088,7 @@ impl AppServices {
         let stderr = child.stderr.take();
 
         let started = std::time::Instant::now();
+        let started_ms = crate::core::util::now_millis();
         lock(&self.launches).insert(instance_id.to_string(), pid);
         if let Err(err) = self.instances.mark_launched(instance_id) {
             tracing::warn!(instance = %instance_id, error = %err, "failed to update last launch time");
@@ -2129,6 +2130,16 @@ impl AppServices {
                 success: code == Some(0),
             });
             this.send(UiEvent::AccountsChanged(this.accounts.list()));
+            let settings = this.settings.get();
+            if settings.auto_backup {
+                let (paths, id) = (this.paths.clone(), id_for_hook.clone());
+                let keep = settings.auto_backup_keep as usize;
+                match tokio::task::spawn_blocking(move || manage::auto_backup_saves(&paths, &id, started_ms, keep)).await {
+                    Ok(Ok(saves)) if !saves.is_empty() => tracing::info!(instance = %id_for_hook, ?saves, "backed up played saves"),
+                    Ok(Err(error)) => tracing::warn!(instance = %id_for_hook, %error, "automatic save backup failed"),
+                    _ => {}
+                }
+            }
             // The player's command after the game; it can't undo anything,
             // so a failure is only written to the log.
             if !post_exit.is_empty() {

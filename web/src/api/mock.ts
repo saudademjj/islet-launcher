@@ -47,6 +47,8 @@ const settings: Settings = {
   })(),
   proxyMode: "system",
   proxyUrl: "",
+  autoBackup: true,
+  autoBackupKeep: 5,
 };
 
 let accounts: Account[] = [
@@ -603,7 +605,10 @@ const commands: Record<string, (args: any) => unknown> = {
     { name: "VanillaTweaks.zip", bytes: 84_000, folder: false, description: "原版增强：更多合成与小功能" },
     { name: "coords-hud", bytes: 12_000, folder: true, description: null },
   ],
-  save_backups: () => [{ path: "/demo/backups/1.zip", bytes: 46_000_000, createdMs: now - 26 * HOUR }],
+  save_backups: () => [
+    { path: "/demo/backups/2.auto.zip", bytes: 47_000_000, createdMs: now - 2 * HOUR, auto: true },
+    { path: "/demo/backups/1.zip", bytes: 46_000_000, createdMs: now - 26 * HOUR, auto: false },
+  ],
   storage_usage: () => ({
     root: "/Users/demo/Library/Application Support/com.saudade.mclauncher",
     worlds: 3_400_000_000,

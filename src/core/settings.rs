@@ -68,6 +68,10 @@ pub struct Settings {
     pub proxy_mode: ProxyMode,
     /// The proxy for `ProxyMode::Custom`, e.g. `http://127.0.0.1:7890`.
     pub proxy_url: String,
+    /// Back up each save the game changed, after the game exits.
+    pub auto_backup: bool,
+    /// Automatic backups kept per save; older ones are deleted.
+    pub auto_backup_keep: u32,
 }
 
 fn legacy_schema_version() -> u32 {
@@ -104,6 +108,8 @@ impl Default for Settings {
             language: "system".into(),
             proxy_mode: ProxyMode::System,
             proxy_url: String::new(),
+            auto_backup: true,
+            auto_backup_keep: 5,
         }
     }
 }
@@ -137,6 +143,7 @@ impl Settings {
             .max_concurrent_downloads
             .clamp(1, MAX_CONCURRENT_DOWNLOADS);
         self.memory_mb = self.memory_mb.clamp(512, 32_768);
+        self.auto_backup_keep = self.auto_backup_keep.clamp(1, 50);
         self.java_path = self
             .java_path
             .as_ref()
