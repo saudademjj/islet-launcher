@@ -2362,10 +2362,11 @@ fn analysis_log_text(path: &Path, max_bytes: u64) -> AppResult<Option<(String, i
 }
 
 /// The `[Islet] ... memory=...` line written at the start of each run.
+/// Logs from before the rename start with `[MC Launcher]`.
 fn launcher_header(head: &str) -> Option<&str> {
     head.lines().find(|line| {
         let lower = line.to_ascii_lowercase();
-        lower.starts_with("[mc launcher]") && lower.contains("memory=")
+        (lower.starts_with("[islet]") || lower.starts_with("[mc launcher]")) && lower.contains("memory=")
     })
 }
 
@@ -2795,6 +2796,15 @@ mod tests {
             2
         );
         assert_eq!(instance_mod_count(&paths, "missing"), 0);
+    }
+
+    #[test]
+    fn launcher_header_reads_logs_from_before_the_rename() {
+        let old = "[MC Launcher] version=1.21 memory=2560MB java=21\n[12:00:00] Booting";
+        assert_eq!(launcher_header(old), old.lines().next());
+        let new = "[Islet] version=1.21 memory=2560MB java=21\n";
+        assert_eq!(launcher_header(new), new.lines().next());
+        assert_eq!(launcher_header("[Islet] post-exit: x (exit 0)\n"), None);
     }
 
     #[test]
