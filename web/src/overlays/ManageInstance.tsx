@@ -17,7 +17,7 @@ import { Button, Empty, Field, Identicon, Input, Notice, Segmented, Switch, Tabs
 import { formatBytes, formatCount, formatPlayTime, formatRelative, formatReleaseDate, loaderLabel, updateName, versionTypeLabel } from "../lib/format";
 import { useModIcons, usePackInsights } from "../lib/contentIcons";
 import { FILTER_GROUPS, SORTS, type FilterChoice, type SearchSort } from "../lib/contentFilters";
-import { findChineseMods, findModName, hasChinese, slugOfFile, type ModName } from "../lib/modNames";
+import { findChineseMods, findModName, hasChinese, slugOfFile, zhDescription, type ModName } from "../lib/modNames";
 import { useFormGuard } from "../lib/formGuard";
 import { normal } from "../lib/motion";
 import { SMALL_PX } from "../lib/pixelScale";
@@ -966,7 +966,7 @@ function ModDetail({ row, needs, neededBy, onFind, onOpenUrl }: {
   const STATE = { on: "", off: t(" · 已禁用", " · disabled"), missing: t(" · 没装", " · not installed") };
   return (
     <div className="mod-detail">
-      <p className="mod-detail-text selectable">{meta?.description || t("这个模组没有写简介。", "This mod has no description.")}</p>
+      <p className="mod-detail-text selectable">{(!isEnglish && zhDescription(row.named?.slug ?? info?.slug)) || meta?.description || t("这个模组没有写简介。", "This mod has no description.")}</p>
       <dl className="mod-facts">
         {(info?.versionNumber ?? meta?.version) && (
           <>
@@ -1673,7 +1673,7 @@ function BrowseTab({ instance, busy }: { instance: Instance; busy: boolean }) {
                           {!isEnglish && named && named.zh !== hit.title && <span className="mod-zh"> · {named.zh}</span>}
                         </span>
                         <span className="muted truncate" style={{ fontSize: "var(--text-xs)" }}>
-                          {hit.description}
+                          {(kind === "mod" && !isEnglish && zhDescription(named?.slug ?? hit.slug)) || hit.description}
                         </span>
                         {tags.length > 0 && (
                           <span className="browse-tags">

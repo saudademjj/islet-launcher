@@ -2,6 +2,8 @@
 // in here when its Modrinth slug is known, so lookups never point at a
 // similarly named mod. Aliases are extra search terms, not translations.
 
+import { MOD_DESCRIPTIONS, SHIPPED_NAMES } from "./modDescriptions";
+
 export interface ModName {
   /** Modrinth project slug. */
   slug: string;
@@ -10,7 +12,7 @@ export interface ModName {
   aliases?: string[];
 }
 
-export const MOD_NAMES: ModName[] = [
+const CURATED: ModName[] = [
   // Performance and rendering
   { slug: "sodium", en: "Sodium", zh: "钠", aliases: ["钠优化"] },
   { slug: "lithium", en: "Lithium", zh: "锂", aliases: ["锂优化"] },
@@ -278,6 +280,13 @@ export const MOD_NAMES: ModName[] = [
   { slug: "kubejs", en: "KubeJS", zh: "KubeJS 脚本" },
   { slug: "crafttweaker", en: "CraftTweaker", zh: "CraftTweaker 配方脚本" },
 ];
+
+export const MOD_NAMES: ModName[] = [...CURATED, ...SHIPPED_NAMES.filter((mod) => !CURATED.some((known) => known.slug === mod.slug))];
+
+/** A one-line Chinese description of a Modrinth project, when there is one. */
+export function zhDescription(slug?: string | null): string | undefined {
+  return slug ? MOD_DESCRIPTIONS[slug] : undefined;
+}
 
 const CHINESE = /[㐀-䶿一-鿿豈-﫿]/;
 
