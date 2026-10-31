@@ -83,7 +83,7 @@ export function TunnelDialog({ id }: { id: string }) {
   );
   return (
     <Modal title={t("联机隧道", "Multiplayer tunnel")} subtitle={t("通过你自己的 SSH 主机，把局域网游戏开放给朋友", "Share a LAN game with friends through your own SSH host")} onClose={close} footer={footer}>
-      <div className="col" style={{ gap: 14 }}>
+      <div className="col gap-16">
         <span className="muted" style={{ fontSize: "var(--text-sm)" }}>
           {t("先在游戏里选择「对局域网开放」，把游戏显示的端口填在下面。系统 SSH 需要已配好这台主机的密钥和 known_hosts。", "First choose \"Open to LAN\" in the game and enter the port it shows below. System SSH must already have a key and known_hosts entry for this host.")}
         </span>

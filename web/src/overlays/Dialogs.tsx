@@ -179,8 +179,8 @@ export function AddOffline() {
       }
     >
       <form
-        className="col"
-        style={{ gap: 12 }}
+        className="col gap-12"
+        
         onSubmit={(e) => {
           e.preventDefault();
           void add();
@@ -373,7 +373,7 @@ export function LoginOverlay() {
   return (
     <Modal
       title={!auth ? t("微软账号登录", "Microsoft sign-in") : device ? t("使用设备代码登录", "Sign in with a device code") : t("微软账号登录", "Microsoft sign-in")}
-      icon={<span className="login-mark"><Icon name="shield" size={18} /></span>}
+      icon={<span className="login-mark"><Icon name="shield" /></span>}
       onClose={s.cancel}
       footer={
         <>
@@ -391,7 +391,7 @@ export function LoginOverlay() {
           <span className="spinner" />{t(" 正在向微软请求登录信息…", " Asking Microsoft to start sign-in…")}
         </div>
       ) : (
-        <div className="col" style={{ gap: 14 }}>
+        <div className="col gap-16">
           <p className="muted" style={{ margin: 0 }}>
             {device ? t("打开微软登录页，输入下面的代码，然后按提示登录。", "Open Microsoft's sign-in page, enter the code below and follow the steps.") : t("已在默认浏览器中打开微软登录页。如果没有自动打开，可以手动打开或复制链接。", "Microsoft's sign-in page opened in your default browser. If it didn't, open or copy the link yourself.")}
           </p>
@@ -417,7 +417,7 @@ export function LoginOverlay() {
               </span>
             ) : null}
           </div>
-          <div className="row" style={{ gap: 10 }}>
+          <div className="row gap-12">
             <Status tone="warn" pulse>
               {t("等待中", "Waiting")}
             </Status>

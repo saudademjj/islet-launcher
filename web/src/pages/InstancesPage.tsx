@@ -123,7 +123,7 @@ export function InstancesPage() {
                     </button>
                     {starred > 0 && (
                       <button type="button" className="filter-chip" aria-pressed={shelf.kind === "favorites"} onClick={() => setShelf({ kind: "favorites" })}>
-                        <Icon name="star" size={11} /> {t("收藏", "Starred")} <span className="faint">{starred}</span>
+                        <Icon name="star" /> {t("收藏", "Starred")} <span className="faint">{starred}</span>
                       </button>
                     )}
                     {groups.map((name) => (
@@ -173,7 +173,7 @@ export function InstancesPage() {
                             title={v === "grid" ? t("卡片", "Cards") : t("列表", "List")}
                             onClick={() => setView(v)}
                           >
-                            <Icon name={v === "grid" ? "grid" : "rows"} size={14} />
+                            <Icon name={v === "grid" ? "grid" : "rows"} />
                           </button>
                         ))}
                       </div>
@@ -190,7 +190,7 @@ export function InstancesPage() {
                 {!q && kind === "all" && shelf.kind === "all" && (
                   <motion.button layout="position" type="button" className="world-new" onClick={s.openCreate}>
                     <span className="world-new-icon">
-                      <Icon name="plus" size={20} />
+                      <Icon name="plus" />
                     </span>
                     <span className="world-new-title">{t("新建世界", "New world")}</span>
                     <span className="faint">{t("选择版本和加载器", "Choose version and loader")}</span>
@@ -221,7 +221,7 @@ function PlayStats({ instances }: { instances: Instance[] }) {
           {t("共 ", "")}{formatPlayTime(total)} · {played.length}{t(" 个世界", " worlds")}
         </span>
       </div>
-      <div className="col" style={{ gap: 8 }}>
+      <div className="col gap-8">
         {played.slice(0, 6).map((instance) => (
           <div key={instance.id} className="play-row">
             <span className="truncate play-name">{instance.name}</span>

@@ -130,7 +130,7 @@ function ToastItem({ toast }: { toast: Toast }) {
         </button>
       )}
       <button type="button" className="toast-close" aria-label={t("关闭", "Close")} title={t("关闭", "Close")} onClick={() => dismiss(toast.id)}>
-        <Icon name="close" size={13} />
+        <Icon name="close" />
       </button>
     </motion.div>
   );

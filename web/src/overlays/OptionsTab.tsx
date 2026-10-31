@@ -64,7 +64,7 @@ function ChunkView({ distance }: { distance: number }) {
 function Row({ label, hint, value, children }: { label: string; hint?: string; value?: ReactNode; children: ReactNode }) {
   return (
     <div className="opt-row">
-      <div className="col" style={{ gap: 2, minWidth: 0 }}>
+      <div className="col gap-2">
         <span className="opt-name">{label}</span>
         {hint && <span className="opt-hint">{hint}</span>}
       </div>
@@ -160,7 +160,7 @@ export function OptionsTab({ instance, busy }: { instance: Instance; busy: boole
         <div className="opt-group">
           <div className="opt-group-title">{t("画面", "Video")}</div>
           <Row label={t("渲染距离", "Render distance")} hint={t("越远越吃内存和显卡；低配电脑建议 8 以内", "Farther uses more memory and GPU; keep it at 8 or less on modest computers")} value={t(`${form.renderDistance} 区块`, `${form.renderDistance} chunks`)}>
-            <div className="row" style={{ gap: 14, width: "100%" }}>
+            <div className="row gap-16" style={{ width: "100%" }}>
               <Slider label={t("渲染距离", "Render distance")} min={2} max={32} value={form.renderDistance} disabled={busy} onChange={(renderDistance) => set({ renderDistance })} />
               <ChunkView distance={form.renderDistance} />
             </div>

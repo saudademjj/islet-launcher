@@ -92,6 +92,41 @@ h1 {
   flex: 1;
 }
 
+/* Spacing between children, only in steps of the spacing scale. */
+.gap-2 { gap: 2px; }
+.gap-4 { gap: 4px; }
+.gap-6 { gap: 6px; }
+.gap-8 { gap: 8px; }
+.gap-12 { gap: 12px; }
+.gap-16 { gap: 16px; }
+.gap-20 { gap: 20px; }
+.gap-24 { gap: 24px; }
+
+.fill {
+  flex: 1;
+  min-width: 0;
+}
+
+.min-0 {
+  min-width: 0;
+}
+
+.wrap {
+  flex-wrap: wrap;
+}
+
+.items-start {
+  align-items: flex-start;
+}
+
+.items-baseline {
+  align-items: baseline;
+}
+
+.justify-end {
+  justify-content: flex-end;
+}
+
 .dot {
   width: 4px;
   height: 4px;
@@ -312,7 +347,7 @@ h1 {
   isolation: isolate;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 
 .nav-item {
@@ -321,7 +356,7 @@ h1 {
   align-items: center;
   gap: 12px;
   height: 40px;
-  padding: 0 12px 0 14px;
+  padding: 0 12px 0 16px;
   border: 0;
   border-radius: var(--radius-lg);
   background: transparent;
@@ -341,7 +376,7 @@ h1 {
   font-weight: 650;
 }
 
-.nav-item[aria-current="page"] .pixel-icon {
+.nav-item[aria-current="page"] .icon {
   color: var(--on-dark-accent);
 }
 
@@ -371,8 +406,8 @@ h1 {
 .sidebar-account {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 10px;
+  gap: 12px;
+  padding: 12px;
   border: 0;
   border-radius: var(--radius-xl);
   background: var(--frame-2);
@@ -422,13 +457,15 @@ h1 {
   min-height: 0;
 }
 
+/* The toolbar spans the window so all of it drags, but its actions end
+   where the page measure (below) does. */
 .toolbar {
   height: var(--toolbar-h);
   flex: none;
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 8px 28px 0 32px;
+  gap: 16px;
+  padding: 8px max(32px, calc(100% - 1088px)) 0 32px;
 }
 
 .toolbar-heading {
@@ -457,19 +494,54 @@ h1 {
   min-height: 0;
 }
 
+/* The page grid. Every page has one measure, 1120px at most, so the right
+   edge stays put from page to page; the gutter is 24px and sections are
+   32px apart. A page with secondary material splits 2:1 into a main column
+   and an aside, stacking on narrower windows. */
 .page {
-  padding: 10px 32px 40px;
+  padding: 12px 32px 48px;
   max-width: 1120px;
 }
 
-.page.narrow {
-  max-width: 860px;
+.page-split {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.page-main,
+.page-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+.page-split > .page-main > *,
+.page-split > .page-aside > * {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+@media (max-width: 1199px) {
+  .page-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Small print under a section: the same 12px step below its content. */
+.fine-print {
+  margin-top: 12px;
+  font-size: var(--text-xs);
+  line-height: 1.7;
+  color: var(--faint);
 }
 
 .statusbar {
   display: flex;
   align-items: center;
-  padding: 0 8px 0 10px;
+  padding: 0 8px 0 12px;
   font-size: var(--text-xs);
   color: var(--on-dark-muted);
   overflow: hidden;
@@ -478,9 +550,9 @@ h1 {
 .status-seg {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   height: 100%;
-  padding: 0 11px;
+  padding: 0 12px;
   white-space: nowrap;
 }
 
@@ -528,6 +600,11 @@ button.status-seg:hover {
   display: inline-block;
 }
 
+/* The second tone of a pixel icon: its own colour, lighter. */
+.icon-tone {
+  opacity: 0.4;
+}
+
 .kbd {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -542,9 +619,9 @@ button.status-seg:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 8px;
   height: 32px;
-  padding: 0 13px;
+  padding: 0 12px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-strong);
   background: var(--surface);
@@ -571,9 +648,9 @@ button.status-seg:hover {
 
 .btn-sm {
   height: 28px;
-  padding: 0 10px;
+  padding: 0 12px;
   font-size: var(--text-xs);
-  gap: 5px;
+  gap: 6px;
   border-radius: var(--radius);
 }
 
@@ -592,8 +669,8 @@ button.status-seg:hover {
 
 .btn-xl {
   height: 52px;
-  padding: 0 28px;
-  gap: 10px;
+  padding: 0 32px;
+  gap: 12px;
   font-size: var(--text-md);
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -713,7 +790,7 @@ button.status-seg:hover {
 .input {
   width: 100%;
   height: 34px;
-  padding: 0 11px;
+  padding: 0 12px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-strong);
   background: var(--surface);
@@ -762,13 +839,13 @@ button.status-seg:hover {
 }
 
 .input-wrap .input {
-  padding-left: 33px;
+  padding-left: 32px;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 8px;
 }
 
 .field-label {
@@ -795,7 +872,7 @@ button.status-seg:hover {
   position: relative;
   isolation: isolate;
   display: inline-flex;
-  padding: 3px;
+  padding: 4px;
   border-radius: var(--radius-lg);
   background: var(--surface-3);
 }
@@ -883,7 +960,7 @@ button.status-seg:hover {
   display: inline-flex;
   align-items: center;
   height: 20px;
-  padding: 0 7px;
+  padding: 0 8px;
   border-radius: var(--radius);
   background: var(--surface-3);
   font-size: var(--text-xs);
@@ -895,9 +972,9 @@ button.status-seg:hover {
 .pill-accent {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   height: 26px;
-  padding: 0 11px;
+  padding: 0 12px;
   border-radius: var(--radius-xl);
   background: var(--accent-soft-2);
   color: var(--accent-text);
@@ -949,9 +1026,28 @@ button.status-seg:hover {
 .card-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px 18px;
+  gap: 12px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--border);
+}
+
+.card-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: var(--radius-lg);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.card-heading {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .card-title {
@@ -959,14 +1055,27 @@ button.status-seg:hover {
   font-weight: 700;
 }
 
+.card-meta {
+  margin-left: 8px;
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--faint);
+}
+
+.card-text {
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--faint);
+}
+
 .card-body {
-  padding: 18px 20px 20px;
+  padding: 20px 20px 20px;
 }
 
 .section-title {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   margin: 0 0 12px;
   font-size: var(--text-sm);
   font-weight: 700;
@@ -1002,7 +1111,7 @@ button.status-seg:hover {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 12px;
-  padding: 12px 14px 12px 12px;
+  padding: 12px 16px 12px 12px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
   background: var(--surface);
@@ -1020,7 +1129,7 @@ button.status-seg:hover {
   grid-column: 2;
   grid-row: 1;
   min-height: 30px;
-  padding: 5px 0;
+  padding: 6px 0;
   font-weight: 650;
   line-height: 20px;
 }
@@ -1060,7 +1169,7 @@ button.status-seg:hover {
 .notice-detail pre {
   max-height: 120px;
   margin: 6px 0 0;
-  padding: 8px 10px;
+  padding: 8px 12px;
   overflow: auto;
   border-radius: var(--radius);
   background: var(--surface-2);
@@ -1099,7 +1208,7 @@ button.status-seg:hover {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 10px;
+  gap: 12px;
   padding: 56px 24px;
   color: var(--muted);
 }
@@ -1107,8 +1216,8 @@ button.status-seg:hover {
 .empty-icon {
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   margin-bottom: 4px;
   border-radius: var(--radius-xl);
   background: var(--accent-soft);
@@ -1196,7 +1305,7 @@ button.status-seg:hover {
 .tab {
   position: relative;
   height: 40px;
-  padding: 0 10px;
+  padding: 0 12px;
   border: 0;
   background: transparent;
   color: var(--muted);
@@ -1235,7 +1344,7 @@ button.status-seg:hover {
   align-items: center;
   gap: 12px;
   min-height: 46px;
-  padding: 8px 14px;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -1271,10 +1380,10 @@ button.status-seg:hover {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
   min-height: 36px;
-  padding: 6px 11px;
+  padding: 6px 12px;
   border: 0;
   border-bottom: 1px solid var(--border);
   background: transparent;
@@ -1313,7 +1422,7 @@ button.status-seg:hover {
   flex: 1;
   height: 34px;
   line-height: 32px;
-  padding: 0 11px;
+  padding: 0 12px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--surface-2);
@@ -1366,7 +1475,7 @@ button.status-seg:hover {
 }
 
 .modal-body {
-  padding: 4px 22px 20px;
+  padding: 4px 24px 20px;
   overflow: auto;
   min-height: 0;
   line-height: 1.6;
@@ -1382,7 +1491,7 @@ button.status-seg:hover {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  padding: 12px 20px 14px;
+  padding: 12px 20px 16px;
   border-top: 1px solid var(--border);
   background: var(--surface-2);
 }
@@ -1402,9 +1511,9 @@ button.status-seg:hover {
 .toast {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
   max-width: 440px;
-  padding: 11px 8px 11px 14px;
+  padding: 12px 8px 12px 16px;
   border-radius: var(--radius-lg);
   background: var(--frame);
   color: var(--on-dark);
@@ -1468,7 +1577,7 @@ button.status-seg:hover {
   position: fixed;
   z-index: 95;
   max-width: 280px;
-  padding: 5px 8px;
+  padding: 6px 8px;
   border: 1px solid var(--frame-line);
   border-radius: var(--radius);
   background: var(--frame);
@@ -1529,7 +1638,7 @@ details[open] > summary::before {
 
 .console-line {
   height: 18px;
-  padding: 0 14px;
+  padding: 0 16px;
   white-space: pre;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1599,13 +1708,13 @@ html.reduce-motion *::after {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  padding: 24px 30px 112px;
+  padding: 24px 32px 112px;
 }
 
 .hero-eyebrow {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   font-size: var(--text-xs);
   font-weight: 600;
   letter-spacing: 0.1em;
@@ -1653,7 +1762,7 @@ html.reduce-motion *::after {
 .hero-head {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 20px;
   min-width: 0;
   max-width: calc(100% - 112px);
 }
@@ -1670,7 +1779,7 @@ html.reduce-motion *::after {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 9px;
+  gap: 8px;
   color: var(--on-dark-muted);
   font-size: var(--text-sm);
 }
@@ -1688,7 +1797,7 @@ html.reduce-motion *::after {
 .hero-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   margin-top: 2px;
 }
 
@@ -1705,7 +1814,7 @@ html.reduce-motion *::after {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 14px 16px 16px;
+  padding: 16px 16px 16px;
   border-radius: var(--radius-xl);
   background: var(--hero-2);
 }
@@ -1744,7 +1853,7 @@ html.reduce-motion *::after {
 .facts {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px;
   margin-top: 16px;
 }
 
@@ -1754,9 +1863,9 @@ html.reduce-motion *::after {
   flex-direction: column;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   min-height: 112px;
-  padding: 16px 18px;
+  padding: 16px 20px;
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   background: var(--surface);
@@ -1844,7 +1953,7 @@ html.reduce-motion *::after {
 .worlds {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 14px;
+  gap: 16px;
 }
 
 .world {
@@ -1893,7 +2002,7 @@ html.reduce-motion *::after {
   display: inline-flex;
   align-items: center;
   height: 22px;
-  padding: 0 9px;
+  padding: 0 8px;
   border-radius: var(--radius-lg);
   background: var(--accent);
   color: var(--accent-ink);
@@ -1904,8 +2013,8 @@ html.reduce-motion *::after {
 .world-body {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  padding: 12px 14px 14px;
+  gap: 6px;
+  padding: 12px 16px 16px;
 }
 
 .world-name {
@@ -1916,7 +2025,7 @@ html.reduce-motion *::after {
 .world-meta {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   min-width: 0;
   font-size: var(--text-xs);
   color: var(--faint);
@@ -1927,7 +2036,7 @@ html.reduce-motion *::after {
   align-items: center;
   gap: 4px;
   margin-top: 8px;
-  padding-top: 10px;
+  padding-top: 12px;
   border-top: 1px solid var(--border);
 }
 
@@ -1953,8 +2062,8 @@ html.reduce-motion *::after {
 .world-new-icon {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   margin-bottom: 4px;
   border-radius: var(--radius-xl);
   background: var(--accent-soft-2);
@@ -1969,7 +2078,7 @@ html.reduce-motion *::after {
 /* cards or list: the same well as the segmented controls beside it */
 .view-toggle {
   display: inline-flex;
-  padding: 3px;
+  padding: 4px;
   border-radius: var(--radius-lg);
   background: var(--surface-3);
 }
@@ -2029,9 +2138,9 @@ html.reduce-motion *::after {
     "avatar head actions"
     "avatar meta actions";
   align-items: center;
-  column-gap: 14px;
-  row-gap: 3px;
-  padding: 10px 12px 10px 14px;
+  column-gap: 16px;
+  row-gap: 4px;
+  padding: 12px 12px 12px 16px;
 }
 
 .as-list .world-avatar {
@@ -2078,14 +2187,14 @@ html.reduce-motion *::after {
 .starts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px;
 }
 
 .start {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 18px;
+  gap: 16px;
+  padding: 20px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-xl);
   background: var(--surface);
@@ -2110,8 +2219,8 @@ html.reduce-motion *::after {
 .start-icon {
   display: grid;
   place-items: center;
-  width: 46px;
-  height: 46px;
+  width: 40px;
+  height: 40px;
   flex: none;
   border-radius: var(--radius-xl);
   background: var(--accent-soft-2);
@@ -2184,8 +2293,8 @@ html.reduce-motion *::after {
 .account-card {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
+  gap: 16px;
+  padding: 16px 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   background: var(--surface);
@@ -2212,9 +2321,9 @@ html.reduce-motion *::after {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 5px;
+  gap: 6px;
   min-height: 158px;
-  padding: 18px;
+  padding: 20px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-xl);
   background: var(--surface);
@@ -2250,9 +2359,9 @@ html.reduce-motion *::after {
 .option-icon {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
-  margin-bottom: 10px;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 12px;
   border-radius: var(--radius-lg);
   background: var(--accent-soft);
   color: var(--accent-text);
@@ -2286,32 +2395,44 @@ html.reduce-motion *::after {
   color: var(--accent-text);
 }
 
+/* In an aside the ways to choose stack as rows: tile, words, arrow. */
+.page-aside .options {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.page-aside .option {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 16px;
+  column-gap: 12px;
+  row-gap: 2px;
+  align-items: center;
+  min-height: 0;
+  padding: 16px;
+}
+
+.page-aside .option-icon {
+  grid-row: span 2;
+  margin: 0;
+}
+
+.page-aside .option-text {
+  grid-column: 2;
+  font-size: var(--text-xs);
+}
+
+.page-aside .option-go {
+  position: static;
+  grid-column: 3;
+  grid-row: 1 / span 2;
+}
+
 /* ---------- settings ---------- */
 
 .settings {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  max-width: 860px;
-}
-
-.settings-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
-}
-
-.settings-icon {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-lg);
-  background: var(--accent-soft);
-  color: var(--accent-text);
-  flex: none;
+  gap: 24px;
 }
 
 .setting-row {
@@ -2336,7 +2457,7 @@ html.reduce-motion *::after {
 .presets {
   display: inline-flex;
   gap: 2px;
-  padding: 3px;
+  padding: 4px;
   border-radius: var(--radius-lg);
   background: var(--surface-3);
 }
@@ -2344,7 +2465,7 @@ html.reduce-motion *::after {
 .preset {
   height: 26px;
   min-width: 42px;
-  padding: 0 9px;
+  padding: 0 8px;
   border: 0;
   border-radius: var(--radius);
   background: transparent;
@@ -2367,7 +2488,7 @@ html.reduce-motion *::after {
 .themes {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 176px));
-  gap: 14px;
+  gap: 16px;
 }
 
 .theme {
@@ -2401,7 +2522,7 @@ html.reduce-motion *::after {
 .theme-label {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   font-size: var(--text-sm);
   color: var(--muted);
 }
@@ -2427,7 +2548,7 @@ html.reduce-motion *::after {
   gap: 4px;
   width: 22%;
   flex: none;
-  padding: 14px 6px 0;
+  padding: 16px 6px 0;
 }
 
 .tp-nav {
@@ -2545,8 +2666,8 @@ html.reduce-motion *::after {
 }
 
 .create-form {
-  gap: 18px;
-  padding: 18px 20px;
+  gap: 20px;
+  padding: 20px 20px;
   border-right: 1px solid var(--border);
   overflow: auto;
 }
@@ -2560,7 +2681,7 @@ html.reduce-motion *::after {
   position: relative;
   isolation: isolate;
   min-height: 124px;
-  padding: 14px 14px 48px;
+  padding: 16px 16px 48px;
   border-radius: var(--radius-xl);
   background: var(--hero);
   color: var(--on-dark);
@@ -2595,8 +2716,8 @@ html.reduce-motion *::after {
 }
 
 .create-versions {
-  gap: 10px;
-  padding: 18px 20px;
+  gap: 12px;
+  padding: 20px 20px;
   min-height: 0;
 }
 
@@ -2615,7 +2736,7 @@ html.reduce-motion *::after {
   gap: 12px;
   width: 100%;
   height: 100%;
-  padding: 0 14px;
+  padding: 0 16px;
   border: 0;
   border-bottom: 1px solid var(--border);
   background: transparent;
@@ -2663,13 +2784,13 @@ html.reduce-motion *::after {
 }
 
 .version-combo-note {
-  padding: 9px 14px;
+  padding: 8px 16px;
   color: var(--muted);
   font-size: var(--text-xs);
 }
 
 .badge-latest {
-  padding: 1px 7px;
+  padding: 1px 8px;
   border-radius: var(--radius);
   background: var(--accent);
   color: var(--accent-ink);
@@ -2682,7 +2803,7 @@ html.reduce-motion *::after {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 12px;
   height: 100%;
   color: var(--faint);
 }
@@ -2700,7 +2821,7 @@ html.reduce-motion *::after {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 22px;
+  padding: 8px 24px;
   font-size: var(--text-xs);
   color: var(--warn);
   background: var(--warn-soft);
@@ -2725,10 +2846,10 @@ html.reduce-motion *::after {
 .manage-scroll {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
   flex: 1;
   min-height: 0;
-  padding: 20px 22px;
+  padding: 20px 24px;
   overflow: auto;
 }
 
@@ -2742,7 +2863,7 @@ html.reduce-motion *::after {
 .manage-grid {
   display: grid;
   grid-template-columns: 1fr 200px;
-  gap: 14px;
+  gap: 16px;
 }
 
 .browse {
@@ -2782,8 +2903,8 @@ html.reduce-motion *::after {
 .logs-toolbar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
+  gap: 12px;
+  padding: 12px 16px;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border);
 }
@@ -2807,7 +2928,7 @@ html.reduce-motion *::after {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 16px 18px;
+  padding: 16px 20px;
   border-radius: var(--radius-xl);
   background: var(--hero);
   color: var(--on-dark);
@@ -2823,8 +2944,8 @@ html.reduce-motion *::after {
 .login-mark {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--radius-lg);
   background: var(--accent);
   color: var(--accent-ink);
@@ -2839,7 +2960,7 @@ html.reduce-motion *::after {
   }
   .option {
     min-height: 0;
-    padding-right: 44px;
+    padding-right: 48px;
   }
   .option-icon {
     margin-bottom: 4px;
@@ -2925,11 +3046,11 @@ html.reduce-motion *::after {
 
 /* ---------- small motions ---------- */
 
-.pixel-icon {
+.nav-item .icon {
   transition: transform var(--dur-fast) var(--ease-out);
 }
 
-.nav-item:hover .pixel-icon {
+.nav-item:hover .icon {
   transform: translateX(1px);
 }
 
@@ -2937,8 +3058,8 @@ html.reduce-motion *::after {
 
 .settings-layout {
   display: grid;
-  grid-template-columns: 168px minmax(0, 860px);
-  gap: 28px;
+  grid-template-columns: 168px minmax(0, 1fr);
+  gap: 32px;
   align-items: start;
 }
 
@@ -2955,9 +3076,9 @@ html.reduce-motion *::after {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   height: 36px;
-  padding: 0 12px 0 14px;
+  padding: 0 12px 0 16px;
   border: 0;
   border-radius: var(--radius-lg);
   background: transparent;
@@ -3120,7 +3241,7 @@ html.reduce-motion *::after {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 10px 30px;
+  padding: 12px 12px 32px;
   border-radius: var(--radius-xl);
   background: var(--frame-2);
   overflow: hidden;
@@ -3139,7 +3260,7 @@ html.reduce-motion *::after {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -3227,9 +3348,9 @@ html.reduce-motion *::after {
   isolation: isolate;
   display: flex;
   align-items: center;
-  gap: 22px;
-  margin-bottom: 26px;
-  padding: 26px 28px 80px;
+  gap: 24px;
+  margin-bottom: 24px;
+  padding: 24px 32px 80px;
   border-radius: var(--radius-xl);
   background: var(--hero);
   color: var(--on-dark);
@@ -3254,7 +3375,7 @@ html.reduce-motion *::after {
   display: inline-flex;
   align-items: center;
   height: 24px;
-  padding: 0 10px;
+  padding: 0 12px;
   border-radius: var(--radius-xl);
   background: var(--hero-2);
   font-size: var(--text-xs);
@@ -3302,8 +3423,8 @@ html.reduce-motion *::after {
 .stage-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 20px 28px 0 32px;
+  gap: 12px;
+  padding: 20px max(32px, calc(100% - 1088px)) 0 32px;
 }
 
 .stage-greeting {
@@ -3327,9 +3448,9 @@ html.reduce-motion *::after {
 .stage-body {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
   max-width: 780px;
-  padding: 30px 32px 146px;
+  padding: 32px 32px 144px;
 }
 
 .stage-intro {
@@ -3341,7 +3462,7 @@ html.reduce-motion *::after {
 .stage-eyebrow {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   font-size: var(--text-xs);
   font-weight: 650;
   letter-spacing: 0.12em;
@@ -3368,7 +3489,7 @@ html.reduce-motion *::after {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 9px;
+  gap: 8px;
   font-size: var(--text-sm);
   color: var(--on-dark-muted);
 }
@@ -3376,7 +3497,7 @@ html.reduce-motion *::after {
 .stage-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   margin-top: 6px;
 }
 
@@ -3396,7 +3517,7 @@ html.reduce-motion *::after {
 /* Short windows: a smaller title and less land, the facts still in view. */
 @media (max-height: 700px) {
   .stage-body {
-    gap: 14px;
+    gap: 16px;
     padding-top: 16px;
     padding-bottom: 124px;
   }
@@ -3449,7 +3570,7 @@ html.reduce-motion *::after {
 /* The facts sit just below the cut through the ground; the stone above
    them is the seam between the world and the page in both themes. */
 .home-below {
-  padding-top: 22px;
+  padding-top: 24px;
   container: home / inline-size;
 }
 
@@ -3487,7 +3608,7 @@ html.reduce-motion *::after {
   display: inline-flex;
   align-items: center;
   height: 22px;
-  padding: 0 9px;
+  padding: 0 8px;
   border-radius: var(--radius-lg);
   background: var(--hero-2);
   color: var(--on-dark);
@@ -3498,7 +3619,7 @@ html.reduce-motion *::after {
 .biomes {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .biome {
@@ -3536,7 +3657,7 @@ html.reduce-motion *::after {
   position: absolute;
   top: 4px;
   left: 4px;
-  padding: 1px 5px;
+  padding: 1px 6px;
   border-radius: var(--radius-sm);
   background: var(--hero-edge);
   color: var(--on-dark);
@@ -3597,7 +3718,7 @@ html.reduce-motion *::after {
 }
 
 .crash-excerpt summary {
-  padding: 10px 16px;
+  padding: 12px 16px;
   font-size: var(--text-sm);
   font-weight: 650;
   color: var(--muted);
@@ -3619,15 +3740,15 @@ html.reduce-motion *::after {
 .crash-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   padding: 4px 0;
 }
 
 .crash-card {
   display: flex;
   align-items: flex-start;
-  gap: 14px;
-  padding: 14px 16px;
+  gap: 16px;
+  padding: 16px 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   background: var(--surface-2);
@@ -3684,7 +3805,7 @@ html.reduce-motion *::after {
   align-items: flex-start;
   gap: 16px;
   height: 148px;
-  padding: 22px 18px 0 24px;
+  padding: 24px 20px 0 24px;
   overflow: hidden;
   transition: height var(--dur-slow) var(--ease-out), padding var(--dur-slow) var(--ease-out);
 }
@@ -3719,7 +3840,7 @@ html.reduce-motion *::after {
   align-items: center;
   height: auto;
   min-height: 84px;
-  padding: 16px 18px 30px 24px;
+  padding: 16px 20px 32px 24px;
 }
 
 .scene-head.plain .landscape {
@@ -3747,7 +3868,7 @@ html.reduce-motion *::after {
 .scene-head-text {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
   flex: 1;
   min-width: 0;
 }
@@ -3769,7 +3890,7 @@ html.reduce-motion *::after {
 .scene-head-meta {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   font-size: var(--text-sm);
   color: var(--on-dark-muted);
 }
@@ -3780,7 +3901,7 @@ html.reduce-motion *::after {
 
 .scene-head-aside {
   margin-top: 2px;
-  padding: 3px;
+  padding: 4px;
   border-radius: var(--radius-xl);
   background: var(--hero-edge);
   line-height: 0;
@@ -3798,7 +3919,7 @@ html.reduce-motion *::after {
 
 .scene-head-strip .tabs {
   border-bottom: 0;
-  padding: 0 14px;
+  padding: 0 16px;
 }
 
 .scene-head-strip .tab {
@@ -3837,7 +3958,7 @@ html.reduce-motion *::after {
   min-width: 18px;
   height: 18px;
   margin-left: 6px;
-  padding: 0 5px;
+  padding: 0 6px;
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--on-dark) 16%, transparent);
   font-family: var(--font-mono);
@@ -3872,7 +3993,7 @@ html.reduce-motion *::after {
 .section-label {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 12px;
   font-size: var(--text-xs);
   font-weight: 750;
   letter-spacing: 0.06em;
@@ -3888,7 +4009,7 @@ html.reduce-motion *::after {
 .saves {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .saves-empty {
@@ -3912,7 +4033,7 @@ html.reduce-motion *::after {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px;
+  padding: 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   background: var(--surface);
@@ -4074,7 +4195,7 @@ html.reduce-motion *::after {
 .mods-head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 /* The count is the headline: big digits, the words beside it. */
@@ -4151,10 +4272,10 @@ html.reduce-motion *::after {
 .mod-update {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   max-width: 170px;
   height: 26px;
-  padding: 0 10px;
+  padding: 0 12px;
   /* Outlined: "update all" is the one solid green on this tab. */
   border: 1px solid var(--accent-soft-2);
   border-radius: var(--radius);
@@ -4184,7 +4305,7 @@ html.reduce-motion *::after {
 
 .mod-local {
   flex: none;
-  padding: 2px 7px;
+  padding: 2px 8px;
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius);
   font-size: var(--text-xs);
@@ -4200,8 +4321,8 @@ html.reduce-motion *::after {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin: -20px -22px 0;
-  padding: 20px 22px 12px;
+  margin: -20px -24px 0;
+  padding: 20px 24px 12px;
   background: var(--surface);
   box-shadow: 0 1px 0 var(--border);
 }
@@ -4243,7 +4364,7 @@ html.reduce-motion *::after {
 
 .mod-broken {
   flex: none;
-  padding: 2px 7px;
+  padding: 2px 8px;
   border: 1px solid var(--warn);
   border-radius: var(--radius);
   background: var(--warn-soft);
@@ -4255,8 +4376,8 @@ html.reduce-motion *::after {
 .mod-detail {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 2px 14px 14px 60px;
+  gap: 12px;
+  padding: 2px 16px 16px 60px;
   background: var(--surface-2);
   font-size: var(--text-sm);
 }
@@ -4269,7 +4390,7 @@ html.reduce-motion *::after {
 .mod-facts {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 3px 12px;
+  gap: 4px 12px;
   margin: 0;
   font-size: var(--text-xs);
 }
@@ -4325,7 +4446,7 @@ html.reduce-motion *::after {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px 8px 14px;
+  padding: 8px 12px 8px 16px;
   border: 1px solid var(--warn);
   background: var(--warn-soft);
   font-size: var(--text-sm);
@@ -4356,7 +4477,7 @@ html.reduce-motion *::after {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 6px 5px 12px;
+  padding: 6px 6px 6px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface-2);
@@ -4369,7 +4490,7 @@ html.reduce-motion *::after {
 .pack-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .pack-head {
@@ -4423,8 +4544,8 @@ html.reduce-motion *::after {
 .pack-tile {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
+  gap: 12px;
+  padding: 8px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
@@ -4473,7 +4594,7 @@ html.reduce-motion *::after {
 }
 
 .version-flag {
-  padding: 0 5px;
+  padding: 0 6px;
   border-radius: var(--radius-lg);
   background: var(--warn-soft);
   color: var(--warn);
@@ -4487,7 +4608,7 @@ html.reduce-motion *::after {
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  padding: 28px 20px;
+  padding: 32px 20px;
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius-xl);
   color: var(--faint);
@@ -4501,10 +4622,10 @@ html.reduce-motion *::after {
 .sidebar-search {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   height: 34px;
-  margin: 0 0 14px;
-  padding: 0 10px;
+  margin: 0 0 16px;
+  padding: 0 12px;
   border: 1px solid var(--frame-line);
   border-radius: var(--radius-lg);
   background: var(--frame-2);
@@ -4561,7 +4682,7 @@ html.reduce-motion *::after {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0 18px;
+  padding: 0 20px;
   height: 58px;
   border-bottom: 1px solid var(--frame-line);
   color: var(--on-dark-faint);
@@ -4591,15 +4712,15 @@ html.reduce-motion *::after {
 
 .palette-list {
   min-height: 0;
-  padding: 4px 8px 10px;
+  padding: 4px 8px 12px;
   overflow: auto;
 }
 
 .palette-group {
   display: flex;
   align-items: baseline;
-  gap: 10px;
-  padding: 12px 12px 5px;
+  gap: 12px;
+  padding: 12px 12px 6px;
   font-family: var(--font-pixel);
   font-size: var(--px-font);
   -webkit-font-smoothing: none;
@@ -4620,7 +4741,7 @@ html.reduce-motion *::after {
   gap: 12px;
   width: 100%;
   min-height: 44px;
-  padding: 6px 12px 6px 14px;
+  padding: 6px 12px 6px 16px;
   border: 0;
   border-radius: var(--radius-lg);
   background: transparent;
@@ -4648,8 +4769,8 @@ html.reduce-motion *::after {
   display: grid;
   place-items: center;
   flex: none;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-lg);
   background: var(--frame-2);
   color: var(--on-dark-accent);
@@ -4693,7 +4814,7 @@ html.reduce-motion *::after {
 }
 
 .palette-empty {
-  padding: 36px 20px;
+  padding: 40px 20px;
   text-align: center;
   font-size: var(--text-sm);
   color: var(--on-dark-faint);
@@ -4703,7 +4824,7 @@ html.reduce-motion *::after {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 9px 16px;
+  padding: 8px 16px;
   border-top: 1px solid var(--frame-line);
   background: var(--frame-2);
   font-size: var(--text-xs);
@@ -4720,7 +4841,7 @@ html.reduce-motion *::after {
 .palette-scopes {
   display: flex;
   gap: 4px;
-  padding: 8px 14px;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--frame-line);
   overflow-x: auto;
   scrollbar-width: none;
@@ -4729,10 +4850,10 @@ html.reduce-motion *::after {
 .palette-scope {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   flex: none;
   height: 26px;
-  padding: 0 10px;
+  padding: 0 12px;
   border: 0;
   border-radius: var(--radius);
   background: transparent;
@@ -4778,8 +4899,8 @@ html.reduce-motion *::after {
 }
 
 .palette-item.hero .palette-icon {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
 }
 
 .palette-hit {
@@ -4792,7 +4913,7 @@ html.reduce-motion *::after {
 
 .palette-value {
   flex: none;
-  padding: 1px 7px;
+  padding: 1px 8px;
   border-radius: var(--radius-sm);
   background: var(--frame-2);
   color: var(--on-dark-muted);
@@ -4902,7 +5023,7 @@ html.reduce-motion *::after {
 
 .pv-motd {
   min-height: 18px;
-  padding: 8px 10px;
+  padding: 8px 12px;
   border-radius: var(--radius);
   background: var(--frame);
   font-family: var(--font-mono);
@@ -4956,7 +5077,7 @@ html.reduce-motion *::after {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding-right: 14px;
+  padding-right: 16px;
 }
 
 .create-strip .tabs {
@@ -4968,14 +5089,14 @@ html.reduce-motion *::after {
 }
 
 .create-strip .tab {
-  padding: 0 9px;
+  padding: 0 8px;
   white-space: nowrap;
 }
 
 .create-reroll {
   flex: none;
   height: 26px;
-  padding: 0 10px;
+  padding: 0 12px;
   border: 1px solid color-mix(in srgb, var(--on-dark) 30%, transparent);
   border-radius: var(--radius);
   background: transparent;
@@ -4992,7 +5113,7 @@ html.reduce-motion *::after {
 /* Says what the strip picks: the launcher's picture, not the game's land. */
 .create-strip-label {
   flex: none;
-  padding-left: 18px;
+  padding-left: 20px;
   font-size: var(--text-xs);
   color: var(--on-dark-faint);
 }
@@ -5012,7 +5133,7 @@ html.reduce-motion *::after {
 @media (max-height: 760px) {
   .scene-head.create-head .scene-head-view {
     height: 100px;
-    padding-top: 14px;
+    padding-top: 16px;
   }
   .scene-head.create-head .landscape {
     transform: translateY(20px);
@@ -5023,15 +5144,15 @@ html.reduce-motion *::after {
     display: none;
   }
   .create-form {
-    gap: 14px;
-    padding-top: 14px;
+    gap: 16px;
+    padding-top: 16px;
   }
 }
 
 .quick-versions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 7px;
+  gap: 8px;
 }
 
 .quick-version {
@@ -5039,7 +5160,7 @@ html.reduce-motion *::after {
   flex-direction: column;
   align-items: flex-start;
   gap: 1px;
-  padding: 8px 10px;
+  padding: 8px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
@@ -5100,7 +5221,7 @@ html.reduce-motion *::after {
 .pane-head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex: none;
 }
 
@@ -5128,7 +5249,7 @@ html.reduce-motion *::after {
 .server-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .server-grid {
@@ -5141,9 +5262,9 @@ html.reduce-motion *::after {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
   min-width: 0;
-  padding: 12px 14px 12px 12px;
+  padding: 12px 16px 12px 12px;
   border: 1px solid var(--hero-edge);
   border-radius: var(--radius-xl);
   background: var(--hero);
@@ -5199,7 +5320,7 @@ html.reduce-motion *::after {
 .server-head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
 }
 
@@ -5213,7 +5334,7 @@ html.reduce-motion *::after {
 .server-ping {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   flex: none;
   font-size: var(--text-xs);
   color: var(--on-dark-faint);
@@ -5333,7 +5454,7 @@ html.reduce-motion .signal.scanning i {
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 12px;
-  padding: 14px;
+  padding: 16px;
   border: 1px solid var(--accent);
   border-radius: var(--radius-xl);
   background: var(--surface);
@@ -5349,7 +5470,7 @@ html.reduce-motion .signal.scanning i {
 .shot-day {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   flex: none;
 }
 
@@ -5422,7 +5543,7 @@ html.reduce-motion .signal.scanning i {
 /* The viewer: a dark room with the picture, solid controls at the edges. */
 
 .overlay-root.viewer {
-  padding: 22px 22px 20px;
+  padding: 24px 24px 20px;
 }
 
 .viewer-backdrop {
@@ -5435,7 +5556,7 @@ html.reduce-motion .signal.scanning i {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   width: 100%;
   height: 100%;
   margin: 0;
@@ -5512,7 +5633,7 @@ html.reduce-motion .signal.scanning i {
   align-items: center;
   gap: 8px;
   flex: none;
-  padding: 10px 12px 10px 16px;
+  padding: 12px 12px 12px 16px;
   border-radius: var(--radius-xl);
   background: var(--frame-2);
   box-shadow: 0 4px 0 var(--hero-edge);
@@ -5546,7 +5667,7 @@ html.reduce-motion .signal.scanning i {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 13px 16px 3px;
+  padding: 12px 16px 4px;
   font-size: var(--text-xs);
   font-weight: 750;
   letter-spacing: 0.06em;
@@ -5564,9 +5685,9 @@ html.reduce-motion .signal.scanning i {
   display: grid;
   grid-template-columns: 200px minmax(0, 1fr) 104px;
   align-items: center;
-  gap: 18px;
+  gap: 20px;
   min-height: 58px;
-  padding: 10px 16px;
+  padding: 12px 16px;
 }
 
 .opt-row + .opt-row {
@@ -5761,14 +5882,14 @@ html.reduce-motion .signal.scanning i {
   right: 0;
   display: flex;
   justify-content: flex-end;
-  padding: 18px 22px;
+  padding: 20px 24px;
 }
 
 .enter-body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
   margin-bottom: 120px;
   max-width: min(720px, 86vw);
   text-align: center;
@@ -5832,9 +5953,9 @@ html.reduce-motion .signal.scanning i {
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   max-width: min(760px, 90vw);
-  padding: 9px 14px;
+  padding: 8px 16px;
   border-radius: var(--radius);
   background: var(--hero-edge);
   color: var(--on-dark);
@@ -5864,10 +5985,10 @@ html.reduce-motion .enter-loader i {
   z-index: 5;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   width: min(560px, calc(100% - 64px));
   margin: 0 auto;
-  padding: 10px 10px 10px 16px;
+  padding: 12px 12px 12px 16px;
   border-radius: var(--radius-xl);
   background: var(--frame);
   color: var(--on-dark);
@@ -6017,7 +6138,7 @@ html.reduce-motion .enter-loader i {
 
 .browse-have {
   flex: none;
-  padding: 2px 7px;
+  padding: 2px 8px;
   border-radius: var(--radius-sm);
   background: var(--accent-soft);
   color: var(--accent-text);
@@ -6083,7 +6204,7 @@ html.reduce-motion .blocks.grow span {
 
 .world-stats {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   font-size: var(--text-xs);
   color: var(--muted);
 }
@@ -6093,7 +6214,7 @@ html.reduce-motion .blocks.grow span {
   display: inline-block;
   width: 6px;
   height: 6px;
-  margin-right: 5px;
+  margin-right: 6px;
   background: var(--accent);
   vertical-align: 1px;
 }
@@ -6102,7 +6223,7 @@ html.reduce-motion .blocks.grow span {
   position: fixed;
   z-index: 90;
   min-width: 180px;
-  padding: 5px;
+  padding: 6px;
   border: 1px solid var(--frame-line);
   border-radius: var(--radius-lg);
   background: var(--frame);
@@ -6113,10 +6234,10 @@ html.reduce-motion .blocks.grow span {
 .context-item {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   width: 100%;
   height: 30px;
-  padding: 0 10px;
+  padding: 0 12px;
   border: 0;
   border-radius: var(--radius);
   background: transparent;
@@ -6226,7 +6347,7 @@ html.reduce-motion .blocks.grow span {
 
 .pack-active {
   flex: none;
-  padding: 2px 7px;
+  padding: 2px 8px;
   border-radius: var(--radius-sm);
   background: var(--accent-soft);
   color: var(--accent-text);
@@ -6317,7 +6438,7 @@ html.reduce-motion .blocks.grow span {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 12px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface-2);
@@ -6326,7 +6447,7 @@ html.reduce-motion .blocks.grow span {
 .filter-row {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
 }
 
 .filter-row:last-child {
@@ -6349,13 +6470,13 @@ html.reduce-motion .blocks.grow span {
 .filter-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 6px;
   min-width: 0;
 }
 
 .filter-chip {
   height: 24px;
-  padding: 0 9px;
+  padding: 0 8px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   background: var(--surface);
@@ -6391,8 +6512,8 @@ html.reduce-motion .blocks.grow span {
 }
 
 .pack-tools {
-  gap: 10px;
-  margin-bottom: 14px;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 /* A thing without its own picture: what kind it is, never a fake icon. */
@@ -6469,8 +6590,8 @@ html.reduce-motion .blocks.grow span {
 }
 
 .skeleton-icon {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   flex: none;
   border-radius: var(--radius-lg);
 }
@@ -6536,8 +6657,8 @@ html.reduce-motion .blocks.grow span {
 /* ---------- one save ---------- */
 
 .save-icon {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--radius-lg);
   image-rendering: pixelated;
 }
@@ -6545,13 +6666,13 @@ html.reduce-motion .blocks.grow span {
 .save-dialog {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .config-dialog {
   display: grid;
   grid-template-columns: minmax(200px, 34%) 1fr;
-  gap: 14px;
+  gap: 16px;
   min-height: 420px;
 }
 
@@ -6579,7 +6700,7 @@ html.reduce-motion .blocks.grow span {
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
-  padding: 7px 10px;
+  padding: 8px 12px;
   border: 0;
   border-bottom: 1px solid var(--border);
   background: none;
@@ -6610,7 +6731,7 @@ html.reduce-motion .blocks.grow span {
 }
 
 .config-pending {
-  padding: 6px 10px;
+  padding: 6px 12px;
   border: 1px solid var(--warn);
   border-radius: var(--radius-lg);
   background: var(--warn-soft);
@@ -6627,7 +6748,7 @@ html.reduce-motion .blocks.grow span {
 .config-text {
   flex: 1;
   min-height: 420px;
-  padding: 10px 12px;
+  padding: 12px 12px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
   background: var(--surface);
@@ -6663,7 +6784,7 @@ html.reduce-motion .blocks.grow span {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 14px;
+  margin-top: 16px;
 }
 
 /* ---------- storage ---------- */
@@ -6671,7 +6792,7 @@ html.reduce-motion .blocks.grow span {
 .storage-total {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 12px;
 }
 
 /* One bar, one solid block per kind of file, in the grass family. */
@@ -6703,7 +6824,7 @@ html.reduce-motion .blocks.grow span {
 }
 
 .storage-row {
-  gap: 14px;
+  gap: 16px;
 }
 
 /* ---------- launch options ---------- */
@@ -6736,7 +6857,7 @@ html.reduce-motion .blocks.grow span {
 .launch-env {
   height: auto;
   min-height: 72px;
-  padding: 8px 10px;
+  padding: 8px 12px;
   resize: vertical;
   line-height: 1.5;
 }
@@ -6746,20 +6867,20 @@ html.reduce-motion .blocks.grow span {
 .import-dialog {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 24px;
 }
 
 .import-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 /* ---------- skins and capes ---------- */
 
 .skin-dialog {
   display: flex;
-  gap: 22px;
+  gap: 24px;
   align-items: flex-start;
 }
 
@@ -6917,7 +7038,7 @@ html.reduce-motion .skin-stage.spinning {
 .task-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-height: 38px;
   padding: 4px 8px;
   border-radius: var(--radius);
@@ -6943,7 +7064,7 @@ html.reduce-motion .skin-stage.spinning {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 14px 16px 10px;
+  padding: 16px 16px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   background: var(--surface);
@@ -6972,7 +7093,7 @@ html.reduce-motion .skin-stage.spinning {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-top: 30px;
+  margin-top: 32px;
 }
 
 .play-row {
@@ -7009,7 +7130,7 @@ html.reduce-motion .skin-stage.spinning {
 .project-detail {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
 }
 
@@ -7017,7 +7138,7 @@ html.reduce-motion .skin-stage.spinning {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding-bottom: 10px;
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -7063,7 +7184,7 @@ html.reduce-motion .skin-stage.spinning {
 }
 
 .project-body {
-  padding: 14px 16px;
+  padding: 16px 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
@@ -7117,7 +7238,7 @@ html.reduce-motion .skin-stage.spinning {
 }
 
 .project-body pre {
-  padding: 10px 12px;
+  padding: 12px 12px;
   overflow-x: auto;
 }
 
@@ -7155,7 +7276,7 @@ html.reduce-motion .skin-stage.spinning {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 8px 12px;
   border: 1px solid var(--accent-edge);
   border-radius: var(--radius);
   background: var(--accent-soft);
@@ -7208,8 +7329,8 @@ html.reduce-motion .skin-stage.spinning {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 30px 42px 26px;
+  gap: 12px;
+  padding: 32px 40px 24px;
   border: 3px solid var(--on-dark-accent);
   border-radius: var(--radius-xl);
   background: var(--frame);
@@ -7217,7 +7338,7 @@ html.reduce-motion .skin-stage.spinning {
   box-shadow: 0 4px 0 var(--hero-edge);
 }
 
-.drop-hint-card .pixel-icon {
+.drop-hint-card .icon {
   margin-bottom: 4px;
   color: var(--on-dark-accent);
 }
@@ -7242,8 +7363,8 @@ html.reduce-motion .skin-stage.spinning {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 9px 12px;
-  margin-bottom: 18px;
+  gap: 8px 12px;
+  margin-bottom: 20px;
 }
 
 .world-filters .filter-chip {
@@ -7269,8 +7390,8 @@ html.reduce-motion .skin-stage.spinning {
   color: var(--warn);
 }
 
-.world-star[aria-pressed="true"] .icon path {
-  fill: currentColor;
+.world-star[aria-pressed="true"] .icon-tone {
+  opacity: 1;
 }
 
 /* ---------- multiplayer: P2P rooms ----------
@@ -7291,8 +7412,8 @@ html.reduce-motion .skin-stage.spinning {
 .room-hero-body {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 24px 28px 84px;
+  gap: 16px;
+  padding: 24px 32px 84px;
 }
 
 .room-eyebrow {
@@ -7516,8 +7637,8 @@ html.reduce-motion .skin-stage.spinning {
 .room-card {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 18px 20px 20px;
+  gap: 16px;
+  padding: 20px 20px 20px;
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   background: var(--surface);
@@ -7562,7 +7683,7 @@ html.reduce-motion .skin-stage.spinning {
 .lan-game {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   height: 36px;
   padding: 0 12px;
   border: 1px solid var(--border-strong);
@@ -7605,10 +7726,10 @@ button.lan-game:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 12px;
   height: auto;
   min-height: 36px;
-  padding: 6px 10px;
+  padding: 6px 12px;
   text-align: center;
 }
 
@@ -7646,7 +7767,7 @@ button.lan-game:hover {
   align-items: center;
   gap: 12px;
   min-height: 56px;
-  padding: 10px 16px;
+  padding: 12px 16px;
 }
 
 .check + .check,
@@ -7684,7 +7805,7 @@ button.lan-game:hover {
 }
 
 .players-empty {
-  padding: 18px 16px;
+  padding: 20px 16px;
   font-size: var(--text-xs);
   line-height: 1.6;
   color: var(--faint);
@@ -7694,8 +7815,8 @@ button.lan-game:hover {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-top: 10px;
-  padding: 10px 14px;
+  margin-top: 12px;
+  padding: 12px 16px;
   border-radius: var(--radius-lg);
   background: var(--surface-3);
   font-size: var(--text-xs);
@@ -7708,7 +7829,7 @@ button.lan-game:hover {
 }
 
 .room-advanced > summary {
-  padding: 14px 0;
+  padding: 16px 0;
   font-size: var(--text-sm);
   font-weight: 650;
 }
@@ -7742,7 +7863,7 @@ button.lan-game:hover {
 .room-nodes {
   height: auto;
   min-height: 112px;
-  padding: 10px 12px;
+  padding: 12px 12px;
   line-height: 1.6;
   resize: vertical;
 }
@@ -7779,7 +7900,7 @@ button.lan-game:hover {
   }
 
   .sidebar {
-    padding: 0 10px 12px;
+    padding: 0 12px 12px;
   }
 
   .brand {
@@ -7827,7 +7948,7 @@ button.lan-game:hover {
   /* the current world stacks: its face above the play button */
   .now {
     flex-direction: column;
-    padding: 8px 0 14px;
+    padding: 8px 0 16px;
   }
 
   .now-main {
@@ -7845,7 +7966,7 @@ button.lan-game:hover {
 .save-bar-question {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex: 1;
   min-width: 0;
 }
@@ -7855,7 +7976,7 @@ button.lan-game:hover {
 .server-layout {
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
-  gap: 18px;
+  gap: 20px;
   align-items: start;
 }
 
@@ -7887,8 +8008,8 @@ button.lan-game:hover {
 .server-head {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 16px 18px;
+  gap: 16px;
+  padding: 16px 20px;
   flex-wrap: wrap;
 }
 
@@ -7906,7 +8027,7 @@ button.lan-game:hover {
 .server-kind-row {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 7px;
+  gap: 8px;
 }
 
 .server-versions {
@@ -7917,7 +8038,7 @@ button.lan-game:hover {
 
 .server-version {
   min-width: 64px;
-  padding: 5px 10px;
+  padding: 6px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);

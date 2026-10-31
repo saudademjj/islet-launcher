@@ -4,7 +4,6 @@ import { call } from "../api/backend";
 import type { ImportCandidate } from "../api/types";
 import { Icon } from "../components/Icon";
 import { Modal } from "../components/overlay";
-import { PixelIcon } from "../components/Pixel";
 import { Button, Empty } from "../components/ui";
 import { loaderLabel } from "../lib/format";
 import { usePick } from "../store";
@@ -111,8 +110,8 @@ export function ImportDialog() {
                 const done = imported.includes(game.source);
                 return (
                   <div key={game.source} className="list-row">
-                    <PixelIcon name="block" size={20} />
-                    <div className="col" style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                    <Icon name="block" />
+                    <div className="col fill gap-2">
                       <span className="truncate" style={{ fontWeight: 650 }}>
                         {game.name}
                       </span>
@@ -124,7 +123,7 @@ export function ImportDialog() {
                     </div>
                     {done ? (
                       <span className="pill-accent">
-                        <Icon name="check" size={13} />{t(" 已导入", " Imported")}
+                        <Icon name="check" />{t(" 已导入", " Imported")}
                       </span>
                     ) : (
                       <Button

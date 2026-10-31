@@ -30,7 +30,7 @@ export function Button({ variant = "default", size = "md", icon, busy, className
   if (className) classes.push(className);
   return (
     <button type="button" className={classes.join(" ")} disabled={disabled || busy} {...rest}>
-      {busy ? <span className="spinner" /> : icon && <Icon name={icon} size={size === "xl" ? 19 : size === "lg" ? 17 : size === "sm" ? 13 : 15} />}
+      {busy ? <span className="spinner" /> : icon && <Icon name={icon} />}
       {children}
     </button>
   );
@@ -68,7 +68,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input({ m
   if (!icon) return input;
   return (
     <div className="input-wrap">
-      <Icon name={icon} size={14} />
+      <Icon name={icon} />
       {input}
     </div>
   );
@@ -256,6 +256,28 @@ export function Identicon({ seed, size = 36, accent, hero, build }: { seed: stri
   );
 }
 
+/** The one card header: an icon tile, the title with an optional count,
+    a line of explanation under it, and actions at the far end. */
+export function CardHeader({ icon, title, meta, text, children }: { icon?: IconName; title: ReactNode; meta?: ReactNode; text?: ReactNode; children?: ReactNode }) {
+  return (
+    <div className="card-header">
+      {icon && (
+        <span className="card-icon">
+          <Icon name={icon} />
+        </span>
+      )}
+      <div className="card-heading">
+        <span className="card-title">
+          {title}
+          {meta != null && <span className="card-meta">{meta}</span>}
+        </span>
+        {text && <span className="card-text">{text}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 /** Small heading above a group: a pixel square, a label, optional trailing. */
 export function SectionTitle({ children, trailing }: { children: ReactNode; trailing?: ReactNode }) {
   return (
@@ -276,7 +298,7 @@ export function Empty({ icon, art, title, children, actions }: { icon?: IconName
       {art ??
         (icon && (
           <span className="empty-icon">
-            <Icon name={icon} size={22} />
+            <Icon name={icon} size={32} />
           </span>
         ))}
       <div className="empty-title">{title}</div>

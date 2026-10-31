@@ -231,7 +231,7 @@ export function RemoteServer({ id }: { id: string }) {
   );
 
   const progress = s.progress && (
-    <div className="col" style={{ gap: 8 }}>
+    <div className="col gap-8">
       <span className="setting-name">
         {s.progress.stage}
         {s.progress.total > 0 ? ` · ${formatBytes(s.progress.done)} / ${formatBytes(s.progress.total)}` : s.progress.done > 0 ? ` · ${s.progress.done}s` : "…"}
@@ -273,7 +273,7 @@ export function RemoteServer({ id }: { id: string }) {
           </>
         }
       >
-        <div className="col" style={{ gap: 16 }}>
+        <div className="col gap-16">
           {deploying ? (
             progress
           ) : (
@@ -291,7 +291,7 @@ export function RemoteServer({ id }: { id: string }) {
               </span>
               {!supported && <span className="field-hint bad">{t("这个加载器没有可以一键生成的服务端；原版、Fabric、Quilt、Forge 和 NeoForge 可以。", "This loader has no server Islet can set up; vanilla, Fabric, Quilt, Forge and NeoForge do.")}</span>}
               {errorNotice}
-              <div className="row" style={{ gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
+              <div className="row gap-12 wrap items-start">
                 <Field label={t("服务器 IP 或域名", "Server IP or domain")}>
                   <Input mono value={form.host} placeholder="203.0.113.10" style={{ width: 220 }} onChange={(e) => (set({ host: e.target.value.trim().slice(0, 253) }), setProbe(null))} />
                 </Field>
@@ -317,9 +317,9 @@ export function RemoteServer({ id }: { id: string }) {
                   <Input type="password" autoComplete="off" value={form.secret} placeholder={info.hasSecret ? "••••••••" : ""} style={{ width: 260 }} onChange={(e) => set({ secret: e.target.value })} />
                 </Field>
               ) : (
-                <div className="row" style={{ gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+                <div className="row gap-12 wrap" style={{ alignItems: "flex-end" }}>
                   <Field label={t("私钥文件", "Private key")}>
-                    <div className="row" style={{ gap: 8 }}>
+                    <div className="row gap-8">
                       <Input mono readOnly value={form.keyPath} placeholder="~/.ssh/id_ed25519" style={{ width: 260 }} />
                       <Button
                         size="sm"
@@ -411,11 +411,11 @@ export function RemoteServer({ id }: { id: string }) {
         </>
       }
     >
-      <div className="col" style={{ gap: 16 }}>
+      <div className="col gap-16">
         {deploying && progress}
         {errorNotice}
         <div className="setting-row" style={{ flexWrap: "wrap" }}>
-          <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
+          <div className="row gap-12 wrap">
             <Status tone={tone} pulse={!!st?.running}>
               {label}
             </Status>
@@ -429,7 +429,7 @@ export function RemoteServer({ id }: { id: string }) {
             )}
             {st?.running && st.ready && !status?.ping && <span className="field-hint bad">{t(`从这里连不上：请在云服务器的安全组里放行 TCP ${info.target?.gamePort}`, `Unreachable from here: allow TCP ${info.target?.gamePort} in the cloud security group`)}</span>}
           </div>
-          <div className="row" style={{ gap: 6 }}>
+          <div className="row gap-6">
             {st?.running ? (
               <>
                 <Button size="sm" busy={busy === "restart"} disabled={!!busy || deploying} onClick={() => void action("restart")}>
@@ -456,13 +456,13 @@ export function RemoteServer({ id }: { id: string }) {
           ]}
         />
         {tab === "console" && (
-          <div className="col" style={{ gap: 8 }}>
+          <div className="col gap-8">
             <pre className="console selectable" style={{ margin: 0, padding: "10px 14px", height: 260, overflow: "auto", whiteSpace: "pre-wrap", borderRadius: "var(--radius-lg)" }}>
               {log ?? t("正在读取日志…", "Loading the log…")}
             </pre>
             <form
-              className="row"
-              style={{ gap: 8 }}
+              className="row gap-8"
+              
               onSubmit={(e) => {
                 e.preventDefault();
                 if (command.trim()) void send();
@@ -477,7 +477,7 @@ export function RemoteServer({ id }: { id: string }) {
           </div>
         )}
         {tab === "backups" && (
-          <div className="col" style={{ gap: 10 }}>
+          <div className="col gap-12">
             <div className="setting-row">
               <span className="field-hint">
                 {info.target?.dailyBackup
@@ -510,9 +510,9 @@ export function RemoteServer({ id }: { id: string }) {
           </div>
         )}
         {tab === "settings" && (
-          <div className="col" style={{ gap: 14 }}>
+          <div className="col gap-16">
             <ServerSettings form={form} set={set} />
-            <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+            <div className="row gap-8 wrap">
               <Button variant="primary" busy={busy === "settings"} disabled={!!busy || deploying || !settingsOk} onClick={() => void saveSettings()}>
                 {t("保存设置", "Save settings")}
               </Button>
@@ -547,7 +547,7 @@ export function MemoryField({ value, onChange }: { value: string; onChange: (val
       tone={ok ? undefined : "bad"}
       hint={auto ? t("每次启动按机器内存分配，留出 1/4 给系统，视距也随之调整", "Sized to the machine at each start, leaving a quarter for the system; view distance follows") : ok ? t("单位 MB；比机器总内存少 1G 左右", "In MB; about 1 GB under the machine's total") : t("512 到 32768 MB", "512 to 32768 MB")}
     >
-      <div className="row" style={{ gap: 8 }}>
+      <div className="row gap-8">
         <Segmented
           value={auto ? "auto" : "fixed"}
           options={[
@@ -567,7 +567,7 @@ function ServerSettings({ form, set }: { form: Form; set: (patch: Partial<Form>)
   const keepOk = Number(form.keep) >= 1 && Number(form.keep) <= 100;
   return (
     <>
-      <div className="row" style={{ gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
+      <div className="row gap-12 wrap items-start">
         <Field label={t("游戏端口", "Game port")} tone={portOk(form.gamePort) ? undefined : "bad"} hint={t("记得在安全组里放行", "Allow it in the security group")}>
           <Input mono inputMode="numeric" value={form.gamePort} style={{ width: 100 }} invalid={!portOk(form.gamePort)} onChange={(e) => set({ gamePort: digits(e.target.value, 5) })} />
         </Field>
@@ -595,7 +595,7 @@ function ServerSettings({ form, set }: { form: Form; set: (patch: Partial<Form>)
           <span className="setting-name">{t("每天自动备份", "Back up every day")}</span>
           <span className="field-hint">{t("凌晨 5:17 打包一份世界，不停服", "Packs the world at 5:17 each morning without stopping the server")}</span>
         </div>
-        <div className="row" style={{ gap: 8 }}>
+        <div className="row gap-8">
           {form.dailyBackup && (
             <>
               <span className="field-hint">{t("保留", "Keep")}</span>

@@ -30,7 +30,7 @@ export function WorldChoice({ instance, value, onChange }: { instance: Instance;
           }}
         >
           {row.icon ? <img src={row.icon} alt="" width={28} height={28} style={{ imageRendering: "pixelated" }} /> : <Identicon seed={`${instance.id}:${row.folder ?? "new"}`} size={28} />}
-          <span className="col" style={{ minWidth: 0, gap: 2, flex: 1 }}>
+          <span className="col gap-2 fill">
             <span className="truncate setting-name">{row.name}</span>
             <span className="field-hint">{row.meta}</span>
           </span>

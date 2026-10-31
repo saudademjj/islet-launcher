@@ -41,7 +41,7 @@ export function GroupDialog({ id }: { id: string }) {
         </>
       }
     >
-      <div className="col" style={{ gap: 14 }}>
+      <div className="col gap-16">
         {groups.length > 0 && (
           <div className="filter-chips" role="group" aria-label={t("已有分组", "Groups in use")}>
             <button type="button" className="filter-chip" aria-pressed={!name} onClick={() => setGroup("")}>

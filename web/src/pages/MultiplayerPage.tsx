@@ -54,7 +54,7 @@ export function MultiplayerPage() {
         )}
       </Toolbar>
       <div className="content">
-        <motion.div className="page narrow" variants={stagger} initial="initial" animate="animate">
+        <motion.div className="page" variants={stagger} initial="initial" animate="animate">
           <AnimatePresence initial={false}>
             {s.error && (
               <motion.div key="error" variants={item} initial="initial" animate="animate" exit={{ opacity: 0 }} style={{ marginBottom: 16 }}>
@@ -155,7 +155,7 @@ function Start({ downloadSize }: { downloadSize: number | null }) {
         <HostCard name={name} />
         <JoinCard name={name} />
       </motion.div>
-      <motion.div className="col" variants={item} style={{ gap: 10, marginTop: 16 }}>
+      <motion.div className="col gap-12" variants={item} style={{ marginTop: 16 }}>
         {downloadSize != null && (
           <Notice icon="download" title={t(`首次联机会下载约 ${formatBytes(downloadSize)} 的联机组件`, `The first room downloads about ${formatBytes(downloadSize)} of networking`)}>
             {t("EasyTier 开源组网核心（LGPL-3.0），从官方发布页下载并校验，只需下载一次。", "EasyTier, an open-source networking core (LGPL-3.0), downloaded from its official releases and verified, once.")}
@@ -163,7 +163,7 @@ function Start({ downloadSize }: { downloadSize: number | null }) {
         )}
         {isWindows && (
           <p className="room-hint">
-            <Icon name="shield" size={13} />
+            <Icon name="shield" />
             {t("Windows 可能弹出防火墙提示，请选「允许」；否则只能通过中转连接，延迟会高一些。", "Windows may ask about the firewall; choose Allow, or connections can only go through a relay, with more delay.")}
           </p>
         )}
@@ -240,7 +240,7 @@ function HostCard({ name }: { name: string }) {
     <section className="room-card">
       <div className="room-card-head">
         <span className="room-card-index">1</span>
-        <div className="col" style={{ gap: 2 }}>
+        <div className="col gap-2">
           <span className="room-card-title">{t("开房间", "Host a room")}</span>
           <span className="room-card-text">{t("在游戏里按 Esc →「对局域网开放」，再回来选中它。", "In the game, press Esc → Open to LAN, then pick it here.")}</span>
         </div>
@@ -251,7 +251,7 @@ function HostCard({ name }: { name: string }) {
         ) : games?.length ? (
           games.map((game) => (
             <button key={game.port} type="button" className="lan-game" aria-pressed={port === String(game.port)} onClick={() => setPort(String(game.port))}>
-              <Icon name={port === String(game.port) ? "check" : "monitor"} size={14} />
+              <Icon name={port === String(game.port) ? "check" : "monitor"} />
               <span className="truncate" style={{ flex: 1 }}>{game.motd}</span>
               <span className="mono faint">:{game.port}</span>
             </button>
@@ -272,7 +272,7 @@ function HostCard({ name }: { name: string }) {
           </div>
         )}
       </div>
-      <div className="row" style={{ gap: 8 }}>
+      <div className="row gap-8">
         <Input ref={portRef} mono value={port} inputMode="numeric" placeholder={t("端口", "Port")} aria-label={t("游戏端口", "Game port")} style={{ width: 110 }} onChange={(e) => setPort(e.target.value.replace(/\D/g, "").slice(0, 5))} />
         <Button size="sm" variant="ghost" icon="refresh" busy={scanning} onClick={() => void scan()}>
           {t("重新检测", "Scan again")}
@@ -298,7 +298,7 @@ function JoinCard({ name }: { name: string }) {
     <section className="room-card">
       <div className="room-card-head">
         <span className="room-card-index">2</span>
-        <div className="col" style={{ gap: 2 }}>
+        <div className="col gap-2">
           <span className="room-card-title">{t("加入房间", "Join a room")}</span>
           <span className="room-card-text">{t("向房主要房间码，粘贴到这里。HMCL、PCL CE 等启动器开的房间也能加入。", "Ask the host for the room code and paste it here. Rooms opened in HMCL, PCL CE and similar launchers work too.")}</span>
         </div>
@@ -315,7 +315,7 @@ function JoinCard({ name }: { name: string }) {
           if (e.key === "Enter" && !e.nativeEvent.isComposing) go();
         }}
       />
-      <div className="row" style={{ gap: 8 }}>
+      <div className="row gap-8">
         <span className="room-card-text">{t("加入后，房间会出现在游戏的局域网世界列表里。", "Once joined, the room shows up in the game's LAN worlds.")}</span>
         <div className="spacer" />
         <Button variant="primary" icon="link" busy={busy} disabled={!ready} onClick={go}>
@@ -333,13 +333,13 @@ function Preparing({ status }: { status: P2pStatus | null }) {
   return (
     <RoomHero seed="p2p-start">
       <div className="room-hero-body">
-        <div className="row" style={{ gap: 12 }}>
+        <div className="row gap-12">
           <Lamp level="starting" />
           <span className="room-eyebrow">{LEVELS.starting.label}</span>
         </div>
         <h2 className="room-title">{download ? t("正在下载联机组件…", "Downloading the networking component…") : t("正在准备房间…", "Setting up the room…")}</h2>
         {download && (
-          <div className="col" style={{ gap: 8, maxWidth: 420 }}>
+          <div className="col gap-8" style={{ maxWidth: 420 }}>
             <BlockProgress ratio={download.total ? download.done / download.total : 0} />
             <span className="room-text mono">
               {formatBytes(download.done)} / {formatBytes(download.total)}
@@ -368,7 +368,7 @@ function RoomView({ status, onNodes }: { status: P2pStatus; onNodes: () => void 
     <>
       <RoomHero seed={status.code ?? "p2p"}>
         <div className="room-hero-body">
-          <div className="row" style={{ gap: 12 }}>
+          <div className="row gap-12">
             <Lamp level={level} />
             <span className="room-eyebrow">{LEVELS[level].label}</span>
             <div className="spacer" />
@@ -382,7 +382,7 @@ function RoomView({ status, onNodes }: { status: P2pStatus; onNodes: () => void 
           <Bridge level={level} left={<PlayerFace account={account} size={32} />} right={right} />
           {host && status.code ? (
             <div className="room-code-row">
-              <div className="col" style={{ gap: 4, minWidth: 0 }}>
+              <div className="col gap-4">
                 <span className="room-eyebrow">{t("房间码", "ROOM CODE")}</span>
                 <span className="room-code selectable">{status.code}</span>
               </div>
@@ -392,7 +392,7 @@ function RoomView({ status, onNodes }: { status: P2pStatus; onNodes: () => void 
             </div>
           ) : status.address ? (
             <div className="room-code-row">
-              <div className="col" style={{ gap: 4, minWidth: 0 }}>
+              <div className="col gap-4">
                 <span className="room-eyebrow">{t("游戏里连接", "JOIN IN GAME")}</span>
                 <span className="room-code selectable">{status.address}</span>
               </div>
@@ -405,13 +405,13 @@ function RoomView({ status, onNodes }: { status: P2pStatus; onNodes: () => void 
       </RoomHero>
       {!host && status.notice && (
         <motion.p className="room-hint" variants={item}>
-          <Icon name="alert" size={13} />
+          <Icon name="alert" />
           {status.notice}
         </motion.p>
       )}
       {!host && (
         <motion.p className="room-hint" variants={item}>
-          <Icon name="info" size={13} />
+          <Icon name="info" />
           {t(
             `在游戏的「多人游戏」里，局域网世界会出现${status.world?.motd ? `「${status.world.motd} · P2P」` : "这个房间"}；也可以「直接连接」上面的地址。`,
             `In the game's Multiplayer screen the room shows up as a LAN world${status.world?.motd ? ` ("${status.world.motd} · P2P")` : ""}; or use Direct Connection with the address above.`,
@@ -425,7 +425,7 @@ function RoomView({ status, onNodes }: { status: P2pStatus; onNodes: () => void 
             {health?.checks.map((check) => (
               <li key={check.id} className={`check level-${check.level}`}>
                 <span className="check-mark" aria-hidden />
-                <div className="col" style={{ gap: 2, minWidth: 0, flex: 1 }}>
+                <div className="col gap-2 fill">
                   <span className="check-label">{check.label}</span>
                   <span className="check-detail">{check.detail}</span>
                 </div>
@@ -443,7 +443,7 @@ function RoomView({ status, onNodes }: { status: P2pStatus; onNodes: () => void 
           <ul className="players">
             <li className="player">
               <PlayerFace account={account} size={32} />
-              <div className="col" style={{ gap: 2, minWidth: 0, flex: 1 }}>
+              <div className="col gap-2 fill">
                 <span className="player-name truncate">
                   {status.hostname} <span className="chip">{t("你", "You")}</span>
                 </span>
@@ -453,7 +453,7 @@ function RoomView({ status, onNodes }: { status: P2pStatus; onNodes: () => void 
             {others.map((player) => (
               <li key={player.ip || player.name} className={`player level-${player.level}`}>
                 <PlayerFace name={player.name} size={32} />
-                <div className="col" style={{ gap: 2, minWidth: 0, flex: 1 }}>
+                <div className="col gap-2 fill">
                   <span className="player-name truncate">
                     {player.name} {player.host && <span className="chip">{t("房主", "Host")}</span>}
                   </span>
@@ -514,7 +514,7 @@ function Advanced({ open, onToggle, defaults }: { open: boolean; onToggle: (open
           setSaved(false);
         }}
       />
-      <div className="row" style={{ gap: 8 }}>
+      <div className="row gap-8">
         {invalid.length > 0 && <span className="field-hint bad">{t(`有 ${invalid.length} 行格式不对，会被忽略`, `${invalid.length} line(s) aren't valid and will be ignored`)}</span>}
         {saved && <span className="field-hint ok">{t("已保存，下次开房间或加入时生效", "Saved; used from the next room")}</span>}
         <div className="spacer" />
@@ -542,7 +542,7 @@ function Advanced({ open, onToggle, defaults }: { open: boolean; onToggle: (open
       {/* The older way, for players with a server of their own. */}
       {activeId && (
         <div className="room-advanced-alt">
-          <div className="col" style={{ gap: 2, flex: 1, minWidth: 0 }}>
+          <div className="col gap-2 fill">
             <span className="room-advanced-title">{t("用自己的服务器转发", "Forward through your own server")}</span>
             <span className="room-card-text">
               {t("有公网服务器时，可以用 SSH 反向隧道把当前世界开到服务器上，好友直接连服务器地址，不需要房间码。", "With a public server of your own, an SSH reverse tunnel puts the current world on it; friends connect to the server's address, no room code needed.")}

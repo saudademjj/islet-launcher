@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { Instance, Screenshot, ServerEntry, WorldList } from "../api/types";
 import { Icon } from "../components/Icon";
-import { BrandMark, Celestial, Clouds, Landscape, PixelIcon, PX, Stars } from "../components/Pixel";
+import { BrandMark, Celestial, Clouds, Landscape, PX, Stars } from "../components/Pixel";
 import { ServerCard } from "../components/Server";
 import { WorldCard } from "../components/WorldCard";
 import { ShotTile, dayLabel } from "../overlays/Screenshots";
@@ -340,7 +340,7 @@ function Stage({ instance, worlds }: { instance: Instance; worlds: WorldList | n
                 <InstallProgressView />
               ) : (
                 <div className="install">
-                  <div className="row" style={{ gap: 12 }}>
+                  <div className="row gap-12">
                     <span className="install-percent">100</span>
                     <span className="install-stage install-done">{t("安装完成，可以开始游戏了", "Installed. Ready to play")}</span>
                   </div>
@@ -380,10 +380,10 @@ function Stage({ instance, worlds }: { instance: Instance; worlds: WorldList | n
             animate={{ opacity: 1, y: 0, transition: { delay: 0.2, duration: 0.4, ease: [0.2, 0.8, 0.2, 1] } }}
             onClick={() => void s.launchInstance(instance.id, worlds.worlds[0].folder)}
           >
-            <Icon name="play" size={12} />
+            <Icon name="play" />
             <span className="stage-continue-label">
               {t("继续存档", "Continue")}
-              {worlds.worlds[0].icon ? <img className="stage-continue-icon" src={worlds.worlds[0].icon} alt="" /> : <PixelIcon name="map" size={10} />}
+              {worlds.worlds[0].icon ? <img className="stage-continue-icon" src={worlds.worlds[0].icon} alt="" /> : <Icon name="map" />}
               <span className="truncate">{worlds.worlds[0].folder}</span>
             </span>
             {worlds.worlds[0].modifiedMs && <span className="stage-continue-when">{formatRelative(worlds.worlds[0].modifiedMs)}</span>}
@@ -422,7 +422,7 @@ function StageRoom() {
       </button>
       {share && (
         <button type="button" className="stage-room-copy" onClick={() => void copy(share, host ? t("房间码", "Room code") : t("地址", "Address"))} title={host ? t("复制房间码", "Copy room code") : t("复制地址", "Copy address")}>
-          <Icon name="copy" size={12} />
+          <Icon name="copy" />
           <span className="mono truncate">{share}</span>
         </button>
       )}
@@ -437,9 +437,9 @@ function InstallProgressView() {
   const ratio = progressRatio(install.done, install.total, install.bytes, install.totalBytes);
   return (
     <div className="install">
-      <div className="row" style={{ gap: 12 }}>
+      <div className="row gap-12">
         <span className="install-percent mono">{ratio == null ? "··" : Math.round(ratio * 100)}</span>
-        <div className="col" style={{ flex: 1, gap: 2 }}>
+        <div className="col fill gap-2">
           <span className="install-stage">{stageLabel(install.stage)}</span>
           <span className="install-detail mono">
             {install.total > 0 && t(`${install.done} / ${install.total} 个文件`, `${install.done} / ${install.total} files`)}
@@ -474,18 +474,18 @@ function Facts({ instance, worlds }: { instance: Instance; worlds: WorldList | n
     <motion.div className="facts" variants={item}>
       <button type="button" className="fact" onClick={() => s.openManage(instance.id, "data")}>
         <span className="fact-label">{t("存档", "Saves")}</span>
-        <div className="row" style={{ alignItems: "baseline", gap: 6 }}>
+        <div className="row items-baseline gap-6">
           <span className="fact-number">{worlds ? worlds.worlds.length : "··"}</span>
           <span className="fact-unit">{t("个", "")}</span>
         </div>
         <span className="fact-sub truncate">
           {!worlds ? t("正在读取…", "Loading…") : worlds.worlds[0] ? t(`最近的存档：${worlds.worlds[0].folder}`, `Latest: ${worlds.worlds[0].folder}`) : instance.installed ? t("还没有存档，进游戏创建一个", "No saves yet; create one in game") : t("安装后在游戏里创建", "Create one in game after installing")}
         </span>
-        <Icon name="chevronRight" size={14} className="fact-go" />
+        <Icon name="chevronRight" className="fact-go" />
       </button>
       <button type="button" className="fact" onClick={() => s.openManage(instance.id)}>
         <span className="fact-label">{t("内存", "Memory")}</span>
-        <div className="row" style={{ alignItems: "baseline", gap: 6 }}>
+        <div className="row items-baseline gap-6">
           <span className="fact-number">{memory >= 1024 && memory % 1024 === 0 ? memory / 1024 : memory}</span>
           <span className="fact-unit">{memory >= 1024 && memory % 1024 === 0 ? "GB" : "MB"}</span>
           <span className="fact-blocks" aria-hidden>
@@ -495,7 +495,7 @@ function Facts({ instance, worlds }: { instance: Instance; worlds: WorldList | n
           </span>
         </div>
         <span className="fact-sub">{memorySub}</span>
-        <Icon name="chevronRight" size={14} className="fact-go" />
+        <Icon name="chevronRight" className="fact-go" />
       </button>
       {instance.loader !== "vanilla" ? (
         <ModsFact instance={instance} stats={stats} insights={s.insights} />
@@ -504,7 +504,7 @@ function Facts({ instance, worlds }: { instance: Instance; worlds: WorldList | n
           <span className="fact-label">Java</span>
           <span className="fact-number fact-word">{javaName}</span>
           <span className="fact-sub truncate">{javaCustom ? javaCustom : t("按游戏版本匹配，缺少时自动下载", "Matched to the game version, downloaded if missing")}</span>
-          <Icon name="chevronRight" size={14} className="fact-go" />
+          <Icon name="chevronRight" className="fact-go" />
         </button>
       )}
     </motion.div>
@@ -520,7 +520,7 @@ function ModsFact({ instance, stats, insights }: { instance: Instance; stats: Wo
   return (
     <button type="button" className="fact" onClick={() => openManage(instance.id, "mods")}>
       <span className="fact-label">{t("模组", "Mods")}</span>
-      <div className="row" style={{ alignItems: "baseline", gap: 6 }}>
+      <div className="row items-baseline gap-6">
         <span className="fact-number">{stats?.mods ?? "··"}</span>
         <span className="fact-unit">{t("个", "")}</span>
       </div>
@@ -537,7 +537,7 @@ function ModsFact({ instance, stats, insights }: { instance: Instance; stats: Wo
                   ? t(`${off} 个已停用`, `${off} disabled`)
                   : t("全部已启用", "All enabled")}
       </span>
-      <Icon name="chevronRight" size={14} className="fact-go" />
+      <Icon name="chevronRight" className="fact-go" />
     </button>
   );
 }
@@ -643,7 +643,7 @@ function News() {
       <div className="news">
         {notes.slice(0, 3).map((note) => (
           <article key={note.version} className="news-item">
-            <div className="row" style={{ gap: 8 }}>
+            <div className="row gap-8">
               <span className={`chip${note.kind === "release" ? " chip-accent" : ""}`}>{note.kind === "release" ? t("正式版", "Release") : t("快照", "Snapshot")}</span>
               <span className="news-title truncate" title={note.title}>
                 {note.version}
@@ -655,7 +655,7 @@ function News() {
               </span>
             </div>
             {note.summary && <p className="news-summary">{note.summary}</p>}
-            <div className="row" style={{ gap: 6 }}>
+            <div className="row gap-6">
               <Button size="sm" variant="ghost" icon="external" onClick={() => void s.openUrl(wikiUrl(note.version))}>
                 {t("更新内容", "Changelog")}
               </Button>
@@ -679,9 +679,9 @@ function NewWorlds() {
       <div className="starts">
         <button type="button" className="start" onClick={s.openCreate}>
           <span className="start-icon">
-            <Icon name="plus" size={20} />
+            <Icon name="plus" />
           </span>
-          <span className="col" style={{ flex: 1, gap: 3 }}>
+          <span className="col fill gap-4">
             <span className="start-title">{t("新建世界", "New world")}</span>
             <span className="start-text">{t("任选 Minecraft 版本，可加 Fabric、Quilt、Forge 或 NeoForge", "Any Minecraft version, with Fabric, Quilt, Forge or NeoForge if you like")}</span>
           </span>
@@ -689,13 +689,13 @@ function NewWorlds() {
         </button>
         <button type="button" className="start" disabled={s.fileBusy} onClick={() => useStore.getState().openModal({ kind: "import" })}>
           <span className="start-icon">
-            <Icon name="archive" size={20} />
+            <Icon name="archive" />
           </span>
-          <span className="col" style={{ flex: 1, gap: 3 }}>
+          <span className="col fill gap-4">
             <span className="start-title">{t("导入", "Import")}</span>
             <span className="start-text">{t("整合包，或官方启动器、HMCL、PCL、Prism 里已有的游戏", "A modpack, or games you already have in the official launcher, HMCL, PCL or Prism")}</span>
           </span>
-          <Icon name="chevronRight" size={15} className="faint" />
+          <Icon name="chevronRight" className="faint" />
         </button>
       </div>
     </motion.section>
@@ -784,9 +784,9 @@ function Welcome({ hasInstances }: { hasInstances: boolean }) {
       <StageBar />
       <div className="stage-body">
         <AnimatePresence>{s.lastError && <ErrorBanner key="error" error={s.lastError} instance={null} />}</AnimatePresence>
-        <div className="row" style={{ gap: 16 }}>
+        <div className="row gap-16">
           <BrandMark size={52} />
-          <div className="col" style={{ gap: 6 }}>
+          <div className="col gap-6">
             <h1 className="stage-title">{t("三步开始游戏", "Three steps to play")}</h1>
             <span className="stage-meta">{t("每个世界的版本、存档、模组和内存设置互相独立。", "Each world has its own version, saves, mods and memory.")}</span>
           </div>
@@ -794,7 +794,7 @@ function Welcome({ hasInstances }: { hasInstances: boolean }) {
         <motion.div className="steps" variants={stagger} initial="initial" animate="animate">
           {steps.map((step, i) => (
             <motion.div key={step.title} className={`step${step.done ? " done" : ""}`} variants={item}>
-              <div className="step-index mono">{step.done ? <Icon name="check" size={14} /> : i + 1}</div>
+              <div className="step-index mono">{step.done ? <Icon name="check" /> : i + 1}</div>
               <div className="step-title">{step.title}</div>
               <div className="step-text">{step.text}</div>
               {!step.done && step.action}

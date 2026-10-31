@@ -56,8 +56,8 @@ export function LoaderPicker({
   }, [loader, minecraft]);
 
   return (
-    <div className="col loader-picker" style={{ gap: 8 }}>
-      <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+    <div className="col loader-picker gap-8">
+      <div className="row gap-8 wrap">
         <Segmented
           value={loader}
           disabled={disabled}
@@ -75,7 +75,7 @@ export function LoaderPicker({
       </div>
       <span className="field-hint">{loader === "vanilla" ? t("不加载模组的官方原版", "The official game, without mods") : hint ?? t("按游戏版本列出兼容加载器；可锁定具体版本", "Loaders that fit the game version; you can pin one")}</span>
       {loader !== "vanilla" && (
-        <div className="col" style={{ gap: 6 }}>
+        <div className="col gap-6">
           <div className="row">
             <span className="field-label">{loaderLabel(loader)}{t(" 版本", " version")}</span>
             <span className="mono tone-accent" style={{ fontSize: "var(--text-xs)" }}>

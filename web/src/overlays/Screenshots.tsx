@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { toError } from "../api/backend";
 import type { Instance, Screenshot } from "../api/types";
 import { Icon } from "../components/Icon";
-import { PixelIcon } from "../components/Pixel";
 import { Button, Empty } from "../components/ui";
 import { formatBytes } from "../lib/format";
 import { EASE_OUT, fast, normal } from "../lib/motion";
@@ -75,7 +74,7 @@ export function ScreenshotsTab({ instance }: { instance: Instance }) {
   return (
     <div className="manage-scroll">
       <div className="pane-head">
-        <div className="col" style={{ gap: 3, minWidth: 0 }}>
+        <div className="col gap-4">
           <div className="section-label">
             {t("截图", "Screenshots")}
             {shots && shots.length > 0 && (
@@ -99,7 +98,7 @@ export function ScreenshotsTab({ instance }: { instance: Instance }) {
         <Empty
           art={
             <span className="empty-pixel">
-              <PixelIcon name="camera" size={44} />
+              <Icon name="camera" size={48} />
             </span>
           }
           title={t("还没有截图", "No screenshots yet")}
@@ -208,14 +207,14 @@ export function ShotViewer({ id, name, back }: { id: string; name: string; back?
             </motion.div>
           </AnimatePresence>
           <button type="button" className="viewer-nav prev" disabled={index <= 0} onClick={() => go(-1)} aria-label={t("上一张", "Previous")}>
-            <Icon name="chevronLeft" size={22} />
+            <Icon name="chevronLeft" />
           </button>
           <button type="button" className="viewer-nav next" disabled={index >= shots.length - 1} onClick={() => go(1)} aria-label={t("下一张", "Next")}>
-            <Icon name="chevronRight" size={22} />
+            <Icon name="chevronRight" />
           </button>
         </div>
         <figcaption className="viewer-bar">
-          <div className="col" style={{ gap: 2, minWidth: 0 }}>
+          <div className="col gap-2">
             <span className="viewer-title truncate">
               {s.instance?.name ?? t("截图", "Screenshots")} · {dayLabel(taken)} {clockLabel(taken)}
             </span>

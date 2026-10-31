@@ -43,7 +43,7 @@ export function ServerModsDialog({ id, address, check, offline }: { id: string; 
         </>
       }
     >
-      <div className="col" style={{ gap: 14 }}>
+      <div className="col gap-16">
         <span className="field-hint">
           {t(
             `这台服务器有 ${check.missing.length} 个模组你还没有${check.outdated.length ? `，另有 ${check.outdated.length} 个是旧版本` : ""}。缺模组时服务器通常会拒绝进入。`,

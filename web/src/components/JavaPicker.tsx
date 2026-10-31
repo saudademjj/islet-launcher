@@ -38,7 +38,7 @@ export function JavaPicker({ value, onChange, maxHeight = 150 }: { value: string
     scanJava: s.scanJava,
   }));
   return (
-    <div className="col" style={{ gap: 6 }}>
+    <div className="col gap-6">
       <div className="row">
         <span className="faint" style={{ fontSize: "var(--text-xs)" }}>
           {s.scanning ? t("正在检测本机 Java…", "Looking for Java…") : s.runtimes.length ? t(`检测到 ${s.runtimes.length} 个 Java`, `${s.runtimes.length} Java installations found`) : t("没有检测到系统 Java，安装世界时会自动准备。", "No system Java found; one is prepared when you install a world.")}

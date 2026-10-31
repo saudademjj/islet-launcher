@@ -42,12 +42,12 @@ export function LaunchOptions({ value, onChange, disabled, inherited }: { value:
   return (
     <div className="launch-options">
       <button type="button" className="launch-options-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
-        <Icon name={open ? "chevronDown" : "chevronRight"} size={13} />
+        <Icon name={open ? "chevronDown" : "chevronRight"} />
         {t("高级启动选项", "Advanced launch options")}
         {used && !open && <span className="chip">{t("已设置", "Set")}</span>}
       </button>
       {open && (
-        <div className="col" style={{ gap: 14 }}>
+        <div className="col gap-16">
           <Field label={t("游戏窗口大小", "Game window size")} hint={inheritedWindow ? t(`留空使用全局的 ${inheritedWindow}`, `Leave empty for the global ${inheritedWindow}`) : t("留空使用游戏默认的 854×480；全屏在「游戏选项」里切换", "Leave empty for the game's default 854×480; fullscreen is under Game options")}>
             <div className="row">
               <Input mono style={{ width: 100 }} disabled={disabled} placeholder={t("宽", "Width")} value={value.windowWidth ?? ""} onChange={(e) => set({ windowWidth: size(e.target.value) })} />

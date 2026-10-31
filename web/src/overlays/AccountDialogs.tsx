@@ -79,8 +79,8 @@ export function AddYggdrasil() {
       }
     >
       <form
-        className="col"
-        style={{ gap: 14 }}
+        className="col gap-16"
+        
         onSubmit={(e) => {
           e.preventDefault();
           void login();
@@ -196,7 +196,7 @@ export function SkinDialog({ accountId }: { accountId: string }) {
     <Modal title={t("皮肤与披风", "Skin & cape")} subtitle={s.account.username} onClose={s.closeModal}>
       <div className="skin-dialog">
         <div className="skin-preview">{s.account.skinUrl ? <SkinModel skinUrl={s.account.skinUrl} slim={slim} capeUrl={capes?.find((c) => c.state === "ACTIVE")?.url} /> : <PlayerFace account={s.account} size={80} />}</div>
-        <div className="col" style={{ gap: 14, flex: 1, minWidth: 0 }}>
+        <div className="col gap-16 fill">
           <Field label={t("手臂粗细", "Arm width")} hint={t("Alex 式的细手臂是 3 像素，Steve 式是 4 像素；要和皮肤图一致", "Alex-style slim arms are 3 pixels, Steve-style are 4; match your skin image")}>
             <div>
               <Segmented

@@ -5,9 +5,8 @@ import type { ContentKind, ModProject, ProjectDetails } from "../api/types";
 import { formatCount, formatRelative } from "../lib/format";
 import { t } from "../lib/i18n";
 import { usePick } from "../store";
-import { Icon } from "./Icon";
+import { Icon, type IconName } from "./Icon";
 import { ModIcon } from "./ModIcon";
-import type { PixelIconName } from "./Pixel";
 import { Button } from "./ui";
 
 const LINK_LABEL: Record<string, string> = {
@@ -38,7 +37,7 @@ async function render(details: ProjectDetails): Promise<string> {
 
 /** A search result opened up: description, gallery and links, with the
  *  newest compatible version one click away. */
-export function ProjectDetail({ project, kind, glyph, busy, onInstall, onBack, pick }: { project: ModProject; kind: ContentKind; glyph: PixelIconName; busy: boolean; onInstall: (version: string) => void; onBack: () => void; /** Versions listed by the caller (modpacks), instead of the store's. */ pick?: { loading: boolean; newest: { id: string; version_number: string } | null } }) {
+export function ProjectDetail({ project, kind, glyph, busy, onInstall, onBack, pick }: { project: ModProject; kind: ContentKind; glyph: IconName; busy: boolean; onInstall: (version: string) => void; onBack: () => void; /** Versions listed by the caller (modpacks), instead of the store's. */ pick?: { loading: boolean; newest: { id: string; version_number: string } | null } }) {
   const s = usePick((s) => ({ versions: s.modVersions, activeId: s.settings.activeInstanceId, manageId: s.modal?.kind === "manage" ? s.modal.id : null, installMod: s.installMod, openUrl: s.openUrl, fileBusy: s.fileBusy }));
   const [details, setDetails] = useState<ProjectDetails | null>(null);
   const [html, setHtml] = useState("");
@@ -85,11 +84,11 @@ export function ProjectDetail({ project, kind, glyph, busy, onInstall, onBack, p
         <Button size="sm" variant="ghost" icon="chevronLeft" onClick={onBack}>
           {t("返回结果", "Back to results")}
         </Button>
-        <ModIcon src={project.icon_url} seed={project.project_id} size={44} glyph={glyph} />
-        <div className="col" style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        <ModIcon src={project.icon_url} seed={project.project_id} size={48} glyph={glyph} />
+        <div className="col fill gap-2">
           <span className="project-title truncate">{project.title}</span>
           <span className="faint truncate" style={{ fontSize: "var(--text-xs)" }}>
-            <Icon name="download" size={11} /> {formatCount(project.downloads)}
+            <Icon name="download" /> {formatCount(project.downloads)}
             {details?.license && ` · ${details.license}`}
             {Number.isFinite(updated) && t(` · ${formatRelative(updated)}更新`, ` · updated ${formatRelative(updated)}`)}
           </span>

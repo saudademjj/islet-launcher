@@ -71,7 +71,7 @@ export function ExportServer({ id }: { id: string }) {
         </>
       }
     >
-      <div className="col" style={{ gap: 16 }}>
+      <div className="col gap-16">
         {!supported && <span className="field-hint bad">{t("这个加载器没有可以一键生成的服务端；原版、Fabric、Quilt、Forge、NeoForge、Paper 和 Purpur 可以。", "This loader has no server Islet can set up; vanilla, Fabric, Quilt, Forge, NeoForge, Paper and Purpur do.")}</span>}
         {supported && notInstalled && <span className="field-hint bad">{t("先安装一次这个世界，确定加载器版本后才能导出。", "Install this world once so its loader version is fixed, then export.")}</span>}
         <span className="field-hint">
@@ -95,7 +95,7 @@ export function ExportServer({ id }: { id: string }) {
             <Field label={t("服务器的世界", "The server's world")} hint={world ? t("复制这个存档当服务器的世界；你在单人里的背包和位置会跟着你进服务器", "A copy of this save becomes the server's world; your singleplayer inventory and spot come with you") : undefined}>
               <WorldChoice instance={s.instance} value={world} onChange={setWorld} />
             </Field>
-            <div className="row" style={{ gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+            <div className="row gap-16 items-start wrap">
               <Field label={t("端口", "Port")} tone={portOk ? undefined : "bad"} hint={portOk ? t("默认 25565", "25565 by default") : t("填 1 到 65535", "Enter 1 to 65535")}>
                 <Input mono inputMode="numeric" value={port} style={{ width: 110 }} invalid={!portOk} onChange={(e) => setPort(e.target.value.replace(/\D/g, "").slice(0, 5))} />
               </Field>

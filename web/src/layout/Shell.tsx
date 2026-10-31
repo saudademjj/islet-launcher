@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 
 import { backend, type WindowAction } from "../api/backend";
-import { Icon } from "../components/Icon";
-import { BrandMark, PixelIcon, PX, Terrain, type PixelIconName } from "../components/Pixel";
+import { Icon, type IconName } from "../components/Icon";
+import { BrandMark, PX, Terrain } from "../components/Pixel";
 import { PlayerFace } from "../components/PlayerFace";
 import { Button, Identicon, Kbd, ProgressBar } from "../components/ui";
 import { formatBytes, formatSpeed, loaderLabel, progressRatio, stageLabel } from "../lib/format";
@@ -15,7 +15,7 @@ import { usePrefs } from "../lib/prefs";
 import { instanceState, useActiveAccount, useActiveInstance, useAutoMemory, usePick, useStore, type Page } from "../store";
 import { t } from "../lib/i18n";
 
-const NAV: { page: Page; label: string; icon: PixelIconName; key: string }[] = [
+const NAV: { page: Page; label: string; icon: IconName; key: string }[] = [
   { page: "home", label: t("开始", "Home"), icon: "play", key: "1" },
   { page: "instances", label: t("世界", "Worlds"), icon: "block", key: "2" },
   { page: "multiplayer", label: t("联机", "Multiplayer"), icon: "signal", key: "3" },
@@ -49,7 +49,7 @@ export function Sidebar() {
         </span>
       </div>
       <button type="button" className="sidebar-search" title={`${t("搜索与命令", "Search")} ${MOD_KEY}K`} onClick={() => useStore.getState().openModal({ kind: "palette" })}>
-        <Icon name="search" size={14} />
+        <Icon name="search" />
         <span>{t("搜索与命令", "Search")}</span>
         <Kbd>{MOD_KEY}K</Kbd>
       </button>
@@ -63,7 +63,7 @@ export function Sidebar() {
                   <span className="nav-bar" />
                 </motion.span>
               )}
-              <PixelIcon name={item.icon} size={20} />
+              <Icon name={item.icon} />
               <span className="nav-label">{item.label}</span>
               {badge(item.page)}
               <Kbd>
@@ -82,14 +82,14 @@ export function Sidebar() {
           <PlayerFace account={account} size={32} />
         ) : (
           <span className="identicon hero" style={{ width: 34, height: 34, borderRadius: "var(--radius-lg)" }}>
-            <Icon name="plus" size={15} />
+            <Icon name="plus" />
           </span>
         )}
-        <div className="col sidebar-account-text" style={{ flex: 1, gap: 1 }}>
+        <div className="col sidebar-account-text fill gap-2">
           <span className="sidebar-account-name truncate">{account ? account.username : t("还没有账号", "No account yet")}</span>
           <span className="sidebar-account-kind">{account ? (account.provider === "microsoft" ? t("微软账号", "Microsoft account") : t("离线账号", "Offline account")) : t("点击添加账号", "Click to add one")}</span>
         </div>
-        <Icon name="chevronRight" size={14} />
+        <Icon name="chevronRight" />
       </button>
       </div>
     </aside>
@@ -160,7 +160,7 @@ function CurrentWorld() {
       </div>
       <button type="button" className="now-main" title={instance.name} onClick={() => s.setPage("home")}>
         <Identicon seed={instance.id} size={32} hero />
-        <span className="col" style={{ flex: 1, minWidth: 0, gap: 1 }}>
+        <span className="col fill gap-2">
           <span className="now-label">{t("当前世界", "Current world")}</span>
           <span className="now-name truncate">{instance.name}</span>
           <span className={`now-meta truncate${state === "running" || state === "installing" ? " live" : ""}`}>{meta}</span>
@@ -168,7 +168,7 @@ function CurrentWorld() {
       </button>
       {action ? (
         <button type="button" className={`now-go${state === "running" ? " stop" : ""}`} aria-label={action.label} title={action.label} onClick={() => s.primaryAction(instance.id)}>
-          <Icon name={action.icon} size={15} />
+          <Icon name={action.icon} />
         </button>
       ) : (
         <span className="now-go busy">
@@ -194,7 +194,7 @@ export function WindowBar() {
     const off = backend().onMaximized(setMaximized);
     return () => void off.then((unlisten) => unlisten());
   }, []);
-  const buttons: { action: WindowAction; label: string; icon: PixelIconName }[] = [
+  const buttons: { action: WindowAction; label: string; icon: IconName }[] = [
     { action: "minimize", label: t("最小化", "Minimize"), icon: "winMin" },
     maximized
       ? { action: "toggleMaximize", label: t("还原", "Restore"), icon: "winRestore" }
@@ -212,7 +212,7 @@ export function WindowBar() {
           aria-label={button.label}
           onClick={() => backend().windowAction(button.action)}
         >
-          <PixelIcon name={button.icon} size={20} />
+          <Icon name={button.icon} />
         </button>
       ))}
     </div>
@@ -265,7 +265,7 @@ function TaskPanel({ onClose }: { onClose: () => void }) {
       {s.install && (
         <div className="task-row">
           <span className="status tone-accent pulse" />
-          <div className="col" style={{ flex: 1, minWidth: 0, gap: 4 }}>
+          <div className="col fill gap-4">
             <span className="truncate">
               {t("安装 ", "Install ")}{nameOf(s.install.instanceId)} · {stageLabel(s.install.stage)}
             </span>

@@ -3,10 +3,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { call, toError } from "../api/backend";
 import type { ContentKind, Instance, LastModChange, LocalMod, ModInsight, ModMeta, ModProject, ModVersion, PackFile, PackInfo, VersionSummary } from "../api/types";
-import { BrandMark, PixelIcon, Sign, type PixelIconName } from "../components/Pixel";
+import { BrandMark, Sign } from "../components/Pixel";
 import { ModIcon } from "../components/ModIcon";
 import { ProjectDetail } from "../components/ProjectDetail";
-import { Icon } from "../components/Icon";
+import { Icon, type IconName } from "../components/Icon";
 import { BiomePicker } from "../components/BiomePicker";
 import { JavaPicker } from "../components/JavaPicker";
 import { LoaderPicker, useLoaderSelectionValid } from "../components/LoaderPicker";
@@ -353,7 +353,7 @@ function GeneralTab({ instance, busy }: { instance: Instance; busy: boolean }) {
         </Field>
         <div className="launch-options">
           <button type="button" className="launch-options-toggle" aria-expanded={javaOpen} onClick={() => setJavaOpen(!javaOpen)}>
-            <Icon name={javaOpen ? "chevronDown" : "chevronRight"} size={13} />
+            <Icon name={javaOpen ? "chevronDown" : "chevronRight"} />
             Java
             {!javaOpen && <span className="chip">{mode === "auto" ? t("自动匹配", "Automatic") : mode === "inherit" ? t("继承全局", "Use global") : t("指定", "Custom")}</span>}
           </button>
@@ -716,7 +716,7 @@ function ModsTab({ instance, busy, browse }: { instance: Instance; busy: boolean
       <div className="mods-sticky">
         <div className="mods-head">
           <span className="mods-count mono">{s.mods.length}</span>
-          <div className="col" style={{ gap: 2, minWidth: 0 }}>
+          <div className="col gap-2">
             <span className="mods-title">
               {plugins ? t("个插件 · ", " plugins · ") : t("个模组 · ", " mods · ")}{s.mods.length - disabled}{t(" 个启用", " enabled")}
             </span>
@@ -822,7 +822,7 @@ function ModsTab({ instance, busy, browse }: { instance: Instance; busy: boolean
       </div>
       {recent && (
         <div className="mods-undo">
-          <Icon name="archive" size={14} />
+          <Icon name="archive" />
           <span className="truncate">
             {recent.replaced > 0 ? t(`上次更新了 ${recent.added} 个模组`, `Last update: ${recent.added} mods`) : t(`上次安装了 ${recent.added} 个模组`, `Last install: ${recent.added} mods`)}
             <span className="faint"> · {formatRelative(recent.createdMs)}</span>
@@ -862,10 +862,10 @@ function ModsTab({ instance, busy, browse }: { instance: Instance; busy: boolean
                   aria-selected={picked ? picked.has(mod.name) : undefined}
                   onClick={picked ? () => pick(mod.name) : undefined}
                 >
-                  {picked && <span className={`pick-box${picked.has(mod.name) ? " on" : ""}`} aria-hidden>{picked.has(mod.name) && <Icon name="check" size={12} />}</span>}
+                  {picked && <span className={`pick-box${picked.has(mod.name) ? " on" : ""}`} aria-hidden>{picked.has(mod.name) && <Icon name="check" />}</span>}
                   <button type="button" className="mod-main" aria-expanded={picked ? undefined : open} tabIndex={picked ? -1 : undefined} onClick={picked ? undefined : () => setOpened(open ? null : mod.name)}>
                     {/* The jar's own icon shows at once and offline; Modrinth's when the jar has none. */}
-                    <ModIcon src={icons[mod.name] ?? info?.iconUrl} seed={info?.projectId ?? mod.name} size={34} glyph="mod" />
+                    <ModIcon src={icons[mod.name] ?? info?.iconUrl} seed={info?.projectId ?? mod.name} size={32} glyph="mod" />
                     <span className="mod-text">
                       <span className="mod-title truncate">
                         {title}
@@ -890,7 +890,7 @@ function ModsTab({ instance, busy, browse }: { instance: Instance; busy: boolean
                       title={t(`更新到 ${info.update.versionNumber}`, `Update to ${info.update.versionNumber}`)}
                       onClick={() => void s.updateMods(instance.id, [info.update!.versionId])}
                     >
-                      <Icon name="download" size={12} />
+                      <Icon name="download" />
                       {t("更新", "Update")}
                     </button>
                   ) : !info && s.insights.checked && !s.insights.error ? (
@@ -1132,9 +1132,9 @@ function PacksTab({ instance, browse }: { instance: Instance; browse: (kind: Con
           <section key={section.kind} className="pack-section">
             <div className="pack-head">
               <span className={`pack-glyph ${section.kind}`}>
-                <PixelIcon name={section.glyph} size={20} />
+                <Icon name={section.glyph} />
               </span>
-              <div className="col" style={{ gap: 2, flex: 1, minWidth: 0 }}>
+              <div className="col gap-2 fill">
                 <span className="pack-title">
                   {section.title}
                   {section.list && <span className="mono faint"> {section.list.length}</span>}
@@ -1207,7 +1207,7 @@ function PacksTab({ instance, browse }: { instance: Instance; browse: (kind: Con
                       {/* The pack's own picture as the game's list shows it; for a
                           shader pack (which has none) its Modrinth project's icon. */}
                       <ModIcon src={pack.icon ?? info?.iconUrl} seed={`${section.kind}:${pack.name}`} size={40} glyph={section.glyph} />
-                      <div className="col" style={{ minWidth: 0, gap: 2, flex: 1 }}>
+                      <div className="col gap-2 fill">
                         <span className="pack-name truncate">{info?.title ?? pack.name.replace(/\.zip$/i, "")}</span>
                         <span className="pack-meta mono truncate">
                           {info ? `${pack.name} · ` : pack.folder ? t("文件夹 · ", "Folder · ") : "ZIP · "}
@@ -1287,7 +1287,7 @@ const KIND_PLACEHOLDER: Record<ContentKind, string> = {
 const KIND_NAME: Record<ContentKind, string> = { mod: t("模组", "Mods"), resourcepack: t("资源包", "Resource packs"), shader: t("光影包", "Shader packs"), datapack: t("数据包", "Datapacks"), world: t("地图", "Maps") };
 
 /** What stands in for a missing picture: a puzzle piece, a framed picture, the sun. */
-const KIND_GLYPH = { mod: "mod", resourcepack: "pack", shader: "sun", datapack: "map", world: "block" } as const satisfies Record<ContentKind, PixelIconName>;
+const KIND_GLYPH = { mod: "mod", resourcepack: "pack", shader: "sun", datapack: "map", world: "block" } as const satisfies Record<ContentKind, IconName>;
 
 /** The shader loaders a shader pack supports, as readable tags. */
 function shaderTags(categories: string[] | undefined): string[] {
@@ -1594,7 +1594,7 @@ function BrowseTab({ instance, busy }: { instance: Instance; busy: boolean }) {
                         onClick={() => setUnfolded({ ...unfolded, [group.id]: !open })}
                       >
                         {open ? t("收起", "Less") : t(`更多 ${group.options.length - FOLDED}`, `${group.options.length - FOLDED} more`)}
-                        <Icon name={open ? "chevronUp" : "chevronDown"} size={11} />
+                        <Icon name={open ? "chevronUp" : "chevronDown"} />
                       </button>
                     )}
                   </div>
@@ -1609,7 +1609,7 @@ function BrowseTab({ instance, busy }: { instance: Instance; busy: boolean }) {
           </div>
           {shader && !shader.ok && (
             <Notice tone="warn" title={t("还不能加载光影", "Shaders can't load yet")}>
-              <span className="row" style={{ gap: 10, flexWrap: "wrap" }}>
+              <span className="row gap-12 wrap">
                 {shader.text}
                 {shader.need && (
                   <Button size="sm" variant="ghost" icon="search" onClick={() => switchToMod(shader.need!.slug)}>
@@ -1625,7 +1625,7 @@ function BrowseTab({ instance, busy }: { instance: Instance; busy: boolean }) {
             </div>
           )}
           {chinese && chinese.candidates.length > 1 && (
-            <div className="row" style={{ flexWrap: "wrap", gap: 6 }}>
+            <div className="row wrap gap-6">
               <span className="faint" style={{ fontSize: "var(--text-xs)" }}>
                 {t("匹配到多个模组：", "Several mods match: ")}
               </span>
@@ -1666,7 +1666,7 @@ function BrowseTab({ instance, busy }: { instance: Instance; busy: boolean }) {
                   Array.from({ length: SKELETON_ROWS }, (_, i) => (
                     <div key={i} className="list-row browse-skeleton" aria-hidden>
                       <span className="skeleton skeleton-icon" />
-                      <span className="col" style={{ flex: 1, gap: 7 }}>
+                      <span className="col fill gap-8">
                         <span className="skeleton" style={{ width: `${34 + ((i * 17) % 30)}%` }} />
                         <span className="skeleton" style={{ width: `${62 + ((i * 11) % 26)}%` }} />
                       </span>
@@ -1684,8 +1684,8 @@ function BrowseTab({ instance, busy }: { instance: Instance; busy: boolean }) {
                       aria-selected={hit.project_id === s.versions.project}
                       onClick={() => s.loadModVersions(instance.id, hit.project_id)}
                     >
-                      <ModIcon src={hit.icon_url} seed={hit.project_id} size={38} glyph={KIND_GLYPH[kind]} />
-                      <div className="col" style={{ flex: 1, gap: 2, textAlign: "left", minWidth: 0 }}>
+                      <ModIcon src={hit.icon_url} seed={hit.project_id} size={40} glyph={KIND_GLYPH[kind]} />
+                      <div className="col fill gap-2" style={{ textAlign: "left" }}>
                         <span className="browse-title truncate">
                           {hit.title}
                           {!isEnglish && named && named.zh !== hit.title && <span className="mod-zh"> · {named.zh}</span>}
@@ -1709,10 +1709,10 @@ function BrowseTab({ instance, busy }: { instance: Instance; busy: boolean }) {
                         </span>
                       ) : (
                         <span className="mono faint" style={{ fontSize: "var(--text-xs)", whiteSpace: "nowrap" }}>
-                          <Icon name="download" size={11} /> {formatCount(hit.downloads)}
+                          <Icon name="download" /> {formatCount(hit.downloads)}
                         </span>
                       )}
-                      <Icon name="chevronRight" size={14} className="faint" />
+                      <Icon name="chevronRight" className="faint" />
                     </button>
                   );
                 })}
@@ -1732,7 +1732,7 @@ function BrowseTab({ instance, busy }: { instance: Instance; busy: boolean }) {
                       {t(`${page} / ${pages} 页 · ${s.search.total} 个结果`, `Page ${page} of ${pages} · ${s.search.total} results`)}
                     </span>
                     <Button size="sm" variant="ghost" disabled={page >= pages || s.search.loading} onClick={() => search(s.search.offset + PAGE_SIZE)}>
-                      {t("下一页 ", "Next ")}<Icon name="chevronRight" size={13} />
+                      {t("下一页 ", "Next ")}<Icon name="chevronRight" />
                     </Button>
                   </div>
                 )}
@@ -1740,14 +1740,14 @@ function BrowseTab({ instance, busy }: { instance: Instance; busy: boolean }) {
               <AnimatePresence mode="wait">
                 {!s.versions.project && (
                   <motion.div key="hint" className="browse-versions browse-placeholder" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: normal }} exit={{ opacity: 0 }}>
-                    <PixelIcon name={kind === "mod" ? "block" : KIND_GLYPH[kind]} size={28} />
+                    <Icon name={kind === "mod" ? "block" : KIND_GLYPH[kind]} size={32} />
                     <span>{t("选择左侧任意一项，这里会列出适配 ", "Pick any result on the left to see its versions for ")}{instance.versionId}{t(" 的版本。", ".")}</span>
                   </motion.div>
                 )}
                 {s.versions.project && (
                   <motion.div key={s.versions.project} className="browse-versions card" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0, transition: normal }} exit={{ opacity: 0 }}>
                     <div className="card-header browse-versions-head">
-                      <ModIcon src={project?.icon_url} seed={s.versions.project} size={26} glyph={KIND_GLYPH[kind]} />
+                      <ModIcon src={project?.icon_url} seed={s.versions.project} size={24} glyph={KIND_GLYPH[kind]} />
                       <span className="card-title truncate" style={{ flex: 1 }}>{project?.title ?? s.versions.project}</span>
                       {project && (
                         <Button size="sm" variant="ghost" icon="info" onClick={() => setDetail(project)}>
@@ -1755,7 +1755,7 @@ function BrowseTab({ instance, busy }: { instance: Instance; busy: boolean }) {
                         </Button>
                       )}
                     </div>
-                    <div className="col" style={{ padding: 8, gap: 2 }}>
+                    <div className="col gap-2" style={{ padding: 8 }}>
                       {s.versions.loading ? (
                         <div className="faint row" style={{ padding: 10 }}>
                           <span className="spinner" />{t(" 正在获取版本…", " Loading versions…")}
@@ -1768,7 +1768,7 @@ function BrowseTab({ instance, busy }: { instance: Instance; busy: boolean }) {
                         s.versions.versions.map((v, index) => (
                           <div key={v.id} className="picker-row flat">
                             <div className="col" style={{ flex: 1, minWidth: 0 }}>
-                              <span className="row" style={{ gap: 6 }}>
+                              <span className="row gap-6">
                                 <span className="mono truncate" style={{ fontWeight: 600 }}>
                                   {v.version_number}
                                 </span>
@@ -1996,8 +1996,8 @@ function DataTab({ instance, busy }: { instance: Instance; busy: boolean }) {
       <div className="list">
         {rows.map((row) => (
           <div key={row.title} className="list-row" style={{ minHeight: 58 }}>
-            <Icon name={row.icon} size={16} className="faint" />
-            <div className="col" style={{ flex: 1, gap: 2 }}>
+            <Icon name={row.icon} className="faint" />
+            <div className="col fill gap-2">
               <span style={{ fontWeight: 600 }}>{row.title}</span>
               <span className="muted" style={{ fontSize: "var(--text-xs)" }}>
                 {row.text}
@@ -2090,7 +2090,7 @@ function Worlds({ instance }: { instance: Instance }) {
               animate={{ opacity: 1, y: 0, transition: { ...normal, delay: Math.min(index, 8) * 0.03 } }}
             >
               <span className="world-tile-icon">{world.icon ? <img src={world.icon} alt="" /> : <Identicon seed={`${instance.id}:${world.folder}`} size={40} />}</span>
-              <span className="col" style={{ minWidth: 0, gap: 2 }}>
+              <span className="col gap-2">
                 <span className="world-tile-name truncate">{world.name ?? world.folder}</span>
                 <span className="world-tile-meta mono">
                   {formatBytes(world.bytes)} · {world.modifiedMs ? formatRelative(world.modifiedMs).replace(t("尚未游玩", "Never played"), "—") : "—"}

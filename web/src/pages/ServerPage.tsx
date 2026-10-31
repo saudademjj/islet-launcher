@@ -4,8 +4,7 @@ import { createPortal } from "react-dom";
 
 import { call } from "../api/backend";
 import type { Instance, LocalMod, ServerProject, Snapshot } from "../api/types";
-import { PixelIcon } from "../components/Pixel";
-import { Button, Chip, Field, Identicon, Input, Segmented, Switch } from "../components/ui";
+import { Button, CardHeader, Chip, Field, Identicon, Input, Segmented, Switch } from "../components/ui";
 import { Toolbar } from "../layout/Shell";
 import { loaderLabel } from "../lib/format";
 import { t } from "../lib/i18n";
@@ -73,7 +72,7 @@ function KindPicker({ value, onChange }: { value: string; onChange: (loader: str
   return (
     <div className="server-kinds">
       {KINDS.map((group) => (
-        <div key={group.group} className="col" style={{ gap: 6 }}>
+        <div key={group.group} className="col gap-6">
           <span className="field-label">{group.group}</span>
           <div className="server-kind-row">
             {group.items.map((kind) => (
@@ -98,7 +97,7 @@ function VersionPicker({ loader, value, onChange }: { loader: string; value: str
   if (loading) return <span className="field-hint"><span className="spinner" />{t(" 正在获取版本列表…", " Loading versions…")}</span>;
   if (versions.length === 0) return <span className="field-hint bad">{t("版本列表加载失败，请检查网络后重试", "Couldn't load versions; check the network and try again")}</span>;
   return (
-    <div className="col" style={{ gap: 8 }}>
+    <div className="col gap-8">
       <div className="server-versions">
         {list.map((version) => (
           <button key={version} type="button" className="server-version mono" aria-pressed={value === version} onClick={() => onChange(version)}>
@@ -166,7 +165,7 @@ export function ServerPage() {
               })}
             </nav>
           )}
-          <div className="col" style={{ gap: 16, minWidth: 0 }}>
+          <div className="col gap-16">
             {showCreate ? (
               <CreateServer
                 first={s.projects.length === 0}
@@ -201,11 +200,8 @@ function CreateServer({ first, onCancel, onCreated }: { first: boolean; onCancel
   const ok = name.trim().length > 0 && versions.includes(version);
   return (
     <section className="card">
-      <div className="card-header">
-        <PixelIcon name="rack" size={20} />
-        <span className="card-title">{first ? t("开一台自己的服务器", "Run your own server") : t("新建服务器", "New server")}</span>
-      </div>
-      <div className="card-body col" style={{ gap: 18 }}>
+      <CardHeader icon="rack" title={first ? t("开一台自己的服务器", "Run your own server") : t("新建服务器", "New server")} />
+      <div className="card-body col gap-20">
         {first && (
           <span className="field-hint">
             {t(
@@ -223,7 +219,7 @@ function CreateServer({ first, onCancel, onCreated }: { first: boolean; onCancel
         <Field label={t("游戏版本", "Game version")}>
           <VersionPicker loader={loader} value={version} onChange={setVersion} />
         </Field>
-        <div className="row" style={{ gap: 8, justifyContent: "flex-end" }}>
+        <div className="row gap-8 justify-end">
           {!first && (
             <Button variant="ghost" onClick={onCancel}>
               {t("取消", "Cancel")}
@@ -336,7 +332,7 @@ function ProjectView({ project, bar }: { project: Instance; bar: HTMLDivElement 
     <>
       <section className="card server-head">
         <Identicon seed={project.id} size={46} />
-        <div className="col" style={{ minWidth: 0, gap: 2 }}>
+        <div className="col gap-2">
           <span className="server-head-name">{project.name}</span>
           <span className="field-hint mono">
             {loaderLabel(project.loader)}
@@ -344,7 +340,7 @@ function ProjectView({ project, bar }: { project: Instance; bar: HTMLDivElement 
           </span>
         </div>
         <div className="spacer" />
-        <div className="row" style={{ gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <div className="row gap-8 wrap justify-end">
           <Button icon="folder" disabled={dirty} title={blocked} onClick={() => s.openModal({ kind: "exportServer", id: project.id })}>
             {t("导出到文件夹", "Export to folder")}
           </Button>
@@ -357,21 +353,17 @@ function ProjectView({ project, bar }: { project: Instance; bar: HTMLDivElement 
 
       {project.loader !== "vanilla" && (
         <section className="card">
-          <div className="card-header">
-            <PixelIcon name={plugins ? "pack" : "mod"} size={18} />
-            <span className="card-title">{what}</span>
-            <span className="field-hint">{mods ? mods.length : "…"}</span>
-            <div className="spacer" />
+          <CardHeader icon={plugins ? "pack" : "mod"} title={what} meta={mods ? mods.length : "…"}>
             <Button size="sm" onClick={() => s.openManage(project.id, "mods")}>
               {t("管理", "Manage")}
             </Button>
             <Button size="sm" variant="primary" icon="download" onClick={() => s.openManage(project.id, "browse")}>
               {plugins ? t("下载插件", "Get plugins") : t("下载模组", "Get mods")}
             </Button>
-          </div>
+          </CardHeader>
           <div className="card-body">
             {mods && mods.length > 0 ? (
-              <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+              <div className="row gap-6 wrap">
                 {mods.slice(0, 24).map((mod) => (
                   <Chip key={mod.name}>{mod.name.replace(/\.jar(\.disabled)?$/, "")}</Chip>
                 ))}
@@ -390,12 +382,8 @@ function ProjectView({ project, bar }: { project: Instance; bar: HTMLDivElement 
       {project.loader === "vanilla" && <span className="field-hint">{t("原版服务端不加载模组和插件；想装插件，把类型换成 Paper。", "A vanilla server runs no mods or plugins; switch to Paper for plugins.")}</span>}
 
       <section className="card">
-        <div className="card-header">
-          <PixelIcon name="sliders" size={18} />
-          <span className="card-title">{t("服务器设置", "Server settings")}</span>
-          <span className="field-hint">{t("内存、JVM 参数和视距在开服时按机器配置自动调整", "Memory, JVM flags and view distance fit the machine at start")}</span>
-        </div>
-        <div className="card-body col" style={{ gap: 18 }}>
+        <CardHeader icon="sliders" title={t("服务器设置", "Server settings")} text={t("内存、JVM 参数和视距在开服时按机器配置自动调整", "Memory, JVM flags and view distance fit the machine at start")} />
+        <div className="card-body col gap-20">
           <Field label={t("名称", "Name")} tone={form.name.trim() ? undefined : "bad"}>
             <Input value={form.name} maxLength={64} invalid={!form.name.trim()} onChange={(e) => set("name", e.target.value)} />
           </Field>
@@ -408,7 +396,7 @@ function ProjectView({ project, bar }: { project: Instance; bar: HTMLDivElement 
           <Field label={t("服务器介绍（MOTD）", "Message of the day")} hint={t("显示在多人游戏列表里；不填就用名称", "Shown in the multiplayer list; the name when left empty")}>
             <Input value={form.motd} maxLength={120} placeholder={form.name} onChange={(e) => set("motd", e.target.value.replace(/[\r\n]/g, ""))} />
           </Field>
-          <div className="row" style={{ gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+          <div className="row gap-16 items-start wrap">
             <Field label={t("最多玩家", "Max players")} tone={maxPlayers >= 1 && maxPlayers <= 1000 ? undefined : "bad"}>
               <Input mono inputMode="numeric" value={form.maxPlayers} style={{ width: 100 }} invalid={!(maxPlayers >= 1 && maxPlayers <= 1000)} onChange={(e) => set("maxPlayers", e.target.value.replace(/\D/g, "").slice(0, 4))} />
             </Field>

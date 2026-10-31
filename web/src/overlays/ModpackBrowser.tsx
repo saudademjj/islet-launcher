@@ -6,7 +6,6 @@ import type { ModProject, ModVersion, SearchResults } from "../api/types";
 import { Icon } from "../components/Icon";
 import { ModIcon } from "../components/ModIcon";
 import { Modal } from "../components/overlay";
-import { PixelIcon } from "../components/Pixel";
 import { ProjectDetail } from "../components/ProjectDetail";
 import { Button, Input, Notice, Segmented } from "../components/ui";
 import { MODPACK_GROUPS, SORTS, modpackChoice, type FilterChoice, type SearchSort } from "../lib/contentFilters";
@@ -100,7 +99,7 @@ export function ModpackBrowser() {
 
   return (
     <Modal wide title={t("浏览整合包", "Browse modpacks")} onClose={s.close}>
-      <div className="col" style={{ gap: 12 }}>
+      <div className="col gap-12">
         <div className="row">
           <div style={{ flex: 1 }}>
             <Input icon="search" placeholder={t("搜索整合包，留空看热门", "Search modpacks, or leave empty for popular ones")} value={query} onChange={(e) => { setQuery(e.target.value); restart(); }} />
@@ -171,7 +170,7 @@ export function ModpackBrowser() {
                 Array.from({ length: SKELETON_ROWS }, (_, i) => (
                   <div key={i} className="list-row browse-skeleton" aria-hidden>
                     <span className="skeleton skeleton-icon" />
-                    <span className="col" style={{ flex: 1, gap: 7 }}>
+                    <span className="col fill gap-8">
                       <span className="skeleton" style={{ width: `${34 + ((i * 17) % 30)}%` }} />
                       <span className="skeleton" style={{ width: `${62 + ((i * 11) % 26)}%` }} />
                     </span>
@@ -179,17 +178,17 @@ export function ModpackBrowser() {
                 ))}
               {hits.map((hit) => (
                 <button key={hit.project_id} type="button" className="list-row clickable browse-hit" aria-selected={hit.project_id === chosen?.project_id} onClick={() => setChosen(hit)}>
-                  <ModIcon src={hit.icon_url} seed={hit.project_id} size={38} glyph="pack" />
-                  <div className="col" style={{ flex: 1, gap: 2, textAlign: "left", minWidth: 0 }}>
+                  <ModIcon src={hit.icon_url} seed={hit.project_id} size={40} glyph="pack" />
+                  <div className="col fill gap-2" style={{ textAlign: "left" }}>
                     <span className="browse-title truncate">{hit.title}</span>
                     <span className="muted truncate" style={{ fontSize: "var(--text-xs)" }}>
                       {hit.description}
                     </span>
                   </div>
                   <span className="mono faint" style={{ fontSize: "var(--text-xs)", whiteSpace: "nowrap" }}>
-                    <Icon name="download" size={11} /> {formatCount(hit.downloads)}
+                    <Icon name="download" /> {formatCount(hit.downloads)}
                   </span>
-                  <Icon name="chevronRight" size={14} className="faint" />
+                  <Icon name="chevronRight" className="faint" />
                 </button>
               ))}
               {result && hits.length === 0 && !loading && (
@@ -208,7 +207,7 @@ export function ModpackBrowser() {
                     {t(`${page} / ${pages} 页`, `Page ${page} of ${pages}`)}
                   </span>
                   <Button size="sm" variant="ghost" disabled={page >= pages || loading} onClick={() => setOffset(offset + PAGE_SIZE)}>
-                    {t("下一页 ", "Next ")}<Icon name="chevronRight" size={13} />
+                    {t("下一页 ", "Next ")}<Icon name="chevronRight" />
                   </Button>
                 </div>
               )}
@@ -216,19 +215,19 @@ export function ModpackBrowser() {
             <AnimatePresence mode="wait">
               {!chosen ? (
                 <motion.div key="hint" className="browse-versions browse-placeholder" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: normal }} exit={{ opacity: 0 }}>
-                  <PixelIcon name="pack" size={28} />
+                  <Icon name="pack" size={32} />
                   <span>{t("选择左侧任意整合包，这里会列出它的版本。安装会创建一个新世界。", "Pick any modpack on the left to see its versions. Installing creates a new world.")}</span>
                 </motion.div>
               ) : (
                 <motion.div key={chosen.project_id} className="browse-versions card" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0, transition: normal }} exit={{ opacity: 0 }}>
                   <div className="card-header browse-versions-head">
-                    <ModIcon src={chosen.icon_url} seed={chosen.project_id} size={26} glyph="pack" />
+                    <ModIcon src={chosen.icon_url} seed={chosen.project_id} size={24} glyph="pack" />
                     <span className="card-title truncate" style={{ flex: 1 }}>{chosen.title}</span>
                     <Button size="sm" variant="ghost" icon="info" onClick={() => setDetail(true)}>
                       {t("介绍", "About")}
                     </Button>
                   </div>
-                  <div className="col" style={{ padding: 8, gap: 2 }}>
+                  <div className="col gap-2" style={{ padding: 8 }}>
                     {versionLoading ? (
                       <div className="faint row" style={{ padding: 10 }}>
                         <span className="spinner" />{t(" 正在获取版本…", " Loading versions…")}
@@ -241,7 +240,7 @@ export function ModpackBrowser() {
                       versions.map((v) => (
                         <div key={v.id} className="picker-row flat">
                           <div className="col" style={{ flex: 1, minWidth: 0 }}>
-                            <span className="row" style={{ gap: 6 }}>
+                            <span className="row gap-6">
                               <span className="mono truncate" style={{ fontWeight: 600 }}>
                                 {v.version_number}
                               </span>

@@ -107,7 +107,7 @@ export function ContextMenuHost() {
                   item.run();
                 }}
               >
-                {item.icon ? <Icon name={item.icon} size={14} /> : <span style={{ width: 14 }} />}
+                {item.icon ? <Icon name={item.icon} /> : <span style={{ width: 14 }} />}
                 {item.label}
               </button>
             );

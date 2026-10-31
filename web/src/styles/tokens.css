@@ -19,6 +19,17 @@
   --radius-lg: 4px;
   --radius-xl: 6px;
 
+  /* Spacing: a 4px grid. 2 and 6 only inside small controls; layout steps
+     are 8, 12, 16, 24, 32, 48. Every gap, padding and margin is one of these. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
   --dur-fast: 120ms;
   --dur: 200ms;
   --dur-slow: 300ms;

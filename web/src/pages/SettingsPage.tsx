@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { call, toError } from "../api/backend";
 import type { Cleanup, DownloadSource, LaunchConfig, Settings, StorageUsage, Theme } from "../api/types";
 import { Icon, type IconName } from "../components/Icon";
-import { Button, Field, Input, Segmented, Switch } from "../components/ui";
+import { Button, CardHeader, Field, Input, Segmented, Switch } from "../components/ui";
 import { JavaPicker } from "../components/JavaPicker";
 import { LaunchOptions, launchProblem } from "../components/LaunchOptions";
 import { rememberLanguage, t, type Language } from "../lib/i18n";
@@ -130,7 +130,7 @@ export function SettingsPage() {
       const id = section.id.replace("set-", "");
       // Only the name brings the whole section; its description lists a few
       // of the rows and would bring the rest along with them.
-      const title = section.querySelector(".settings-head .card-title")?.textContent ?? "";
+      const title = section.querySelector(".card-header .card-title")?.textContent ?? "";
       const whole = matchItem(title, [], words) !== null;
       let count = 0;
       for (const row of section.querySelectorAll<HTMLElement>(":scope > .card-body > *")) {
@@ -293,7 +293,7 @@ export function SettingsPage() {
                 onClick={() => jump(sec.id)}
               >
                 {current === sec.id && <motion.span layoutId="settings-index" className="index-highlight" transition={glide} />}
-                <Icon name={sec.icon} size={15} />
+                <Icon name={sec.icon} />
                 {sec.title}
                 {hits && hits[sec.id] > 0 && <span className="index-count">{hits[sec.id]}</span>}
               </button>
@@ -320,7 +320,7 @@ export function SettingsPage() {
               }
               tone={form.memoryAuto || memoryOk ? undefined : "bad"}
             >
-              <div className="col" style={{ gap: 10 }}>
+              <div className="col gap-12">
                 <div>
                   <Segmented
                     value={form.memoryAuto ? "auto" : "manual"}
@@ -529,7 +529,7 @@ export function SettingsPage() {
                     )}
                   </span>
                   <span className="theme-label">
-                    {s.settings.theme === theme.value && <Icon name="check" size={13} />}
+                    {s.settings.theme === theme.value && <Icon name="check" />}
                     {theme.label}
                   </span>
                 </button>
@@ -575,7 +575,7 @@ export function SettingsPage() {
                   </Button>
                 </div>
                 <button type="button" className="launch-options-toggle" aria-expanded={ownAppShown} onClick={() => setOwnApp(!ownApp)}>
-                  <Icon name={ownAppShown ? "chevronDown" : "chevronRight"} size={13} />
+                  <Icon name={ownAppShown ? "chevronDown" : "chevronRight"} />
                   {t("高级：改用自己的 Azure 应用", "Advanced: use your own Azure app")}
                 </button>
               </>
@@ -841,7 +841,7 @@ function LanguageRow() {
 /** Launch options for every world; saved with the rest of the page. */
 function GlobalLaunchOptions({ value, onChange, changed }: { value: LaunchConfig; onChange: (next: LaunchConfig) => void; changed: boolean }) {
   return (
-    <div className="col" style={{ gap: 10 }}>
+    <div className="col gap-12">
       <LaunchOptions value={value} onChange={onChange} />
       {changed && (
         <span className="field-hint">
@@ -988,7 +988,7 @@ function StorageSection() {
           <div className="list">
             {rows.map((row) => (
               <div key={row.label} className="list-row storage-row">
-                <div className="col" style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                <div className="col fill gap-2">
                   <span style={{ fontWeight: 600 }}>{row.label}</span>
                   <span className="faint truncate" style={{ fontSize: "var(--text-xs)" }}>
                     {row.hint}
@@ -1000,7 +1000,7 @@ function StorageSection() {
             ))}
             {usage.java.map((java) => (
               <div key={java.path} className="list-row storage-row">
-                <div className="col" style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                <div className="col fill gap-2">
                   <span style={{ fontWeight: 600 }}>Java {java.major}</span>
                   <span className="faint truncate" style={{ fontSize: "var(--text-xs)" }} title={java.path}>
                     {java.unused ? t("已安装的世界都不需要它，删除后需要时会重新下载", "No installed world needs it; it downloads again if needed") : t("有世界正在用", "In use")}
@@ -1024,16 +1024,8 @@ function StorageSection() {
 function Section({ id, icon, title, text, children }: { id: string; icon: IconName; title: string; text?: string; children: React.ReactNode }) {
   return (
     <motion.section id={`set-${id}`} className="card settings-section" variants={item}>
-      <div className="settings-head">
-        <span className="settings-icon">
-          <Icon name={icon} size={17} />
-        </span>
-        <div className="col" style={{ gap: 2 }}>
-          <span className="card-title">{title}</span>
-          {text && <span className="field-hint">{text}</span>}
-        </div>
-      </div>
-      <div className="card-body col" style={{ gap: 20 }}>
+      <CardHeader icon={icon} title={title} text={text} />
+      <div className="card-body col gap-20">
         {children}
       </div>
     </motion.section>

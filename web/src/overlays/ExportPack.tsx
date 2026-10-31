@@ -64,7 +64,7 @@ export function ExportPack({ id }: { id: string }) {
         </>
       }
     >
-      <div className="col" style={{ gap: 16 }}>
+      <div className="col gap-16">
         {notInstalled && <span className="field-hint bad">{t("先安装一次这个世界，确定加载器版本后才能导出。", "Install this world once so its loader version is fixed, then export.")}</span>}
         <Field
           label={t("格式", "Format")}
@@ -89,7 +89,7 @@ export function ExportPack({ id }: { id: string }) {
         <Field label={t("简介", "Summary")} hint={t("可选，显示在导入它的启动器里", "Optional; shown in the launcher that imports it")}>
           <Input value={options.summary} maxLength={200} onChange={(e) => set({ summary: e.target.value })} />
         </Field>
-        <div className="col" style={{ gap: 10 }}>
+        <div className="col gap-12">
           <span className="field-label">{t("一起打包", "Also include")}</span>
           <span className="field-hint">{t("模组、资源包、光影和 config 等配置文件夹总是包含在内。", "Mods, resource packs, shaders and config folders are always included.")}</span>
           {toggles.map((toggle) => (

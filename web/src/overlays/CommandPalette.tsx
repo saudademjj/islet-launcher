@@ -6,7 +6,7 @@ import type { Instance, LocalMod, PackLists, Screenshot, ServerEntry, Theme, Ver
 import { Icon, type IconName } from "../components/Icon";
 import { ModIcon } from "../components/ModIcon";
 import { useModIcons, usePackInsights } from "../lib/contentIcons";
-import { Landscape, PixelIcon, PX } from "../components/Pixel";
+import { Landscape, PX } from "../components/Pixel";
 import { SceneCover } from "../components/SceneCover";
 import { Motd, Signal } from "../components/Server";
 import { Identicon } from "../components/ui";
@@ -90,7 +90,7 @@ const SCOPES: Scope[] = [
   { id: "action", label: t("操作", "Actions"), prefix: ">", kinds: ["action", "page"] },
 ];
 
-const glyph = (name: IconName) => <Icon name={name} size={15} />;
+const glyph = (name: IconName) => <Icon name={name} />;
 
 // ----- recents ---------------------------------------------------------------
 
@@ -242,14 +242,14 @@ function useItems(query: string): { items: Item[]; quick: Item[] } {
           label: world.folder,
           sub: t(`存档 · ${instance.name}${world.modifiedMs ? ` · ${formatRelative(world.modifiedMs)}` : ""}`, `Save · ${instance.name}${world.modifiedMs ? ` · ${formatRelative(world.modifiedMs)}` : ""}`),
           keywords: `save world 存档 ${instance.name}`,
-          icon: world.icon ? <img className="palette-img pixelated" src={world.icon} alt="" /> : <PixelIcon name="map" size={20} />,
+          icon: world.icon ? <img className="palette-img pixelated" src={world.icon} alt="" /> : <Icon name="map" />,
           primary: ws.quickPlay
             ? { label: t("进入存档", "Open save"), run: () => (store.setActiveInstance(instance.id), void store.launchInstance(instance.id, world.folder)) }
             : { label: t("查看存档", "Show saves"), run: () => store.openManage(instance.id, "data") },
           secondary: { label: t("在文件夹中显示", "Show in folder"), run: () => void store.open({ kind: "world", id: instance.id, folder: world.folder }) },
           preview: () => (
             <div className="pv">
-              <div className="pv-figure">{world.icon ? <img className="pv-save pixelated" src={world.icon} alt="" /> : <PixelIcon name="map" size={40} />}</div>
+              <div className="pv-figure">{world.icon ? <img className="pv-save pixelated" src={world.icon} alt="" /> : <Icon name="map" size={32} />}</div>
               <div className="pv-title">{world.folder}</div>
               <dl className="pv-facts">
                 <dt>{t("所在世界", "World")}</dt>
@@ -759,7 +759,7 @@ export function CommandPalette() {
         }}
       >
         <div className="palette-input-row">
-          <Icon name="search" size={17} />
+          <Icon name="search" />
           {scope.id !== "all" && <span className="palette-scope-pill">{scope.label}</span>}
           <input
             ref={input}

@@ -4,7 +4,6 @@ import { call } from "../api/backend";
 import type { Datapack, SaveBackup } from "../api/types";
 import { Icon } from "../components/Icon";
 import { Modal } from "../components/overlay";
-import { PixelIcon } from "../components/Pixel";
 import { Button, Identicon, Input } from "../components/ui";
 import { formatBytes, formatRelative } from "../lib/format";
 import { useWorlds } from "../lib/worlds";
@@ -69,7 +68,7 @@ export function SaveDialog({ id, folder }: { id: string; folder: string }) {
     <Modal
       title={shown}
       subtitle={world ? t(`${s.instance.name} · ${formatBytes(world.bytes)} · ${world.modifiedMs ? `上次游玩 ${formatRelative(world.modifiedMs)}` : "尚未游玩"}`, `${s.instance.name} · ${formatBytes(world.bytes)} · ${world.modifiedMs ? `last played ${formatRelative(world.modifiedMs)}` : "never played"}`) : list ? t("这个存档已经不在了", "This save is gone") : t("正在读取…", "Loading…")}
-      icon={world?.icon ? <img className="save-icon" src={world.icon} alt="" /> : <Identicon seed={`${id}:${folder}`} size={36} />}
+      icon={world?.icon ? <img className="save-icon" src={world.icon} alt="" /> : <Identicon seed={`${id}:${folder}`} size={40} />}
       onClose={back}
       footer={
         <>
@@ -178,8 +177,8 @@ export function SaveDialog({ id, folder }: { id: string; folder: string }) {
               <div className="list">
                 {packs.map((pack) => (
                   <div key={pack.name} className="list-row">
-                    <PixelIcon name="pack" size={20} />
-                    <div className="col" style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                    <Icon name="pack" />
+                    <div className="col fill gap-2">
                       <span className="truncate" style={{ fontWeight: 600 }}>
                         {pack.name.replace(/\.zip$/i, "")}
                       </span>
@@ -213,8 +212,8 @@ export function SaveDialog({ id, folder }: { id: string; folder: string }) {
               <div className="list">
                 {backups.map((backup) => (
                   <div key={backup.path} className="list-row">
-                    <Icon name="archive" size={15} className="faint" />
-                    <div className="col" style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                    <Icon name="archive" className="faint" />
+                    <div className="col fill gap-2">
                       <span style={{ fontWeight: 600 }}>{new Date(backup.createdMs).toLocaleString(isEnglish ? "en-US" : "zh-CN", { hour12: false })}</span>
                       <span className="faint" style={{ fontSize: "var(--text-xs)" }}>
                         <span className="mono">{formatBytes(backup.bytes)}</span>

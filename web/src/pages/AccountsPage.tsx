@@ -73,58 +73,65 @@ export function AccountsPage() {
     <>
       <Toolbar title={t("账号", "Accounts")} meta={active ? t(`${s.accounts.length} 个账号 · 正在使用 ${active.username}`, `${s.accounts.length} accounts · using ${active.username}`) : t(`${s.accounts.length} 个账号`, `${s.accounts.length} accounts`)} />
       <div className="content">
-        <motion.div className="page narrow" variants={stagger} initial="initial" animate="animate">
-          {active && <Profile account={active} />}
-          {!s.loginConfigured && (
-            <motion.div variants={item} style={{ marginBottom: 18 }}>
-              <Notice
-                tone="warn"
-                title={t("微软登录不可用", "Microsoft sign-in isn't available")}
-                actions={
-                  <Button size="sm" onClick={() => s.openSettings("login")}>
-                    {t("去设置", "Open settings")}
-                  </Button>
-                }
-              >
-                {t("这个版本没有内置微软登录。离线账号可以正常玩单人和局域网；有自己的 Azure 应用的话，可以在设置里填它的 Client ID。", "This build has no Microsoft sign-in built in. Offline accounts play singleplayer and LAN as usual; if you have your own Azure app, enter its Client ID in Settings.")}
-              </Notice>
-            </motion.div>
-          )}
+        <motion.div className="page" variants={stagger} initial="initial" animate="animate">
+          <div className="page-split">
+            <div className="page-main">
+              {active && <Profile account={active} />}
+              {!s.loginConfigured && (
+                <motion.div variants={item}>
+                  <Notice
+                    tone="warn"
+                    title={t("微软登录不可用", "Microsoft sign-in isn't available")}
+                    actions={
+                      <Button size="sm" onClick={() => s.openSettings("login")}>
+                        {t("去设置", "Open settings")}
+                      </Button>
+                    }
+                  >
+                    {t("这个版本没有内置微软登录。离线账号可以正常玩单人和局域网；有自己的 Azure 应用的话，可以在设置里填它的 Client ID。", "This build has no Microsoft sign-in built in. Offline accounts play singleplayer and LAN as usual; if you have your own Azure app, enter its Client ID in Settings.")}
+                  </Notice>
+                </motion.div>
+              )}
 
-          {s.accounts.length > 0 && (
-            <motion.section variants={item} style={{ marginBottom: 30 }}>
-              <SectionTitle>{t("已添加", "Added")}</SectionTitle>
-              <div className="col" style={{ gap: 10 }}>
-                <AnimatePresence initial={false}>
-                  {s.accounts.map((account) => (
-                    <AccountCard key={account.id} account={account} active={account.id === s.activeId} />
-                  ))}
-                </AnimatePresence>
-              </div>
-            </motion.section>
-          )}
-
-          <motion.section variants={item}>
-            <SectionTitle>{s.accounts.length ? t("添加账号", "Add account") : t("添加第一个账号", "Add your first account")}</SectionTitle>
-            <div className="options">
-              {options.map((o) => (
-                <button key={o.title} type="button" className={`option${o.primary ? " primary" : ""}${o.pending ? " pending" : ""}`} disabled={o.disabled} onClick={o.onClick}>
-                  <span className="option-icon">
-                    <Icon name={o.icon} size={20} />
-                  </span>
-                  <span className="option-title">
-                    {o.title}
-                    {o.pending && <span className="option-tag">{t("需配置", "Setup needed")}</span>}
-                  </span>
-                  <span className="option-text">{o.text}</span>
-                  <Icon name="chevronRight" size={15} className="option-go" />
-                </button>
-              ))}
+              {s.accounts.length > 0 && (
+                <motion.section variants={item}>
+                  <SectionTitle>{t("已添加", "Added")}</SectionTitle>
+                  <div className="col gap-12">
+                    <AnimatePresence initial={false}>
+                      {s.accounts.map((account) => (
+                        <AccountCard key={account.id} account={account} active={account.id === s.activeId} />
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                </motion.section>
+              )}
             </div>
-            <p className="faint" style={{ fontSize: "var(--text-xs)", marginTop: 16, lineHeight: 1.7 }}>
-              {t("微软账号在微软官方页面登录，启动器不接触密码；登录后会校验是否拥有 Java 版，刷新令牌保存在系统凭据存储中。", "Microsoft accounts sign in on Microsoft's own page and the launcher never sees the password; ownership of Java Edition is checked, and the refresh token goes to the system keychain.")}
-            </p>
-          </motion.section>
+
+            {/* Adding an account is the side task here: a column of ways to sign in. */}
+            <motion.aside className="page-aside" variants={item}>
+              <section>
+                <SectionTitle>{s.accounts.length ? t("添加账号", "Add account") : t("添加第一个账号", "Add your first account")}</SectionTitle>
+                <div className="options">
+                  {options.map((o) => (
+                    <button key={o.title} type="button" className={`option${o.primary ? " primary" : ""}${o.pending ? " pending" : ""}`} disabled={o.disabled} onClick={o.onClick}>
+                      <span className="option-icon">
+                        <Icon name={o.icon} />
+                      </span>
+                      <span className="option-title">
+                        {o.title}
+                        {o.pending && <span className="option-tag">{t("需配置", "Setup needed")}</span>}
+                      </span>
+                      <span className="option-text">{o.text}</span>
+                      <Icon name="chevronRight" className="option-go" />
+                    </button>
+                  ))}
+                </div>
+                <p className="fine-print">
+                  {t("微软账号在微软官方页面登录，启动器不接触密码；登录后会校验是否拥有 Java 版，刷新令牌保存在系统凭据存储中。", "Microsoft accounts sign in on Microsoft's own page and the launcher never sees the password; ownership of Java Edition is checked, and the refresh token goes to the system keychain.")}
+                </p>
+              </section>
+            </motion.aside>
+          </div>
         </motion.div>
       </div>
     </>
@@ -149,7 +156,7 @@ function AccountCard({ account, active }: { account: Account; active: boolean })
       exit={{ opacity: 0, height: 0, marginTop: -10, transition: { duration: 0.16 } }}
     >
       <PlayerFace account={account} size={48} className={active ? "accent" : undefined} />
-      <div className="col" style={{ flex: 1, gap: 4, minWidth: 0 }}>
+      <div className="col fill gap-4">
         <div className="row">
           <span className="account-name">{account.username}</span>
           <Chip>{providerLabel(account)}</Chip>
@@ -159,14 +166,14 @@ function AccountCard({ account, active }: { account: Account; active: boolean })
         <span className="account-meta">
           {t("添加于 ", "Added ")}{formatDate(account.createdAt)}
           <button type="button" className="link account-uuid" title={account.uuid} onClick={() => void s.copy(account.uuid, "UUID ")}>
-            <Icon name="copy" size={11} />
+            <Icon name="copy" />
             {t("复制 UUID", "Copy UUID")}
           </button>
         </span>
       </div>
       {active ? (
         <span className="pill-accent">
-          <Icon name="check" size={13} />{t(" 使用中", " In use")}
+          <Icon name="check" />{t(" 使用中", " In use")}
         </span>
       ) : (
         <Button size="sm" onClick={() => void s.mutate("set_active_account", { id: account.id })}>
@@ -187,9 +194,9 @@ function Profile({ account }: { account: Account }) {
       {/* The whole skin standing on the land when there is one; else the face. */}
       <span className="profile-figure">{account.skinUrl ? <SkinFront account={account} px={4} /> : null}</span>
       <PlayerFace key={account.uuid} account={account} size={72} className="profile-face" />
-      <div className="col" style={{ gap: 6, minWidth: 0 }}>
+      <div className="col gap-6">
         <span className="profile-label">{t("正在使用", "Signed in as")}</span>
-        <div className="row" style={{ gap: 10 }}>
+        <div className="row gap-12">
           <span className="profile-name truncate">{account.username}</span>
           <span className="profile-kind">{account.provider === "microsoft" ? t("微软账号", "Microsoft account") : account.provider === "yggdrasil" ? (account.serverName ?? t("外置账号", "Third-party account")) : t("离线账号", "Offline account")}</span>
         </div>

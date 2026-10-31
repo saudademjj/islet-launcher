@@ -21,7 +21,7 @@ export function BiomePicker({ seed }: { seed: string }) {
   const auto = biomeFor(seed);
   const options: (BiomeId | null)[] = [null, ...BIOME_IDS];
   return (
-    <div className="col" style={{ gap: 12 }}>
+    <div className="col gap-12">
       <div className="biomes">
         {options.map((id) => {
           const biome = id ? BIOMES[id] : auto;

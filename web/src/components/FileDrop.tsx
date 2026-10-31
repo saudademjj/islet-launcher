@@ -7,7 +7,7 @@ import { usePick, useStore } from "../store";
 import { t } from "../lib/i18n";
 import { Modal } from "./overlay";
 import { Button } from "./ui";
-import { PixelIcon } from "./Pixel";
+import { Icon } from "./Icon";
 
 type Pending = { paths: string[]; account?: string };
 export function FileDrop() {
@@ -43,7 +43,7 @@ export function FileDrop() {
   if (!pending) return over ? (
     <div className="drop-hint">
       <div className="drop-hint-card">
-        <PixelIcon name="drop" size={40} />
+        <Icon name="drop" size={32} />
         <span className="drop-hint-title">{t("松手添加", "Drop to add")}</span>
         <span className="drop-hint-kinds">{t("模组 .jar · 整合包 .mrpack / .zip · 皮肤 .png", "Mods .jar · modpacks .mrpack / .zip · skins .png")}</span>
       </div>
@@ -68,7 +68,7 @@ export function FileDrop() {
     finally { setBusy(false); }
   };
   return <Modal title={t("添加拖入的文件", "Add dropped files")} onClose={() => !busy && setPending(null)} footer={<Button variant="primary" busy={busy} disabled={s.fileBusy || !(jars ? !!target : skin ? !!account : pack)} onClick={() => void execute()}>{t("添加", "Add")}</Button>}>
-    <div className="col" style={{ gap: 14 }}>
+    <div className="col gap-16">
       <div className="list">
         {names.slice(0, 6).map((name, i) => <div key={i} className="list-row mono truncate" style={{ fontSize: "var(--text-sm)" }}>{name}</div>)}
         {names.length > 6 && <div className="list-row faint" style={{ fontSize: "var(--text-xs)" }}>{t(`还有 ${names.length - 6} 个文件`, `${names.length - 6} more files`)}</div>}

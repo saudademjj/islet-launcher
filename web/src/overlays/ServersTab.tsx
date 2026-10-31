@@ -3,7 +3,6 @@ import { useState } from "react";
 
 import { toError } from "../api/backend";
 import type { Instance, ServerEdit } from "../api/types";
-import { PixelIcon } from "../components/Pixel";
 import { JoinButton, ServerCard } from "../components/Server";
 import { Button, Empty, Input } from "../components/ui";
 import { formatCount } from "../lib/format";
@@ -11,6 +10,7 @@ import { normal } from "../lib/motion";
 import { useServerList, useServers } from "../lib/servers";
 import { usePick } from "../store";
 import { t } from "../lib/i18n";
+import { Icon } from "../components/Icon";
 
 type Draft = { index: number | null; name: string; address: string };
 
@@ -67,7 +67,7 @@ export function ServersTab({ instance, busy }: { instance: Instance; busy: boole
   return (
     <div className="manage-scroll">
       <div className="pane-head">
-        <div className="col" style={{ gap: 3, minWidth: 0 }}>
+        <div className="col gap-4">
           <div className="section-label">
             {t("多人游戏", "Multiplayer")}
             {list && list.length > 0 && (
@@ -106,7 +106,7 @@ export function ServersTab({ instance, busy }: { instance: Instance; busy: boole
           <Empty
             art={
               <span className="empty-pixel">
-                <PixelIcon name="signal" size={44} />
+                <Icon name="signal" size={48} />
               </span>
             }
             title={t("还没有服务器", "No servers yet")}
@@ -177,11 +177,11 @@ function ServerForm({ draft, saving, onChange, onSubmit, onCancel }: { draft: Dr
         onSubmit();
       }}
     >
-      <label className="col" style={{ gap: 5, flex: "1 1 160px" }}>
+      <label className="col gap-6" style={{ flex: "1 1 160px" }}>
         <span className="field-label">{t("名称", "Name")}</span>
         <Input autoFocus={draft.index == null} value={draft.name} placeholder={t("Minecraft 服务器", "Minecraft Server")} maxLength={64} onChange={(e) => onChange({ ...draft, name: e.target.value })} />
       </label>
-      <label className="col" style={{ gap: 5, flex: "2 1 240px" }}>
+      <label className="col gap-6" style={{ flex: "2 1 240px" }}>
         <span className="field-label">{t("地址", "Address")}</span>
         <Input mono autoFocus={draft.index != null} value={draft.address} placeholder={t("mc.example.com 或 1.2.3.4:25565", "mc.example.com or 1.2.3.4:25565")} spellCheck={false} onChange={(e) => onChange({ ...draft, address: e.target.value })} />
       </label>
