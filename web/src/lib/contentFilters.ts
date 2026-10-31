@@ -125,6 +125,8 @@ export const FILTER_GROUPS: Record<ContentKind, FilterGroup[]> = {
       ],
     },
   ],
+  // Maps come from CurseForge, which has its own categories.
+  world: [],
 };
 
 /** Chosen values by group id. */

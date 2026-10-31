@@ -114,6 +114,8 @@ export type Modal =
   | { kind: "deleteAccount"; account: Account }
   /** One save of a world: rename, back up, export, datapacks. */
   | { kind: "save"; id: string; folder: string }
+  /** A world's mod config files; `query` filters the list at first. */
+  | { kind: "configs"; id: string; query?: string }
   | { kind: "import" }
   | { kind: "exportPack"; id: string }
   | { kind: "addYggdrasil" }

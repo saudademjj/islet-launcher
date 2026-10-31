@@ -574,6 +574,7 @@ function ModsTab({ instance, busy, browse }: { instance: Instance; busy: boolean
     openUrl: s.openUrl,
     inspectMods: s.inspectMods,
     updateMods: s.updateMods,
+    openModal: s.openModal,
   }));
   const [filter, setFilter] = useState<ModFilter>("all");
   const [query, setQuery] = useState("");
@@ -723,6 +724,9 @@ function ModsTab({ instance, busy, browse }: { instance: Instance; busy: boolean
               {t("全部更新", "Update all")}
             </Button>
           )}
+          <Button size="sm" variant="ghost" icon="edit" disabled={vanilla} onClick={() => s.openModal({ kind: "configs", id: instance.id })}>
+            {t("配置文件", "Configs")}
+          </Button>
           <Button size="sm" variant="ghost" icon="folder" aria-label={t("打开模组文件夹", "Open the mods folder")} title={t("打开模组文件夹", "Open the mods folder")} onClick={() => void s.open({ kind: "contentDir", id: instance.id, content: "mod" })} />
           {s.mods.length > 0 && (
             <Button size="sm" icon="search" onClick={() => browse("mod")}>
@@ -1255,6 +1259,7 @@ const KIND_OPTIONS: { value: ContentKind; label: string }[] = [
   { value: "resourcepack", label: t("资源包", "Resource packs") },
   { value: "shader", label: t("光影", "Shaders") },
   { value: "datapack", label: t("数据包", "Datapacks") },
+  { value: "world", label: t("地图", "Maps") },
 ];
 
 const KIND_PLACEHOLDER: Record<ContentKind, string> = {
@@ -1262,12 +1267,13 @@ const KIND_PLACEHOLDER: Record<ContentKind, string> = {
   resourcepack: t("搜索资源包，例如 Fresh Animations / Faithful", "Search resource packs, e.g. Fresh Animations / Faithful"),
   shader: t("搜索光影，例如 Complementary / BSL", "Search shaders, e.g. Complementary / BSL"),
   datapack: t("搜索数据包，例如 Terralith / Incendium", "Search datapacks, e.g. Terralith / Incendium"),
+  world: t("搜索地图，例如 SkyBlock / Parkour", "Search maps, e.g. SkyBlock / Parkour"),
 };
 
-const KIND_NAME: Record<ContentKind, string> = { mod: t("模组", "Mods"), resourcepack: t("资源包", "Resource packs"), shader: t("光影包", "Shader packs"), datapack: t("数据包", "Datapacks") };
+const KIND_NAME: Record<ContentKind, string> = { mod: t("模组", "Mods"), resourcepack: t("资源包", "Resource packs"), shader: t("光影包", "Shader packs"), datapack: t("数据包", "Datapacks"), world: t("地图", "Maps") };
 
 /** What stands in for a missing picture: a puzzle piece, a framed picture, the sun. */
-const KIND_GLYPH = { mod: "mod", resourcepack: "pack", shader: "sun", datapack: "map" } as const satisfies Record<ContentKind, PixelIconName>;
+const KIND_GLYPH = { mod: "mod", resourcepack: "pack", shader: "sun", datapack: "map", world: "block" } as const satisfies Record<ContentKind, PixelIconName>;
 
 /** The shader loaders a shader pack supports, as readable tags. */
 function shaderTags(categories: string[] | undefined): string[] {
@@ -1360,7 +1366,7 @@ function BrowseTab({ instance, busy }: { instance: Instance; busy: boolean }) {
     // by name: files start with the pack's ("ComplementaryReimagined_r5.2.zip",
     // "§6Faithful 32x.zip"), so it must begin with its slug or title.
     // Datapacks live per save; the list here does not track them.
-    if (kind === "datapack") return null;
+    if (kind === "datapack" || kind === "world") return null;
     if (Object.values(packInsights).some((info) => info.kind === kind && info.projectId === hit.project_id)) return { update: false, version: null };
     const list = kind === "shader" ? s.packs?.shaderpacks : s.packs?.resourcepacks;
     const words = [hit.slug, hit.title].map((w) => packKey(w ?? "")).filter((w) => w.length > 3);
@@ -1417,7 +1423,11 @@ function BrowseTab({ instance, busy }: { instance: Instance; busy: boolean }) {
     setNoChineseMatch(null);
     setChosen(null);
     if (vanilla && next === "mod") s.setBrowseKind(next);
-    else s.searchMods(instance.id, "", 0, next);
+    // Maps are only on CurseForge.
+    else if (next === "world" && source !== "curseforge") {
+      if (s.curseforgeKey.trim()) s.searchMods(instance.id, "", 0, next, { source: "curseforge" });
+      else useStore.setState({ modSearch: { ...s.search, kind: next, source: "curseforge", key: "", hits: [], total: 0 } });
+    } else s.searchMods(instance.id, "", 0, next);
   };
 
   /** Searches what is typed; `refine` also changes the filters or order. */

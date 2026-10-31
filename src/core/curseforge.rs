@@ -27,6 +27,7 @@ fn class_id(kind: ContentKind) -> u32 {
         ContentKind::ResourcePack => 12,
         ContentKind::Shader => 6552,
         ContentKind::Datapack => 6945,
+        ContentKind::World => 17,
     }
 }
 
@@ -36,6 +37,7 @@ fn kind_of_class(class: u32) -> Option<ContentKind> {
         12 => Some(ContentKind::ResourcePack),
         6552 => Some(ContentKind::Shader),
         6945 => Some(ContentKind::Datapack),
+        17 => Some(ContentKind::World),
         _ => None,
     }
 }
@@ -709,6 +711,12 @@ pub async fn install(
             return Err(AppError::new("cancelled", crate::core::i18n::pick("下载已取消。", "Download cancelled.")));
         }
         for name in &names {
+            if kind == ContentKind::World {
+                // A map is a zipped save: unpack it next to the others under
+                // a free folder name, as importing a save does.
+                let save = crate::core::manage::import_save(paths, &instance.id, &stage.join(name))?;
+                return Ok(crate::tr!("已添加地图「{save}」，在存档里就能找到。", "Added the map \"{save}\"; it's with your saves."));
+            }
             std::fs::rename(stage.join(name), folder.join(name))?;
         }
         for file in chosen.iter().filter(|file| names.contains(&file.file_name)) {

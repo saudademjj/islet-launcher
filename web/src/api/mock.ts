@@ -605,6 +605,14 @@ const commands: Record<string, (args: any) => unknown> = {
     { name: "VanillaTweaks.zip", bytes: 84_000, folder: false, description: "原版增强：更多合成与小功能" },
     { name: "coords-hud", bytes: 12_000, folder: true, description: null },
   ],
+  list_configs: () => [
+    { path: "config/sodium-options.json", bytes: 812, modifiedMs: now - 3 * HOUR },
+    { path: "config/create-client.toml", bytes: 4_210, modifiedMs: now - 26 * HOUR },
+    { path: "config/jei/jei-client.ini", bytes: 1_904, modifiedMs: now - 50 * HOUR },
+  ],
+  read_config: ({ path }) =>
+    path.endsWith(".json") ? '{\n  "quality": {\n    "weather_quality": "FAST"\n  }\n}\n' : `# ${path}\n[client]\n\tenableOverlay = true\n`,
+  write_config: () => null,
   save_backups: () => [
     { path: "/demo/backups/2.auto.zip", bytes: 47_000_000, createdMs: now - 2 * HOUR, auto: true },
     { path: "/demo/backups/1.zip", bytes: 46_000_000, createdMs: now - 26 * HOUR, auto: false },

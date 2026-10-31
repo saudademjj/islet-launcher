@@ -13,6 +13,7 @@ import { Toasts } from "./components/overlay";
 import { Sidebar, StatusBar, WindowBar } from "./layout/Shell";
 import { isMac } from "./lib/platform";
 import { SaveDialog } from "./overlays/SaveDialog";
+import { ConfigDialog } from "./overlays/ConfigDialog";
 import { ImportDialog } from "./overlays/ImportDialog";
 import { ExportPack } from "./overlays/ExportPack";
 import { AddYggdrasil, SkinDialog } from "./overlays/AccountDialogs";
@@ -112,6 +113,7 @@ function Overlays() {
       {modal?.kind === "group" && <GroupDialog key={`group-${modal.id}`} id={modal.id} />}
       {modal?.kind === "skin" && <SkinDialog key={`skin-${modal.accountId}`} accountId={modal.accountId} />}
       {modal?.kind === "save" && <SaveDialog key={`save-${modal.id}-${modal.folder}`} id={modal.id} folder={modal.folder} />}
+      {modal?.kind === "configs" && <ConfigDialog key={`configs-${modal.id}`} id={modal.id} initial={modal.query} />}
       {s.logsOpen && <LogsPanel key="logs" />}
       {s.login && <LoginOverlay key="login" />}
     </AnimatePresence>

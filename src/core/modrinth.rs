@@ -300,6 +300,9 @@ pub async fn search(
     categories: &[String],
     sort: &str,
 ) -> AppResult<SearchResults> {
+    if kind == ContentKind::World {
+        return Err(no_maps());
+    }
     let facets = search_facets(instance, kind, categories)?;
     let index = match sort {
         "downloads" | "follows" | "newest" | "updated" => sort,
@@ -362,6 +365,7 @@ pub async fn versions(
         ContentKind::ResourcePack => query.push(("loaders", r#"["minecraft"]"#.to_string())),
         ContentKind::Datapack => query.push(("loaders", r#"["datapack"]"#.to_string())),
         ContentKind::Shader => {}
+        ContentKind::World => return Err(no_maps()),
     }
     let list: Vec<ModVersion> = get(client, &format!("/project/{project}/version"), &query).await?;
     Ok(list
@@ -382,6 +386,11 @@ fn compatible(version: &ModVersion, instance: &Instance, kind: ContentKind) -> b
     version.game_versions.contains(&instance.version_id)
         && (kind != ContentKind::Mod || mod_loaders(&instance.loader).iter().any(|loader| version.loaders.iter().any(|l| l == loader)))
 }
+/// Modrinth hosts no maps; they come from CurseForge.
+pub fn no_maps() -> AppError {
+    AppError::new("modrinth", crate::core::i18n::pick("Modrinth 上没有地图，请切换到 CurseForge 搜索。", "Modrinth has no maps; search CurseForge instead."))
+}
+
 fn check_loader(instance: &Instance) -> AppResult<()> {
     if ["fabric", "quilt", "forge", "neoforge", "legacyfabric", "cleanroom", "liteloader"].contains(&instance.loader.as_str()) {
         Ok(())
@@ -749,6 +758,9 @@ pub async fn install_pack(
 ) -> AppResult<String> {
     if kind == ContentKind::Mod {
         return Err(AppError::new("modrinth", crate::core::i18n::pick("模组请使用模组安装。", "Install mods as mods.")));
+    }
+    if kind == ContentKind::World {
+        return Err(no_maps());
     }
     identifier(version_id)?;
     let version: ModVersion = get(client, &format!("/version/{version_id}"), &[]).await?;

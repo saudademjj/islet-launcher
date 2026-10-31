@@ -372,7 +372,7 @@ export function SettingsPage() {
                 <Presets
                   values={[3, 5, 10, 20]}
                   current={s.settings.autoBackupKeep}
-                  label={(n) => t(`${n} 份`, `${n}`)}
+                  label={(n) => String(n)}
                   onPick={(autoBackupKeep) => void s.mutate("update_settings", { settings: { ...s.settings, autoBackupKeep } }, t(`每个存档保留 ${autoBackupKeep} 份自动备份`, `Keeping ${autoBackupKeep} automatic backups per save`))}
                 />
               )}

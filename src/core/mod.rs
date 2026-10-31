@@ -1,5 +1,6 @@
 pub mod accounts;
 pub mod auth;
+pub mod configs;
 pub mod content;
 pub mod crash;
 pub mod curseforge;

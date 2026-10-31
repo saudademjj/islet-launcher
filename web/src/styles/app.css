@@ -6543,6 +6543,109 @@ html.reduce-motion .blocks.grow span {
   gap: 10px;
 }
 
+.config-dialog {
+  display: grid;
+  grid-template-columns: minmax(200px, 34%) 1fr;
+  gap: 14px;
+  min-height: 420px;
+}
+
+.config-files {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.config-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  max-height: 460px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.config-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 7px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.config-item:hover {
+  background: var(--surface-2);
+}
+
+.config-item[aria-selected="true"] {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.config-name {
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.config-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.config-pending {
+  padding: 6px 10px;
+  border: 1px solid var(--warn);
+  border-radius: var(--radius-lg);
+  background: var(--warn-soft);
+  font-size: var(--text-sm);
+}
+
+.config-empty {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  font-size: var(--text-sm);
+}
+
+.config-text {
+  flex: 1;
+  min-height: 420px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  resize: none;
+  tab-size: 4;
+  outline: none;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.config-text:focus {
+  border-color: var(--accent-edge);
+}
+
+@media (max-width: 760px) {
+  .config-dialog {
+    grid-template-columns: 1fr;
+  }
+}
+
 .save-actions {
   display: flex;
   align-items: center;

@@ -29,6 +29,8 @@ pub enum ContentKind {
     Shader,
     /// Goes into one save's `datapacks`, not the game folder.
     Datapack,
+    /// A map: a zipped save, unpacked into `saves`. Only CurseForge has them.
+    World,
 }
 
 impl ContentKind {
@@ -38,13 +40,14 @@ impl ContentKind {
             Self::ResourcePack => "resourcepacks",
             Self::Shader => "shaderpacks",
             Self::Datapack => "datapacks",
+            Self::World => "saves",
         }
     }
 
     pub fn extension(self) -> &'static str {
         match self {
             Self::Mod => ".jar",
-            Self::ResourcePack | Self::Shader | Self::Datapack => ".zip",
+            Self::ResourcePack | Self::Shader | Self::Datapack | Self::World => ".zip",
         }
     }
 
@@ -55,6 +58,7 @@ impl ContentKind {
             Self::ResourcePack => "resourcepack",
             Self::Shader => "shader",
             Self::Datapack => "datapack",
+            Self::World => "world",
         }
     }
 
@@ -64,6 +68,7 @@ impl ContentKind {
             Self::ResourcePack => crate::core::i18n::pick("资源包", "resource pack"),
             Self::Shader => crate::core::i18n::pick("光影包", "shader pack"),
             Self::Datapack => crate::core::i18n::pick("数据包", "datapack"),
+            Self::World => crate::core::i18n::pick("地图", "map"),
         }
     }
 }
@@ -114,7 +119,7 @@ fn enabled_packs(game_dir: &Path, kind: ContentKind) -> Vec<String> {
             }
             Vec::new()
         }
-        ContentKind::Mod | ContentKind::Datapack => Vec::new(),
+        ContentKind::Mod | ContentKind::Datapack | ContentKind::World => Vec::new(),
     }
 }
 

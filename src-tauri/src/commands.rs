@@ -10,7 +10,7 @@ use tauri_plugin_opener::OpenerExt;
 
 use islet::core::content::{self, ContentKind, ModFile};
 use islet::core::manage::{self, Cleanup, ItemKind};
-use islet::core::{options, screenshots, servers};
+use islet::core::{configs, options, screenshots, servers};
 use islet::core::error::{AppError, ErrorPayload};
 use islet::core::instances::{Instance, LaunchConfig};
 use islet::core::platform;
@@ -638,6 +638,24 @@ pub async fn file_operation(
 pub async fn list_datapacks(state: State<'_, LauncherState>, id: String, save: String) -> CmdResult<Vec<manage::Datapack>> {
     let services = state.services();
     blocking(move || manage::datapacks(&services.paths, &id, &save)).await
+}
+
+#[tauri::command]
+pub async fn list_configs(state: State<'_, LauncherState>, id: String) -> CmdResult<Vec<configs::ConfigFile>> {
+    let services = state.services();
+    blocking(move || configs::list(&services.paths, &id)).await
+}
+
+#[tauri::command]
+pub async fn read_config(state: State<'_, LauncherState>, id: String, path: String) -> CmdResult<String> {
+    let services = state.services();
+    blocking(move || configs::read(&services.paths, &id, &path)).await
+}
+
+#[tauri::command]
+pub async fn write_config(state: State<'_, LauncherState>, id: String, path: String, text: String) -> CmdResult<()> {
+    let services = state.services();
+    blocking(move || configs::write(&services.paths, &id, &path, &text)).await
 }
 
 #[tauri::command]

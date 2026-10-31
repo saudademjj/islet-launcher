@@ -234,7 +234,8 @@ export interface LoaderVersion {
 }
 
 /** What a Modrinth project installs as: a mod, a resource pack or a shader pack. */
-export type ContentKind = "mod" | "resourcepack" | "shader" | "datapack";
+/** `world` is a map: a zipped save, only on CurseForge. */
+export type ContentKind = "mod" | "resourcepack" | "shader" | "datapack" | "world";
 
 // Modrinth types keep the API's snake_case field names.
 export interface ProjectDetails {
@@ -483,6 +484,13 @@ export interface Datapack {
   bytes: number;
   folder: boolean;
   description: string | null;
+}
+
+/** A mod config file, relative to the game folder (`config/…`). */
+export interface ConfigFile {
+  path: string;
+  bytes: number;
+  modifiedMs: number;
 }
 
 export interface SaveBackup {
