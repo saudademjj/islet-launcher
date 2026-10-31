@@ -6,7 +6,6 @@ use std::time::Duration;
 use serde::Serialize;
 use serde_json::Value;
 
-use super::room::HOST_IP;
 use crate::core::i18n::pick;
 use crate::tr;
 
@@ -147,6 +146,11 @@ pub struct Inputs<'a> {
     /// That ping's round trip, in milliseconds.
     pub game_latency_ms: Option<u32>,
     pub game_port: u16,
+    /// The host's address in the room.
+    pub host_ip: &'a str,
+    /// The host's player name, when the room protocol tells it (a
+    /// Scaffolding host's hostname names its service, not the player).
+    pub host_name: Option<&'a str>,
 }
 
 /// The time a link is judged by. EasyTier's latency for a relayed peer
@@ -228,7 +232,7 @@ pub fn grade(inputs: &Inputs) -> Report {
     let own_ip = inputs.node.map(|n| n.ipv4.clone()).filter(|ip| !ip.is_empty()).or_else(|| peers.iter().find(|p| p.local).map(|p| p.ipv4.clone()).filter(|ip| !ip.is_empty()));
     // Only a guest's ping crosses the room, and only to the host.
     let measured = |peer: &Peer| match inputs.role {
-        Role::Guest if peer.ipv4 == HOST_IP => inputs.game_latency_ms.map(f64::from),
+        Role::Guest if peer.ipv4 == inputs.host_ip => inputs.game_latency_ms.map(f64::from),
         _ => None,
     };
     let players: Vec<Player> = room
@@ -236,7 +240,9 @@ pub fn grade(inputs: &Inputs) -> Report {
         .map(|peer| {
             let (level, detail) = link(peer, measured(peer));
             let latency_ms = latency(peer, measured(peer));
-            Player { name: peer.hostname.clone(), ip: peer.ipv4.clone(), host: peer.ipv4 == HOST_IP, direct: peer.direct, latency_ms, level, detail }
+            let host = peer.ipv4 == inputs.host_ip;
+            let name = inputs.host_name.filter(|_| host).map_or_else(|| peer.hostname.clone(), str::to_string);
+            Player { name, ip: peer.ipv4.clone(), host, direct: peer.direct, latency_ms, level, detail }
         })
         .collect();
     let port = inputs.game_port;
@@ -269,13 +275,13 @@ pub fn grade(inputs: &Inputs) -> Report {
         }
         Role::Guest => {
             let (level, detail) = match own_ip.as_deref() {
-                Some(HOST_IP) => (Level::Fair, pick("地址和房主冲突，正在重新分配…", "Address clashes with the host's; getting a new one…").to_string()),
+                Some(ip) if ip == inputs.host_ip => (Level::Fair, pick("地址和房主冲突，正在重新分配…", "Address clashes with the host's; getting a new one…").to_string()),
                 Some(ip) => (Level::Good, ip.to_string()),
                 None if within(20) => (Level::Starting, pick("正在分配地址…", "Getting an address…").to_string()),
                 None => (Level::Poor, pick("还没分到地址：可能还没找到房间里的其他人。", "No address yet: no one else in the room has been found.").to_string()),
             };
             check("ip", level, pick("房间内地址", "Room address"), detail);
-            let host = room.iter().find(|p| p.ipv4 == HOST_IP);
+            let host = room.iter().find(|p| p.ipv4 == inputs.host_ip);
             let (level, detail) = match host {
                 Some(peer) => link(peer, measured(peer)),
                 None if within(25) => (Level::Starting, pick("正在寻找房主…", "Looking for the host…").to_string()),
@@ -322,6 +328,7 @@ fn finish(role: Role, checks: Vec<Check>, players: Vec<Player>, ip: Option<Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::p2p::room::HOST_IP;
 
     fn sample() -> Vec<Peer> {
         let json = serde_json::json!([
@@ -334,7 +341,7 @@ mod tests {
     }
 
     fn inputs<'a>(role: Role, peers: &'a [Peer], node: &'a Node, game: Option<bool>, seconds: u64) -> Inputs<'a> {
-        Inputs { role, elapsed: Duration::from_secs(seconds), exited: None, peers: Some(peers), node: Some(node), game, game_latency_ms: None, game_port: 25565 }
+        Inputs { role, elapsed: Duration::from_secs(seconds), exited: None, peers: Some(peers), node: Some(node), game, game_latency_ms: None, game_port: 25565, host_ip: HOST_IP, host_name: None }
     }
 
     fn level_of(report: &Report, id: &str) -> Level {

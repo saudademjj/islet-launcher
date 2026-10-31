@@ -33,9 +33,26 @@ export function saveNodes(nodes: string[] | null) {
 /** Mirrors the backend's check of a node address. */
 export const validNode = (url: string) => /^(tcp|udp|ws|wss|quic|wg|txt|srv|http|https|faketcp):\/\/[A-Za-z0-9.\-_:/[\]@%?=&~+]+$/.test(url) && url.length <= 200;
 
-/** Room codes are 21 Crockford base32 characters, shown in three groups of
-    seven; look-alikes are read the way the backend reads them. */
+/** Scaffolding room codes (also HMCL's, PCL CE's and Terracotta's) are
+    `U/` and 16 characters in four groups of four. Crockford base32 has no U,
+    so a leading U tells them from an earlier Islet's codes. */
+const SCAFFOLDING = /^\s*U/i;
+
+/** Room codes as they are typed or pasted: `U/XXXX-XXXX-XXXX-XXXX`, or an
+    earlier Islet's 21 Crockford base32 characters in three groups of seven;
+    look-alikes are read the way the backend reads them. */
 export function formatCode(text: string): string {
+  if (SCAFFOLDING.test(text)) {
+    const clean = text
+      .replace(SCAFFOLDING, "")
+      .replace(/^\s*\//, "")
+      .toUpperCase()
+      .replace(/O/g, "0")
+      .replace(/I/g, "1")
+      .replace(/[^0-9A-Z]/g, "")
+      .slice(0, 16);
+    return `U/${clean.match(/.{1,4}/g)?.join("-") ?? ""}`;
+  }
   const clean = text
     .toUpperCase()
     .replace(/O/g, "0")
@@ -45,7 +62,7 @@ export function formatCode(text: string): string {
   return clean.match(/.{1,7}/g)?.join("-") ?? "";
 }
 
-export const codeComplete = (code: string) => code.replace(/-/g, "").length === 21;
+export const codeComplete = (code: string) => (code.startsWith("U/") ? code.slice(2).replace(/-/g, "").length === 16 : code.replace(/-/g, "").length === 21);
 
 type Tone = "accent" | "warn" | "danger" | "neutral";
 

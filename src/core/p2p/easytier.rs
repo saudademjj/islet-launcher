@@ -57,6 +57,68 @@ pub const DEFAULT_NODES: &[&str] = &[
     "txt://net.qicwken.top",
 ];
 
+/// An updated node list and extra download sources, published in the
+/// project's repository so both can change without a new release.
+const REMOTE: &[&str] = &[
+    "https://cdn.jsdelivr.net/gh/saudademjj/islet-launcher@main/p2p.json",
+    "https://raw.githubusercontent.com/saudademjj/islet-launcher/main/p2p.json",
+];
+const REMOTE_FRESH: Duration = Duration::from_secs(6 * 3600);
+
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct Remote {
+    /// Replaces `DEFAULT_NODES` when not empty.
+    #[serde(default)]
+    pub nodes: Vec<String>,
+    /// Extra places to download EasyTier from, tried alongside GitHub and
+    /// its proxies: HTTPS URLs where `{name}` is the archive's file name,
+    /// `{version}` the EasyTier version and `{url}` the GitHub download URL.
+    /// The pinned SHA-256 still decides what is installed.
+    #[serde(default)]
+    pub sources: Vec<String>,
+}
+
+impl Remote {
+    fn clean(self) -> Self {
+        Self {
+            nodes: self.nodes.into_iter().map(|n| n.trim().to_string()).filter(|n| valid_node(n)).take(32).collect(),
+            sources: self
+                .sources
+                .into_iter()
+                .filter(|s| s.starts_with("https://") && s.len() <= 300 && (s.contains("{name}") || s.contains("{url}")) && !s.contains(char::is_whitespace))
+                .take(16)
+                .collect(),
+        }
+    }
+
+    fn source(template: &str, name: &str, official: &str) -> String {
+        template.replace("{url}", official).replace("{name}", name).replace("{version}", VERSION)
+    }
+}
+
+/// The published node list and sources: a copy fetched in the last six
+/// hours, else a fresh one, else the last copy that was fetched, else none.
+pub async fn remote(client: &reqwest::Client, paths: &AppPaths) -> Remote {
+    let cache = paths.cache.join("p2p.json");
+    let cached = std::fs::read(&cache).ok().and_then(|bytes| serde_json::from_slice::<Remote>(&bytes).ok()).map(Remote::clean);
+    let fresh = std::fs::metadata(&cache).and_then(|m| m.modified()).ok().and_then(|at| at.elapsed().ok()).is_some_and(|age| age < REMOTE_FRESH);
+    if let Some(cached) = cached.clone().filter(|_| fresh) {
+        return cached;
+    }
+    for url in REMOTE {
+        let fetched = async { client.get(*url).timeout(Duration::from_secs(4)).send().await?.error_for_status()?.json::<Remote>().await }.await;
+        if let Ok(remote) = fetched {
+            let remote = remote.clean();
+            if let Ok(bytes) = serde_json::to_vec(&remote) {
+                let _ = std::fs::create_dir_all(&paths.cache);
+                let _ = std::fs::write(&cache, bytes);
+            }
+            return remote;
+        }
+    }
+    cached.unwrap_or_default()
+}
+
 pub type Progress = Arc<dyn Fn(u64, u64) + Send + Sync>;
 
 pub fn asset_platform() -> Option<&'static str> {
@@ -119,11 +181,13 @@ pub fn download_size(paths: &AppPaths) -> Option<u64> {
 
 /// Returns the EasyTier binaries, downloading them first if needed from the
 /// source that is fastest right now. `prefer_mirror` puts the GitHub proxies
-/// before GitHub itself among sources that fail the speed test.
+/// before GitHub itself among sources that fail the speed test; `extra` are
+/// the published sources (see `Remote::sources`), tried first.
 pub async fn ensure(
     client: &reqwest::Client,
     paths: &AppPaths,
     prefer_mirror: bool,
+    extra: &[String],
     cancel: &CancellationToken,
     report: Option<Progress>,
 ) -> AppResult<Binaries> {
@@ -137,9 +201,12 @@ pub async fn ensure(
     let official = format!("https://github.com/EasyTier/EasyTier/releases/download/v{VERSION}/{name}");
     let mut sources: Vec<String> = MIRRORS.iter().map(|m| format!("{m}{official}")).collect();
     if prefer_mirror {
-        sources.insert(1, official);
+        sources.insert(1, official.clone());
     } else {
-        sources.insert(0, official);
+        sources.insert(0, official.clone());
+    }
+    for template in extra.iter().rev() {
+        sources.insert(0, Remote::source(template, &name, &official));
     }
     let root = install_dir(paths);
     let archive = root.with_file_name(&name);
@@ -228,10 +295,28 @@ pub fn valid_node(url: &str) -> bool {
         && url.bytes().all(|b| b.is_ascii_alphanumeric() || b".-_:/[]@%?=&~+".contains(&b))
 }
 
-/// The nodes to use: the user's list when it has any valid entry.
-pub fn nodes(custom: &[String]) -> Vec<String> {
+/// The nodes to use: the user's list when it has any valid entry, else the
+/// published list, else the built-in one.
+pub fn nodes(custom: &[String], remote: &Remote) -> Vec<String> {
     let custom: Vec<String> = custom.iter().map(|n| n.trim().to_string()).filter(|n| valid_node(n)).collect();
-    if custom.is_empty() { DEFAULT_NODES.iter().map(|n| n.to_string()).collect() } else { custom }
+    if !custom.is_empty() {
+        custom
+    } else if !remote.nodes.is_empty() {
+        remote.nodes.clone()
+    } else {
+        DEFAULT_NODES.iter().map(|n| n.to_string()).collect()
+    }
+}
+
+/// The nodes for a Scaffolding room: `nodes` plus the ones Terracotta-based
+/// launchers use, so either side can find the other.
+pub fn room_nodes(mut nodes: Vec<String>) -> Vec<String> {
+    for node in super::scaffolding::NODES {
+        if !nodes.iter().any(|n| n == node) {
+            nodes.push(node.to_string());
+        }
+    }
+    nodes
 }
 
 /// The name other players see: ASCII letters, digits, `_` and `-`.
@@ -302,6 +387,34 @@ pub fn host_args(net: &Network, game_port: u16) -> Vec<String> {
     let mut args = common_args(net);
     args.extend(["--tcp-whitelist".into(), game_port.to_string(), "--udp-whitelist".into(), "0".into()]);
     args
+}
+
+/// A Scaffolding host accepts its service port and its game from the room.
+pub fn scaffolding_host_args(net: &Network, service_port: u16, game_port: u16) -> Vec<String> {
+    let mut args = common_args(net);
+    args.extend(["--tcp-whitelist".into(), service_port.to_string(), game_port.to_string(), "--udp-whitelist".into(), game_port.to_string()]);
+    args
+}
+
+/// A Scaffolding guest starts with no forwards: it learns where the host's
+/// service is from the room, then adds them with `add_port_forward`.
+pub fn scaffolding_guest_args(net: &Network) -> Vec<String> {
+    let mut args = common_args(net);
+    args.extend(["--tcp-whitelist".into(), "0".into(), "--udp-whitelist".into(), "0".into()]);
+    args
+}
+
+/// Forwards TCP `bind` on this computer to `destination` in the room, on a
+/// running core.
+pub async fn add_port_forward(cli: &Path, rpc_port: u16, bind: &str, destination: &str) -> AppResult<()> {
+    let failed = |detail: String| AppError::detail("p2p_forward", pick("无法建立到房主的转发。", "Couldn't set up forwarding to the host."), detail);
+    let mut command = tokio::process::Command::from(crate::core::platform::quiet_command(cli));
+    command.args(["-p", &format!("127.0.0.1:{rpc_port}"), "port-forward", "add", "tcp", bind, destination]).stdin(Stdio::null()).kill_on_drop(true);
+    let output = tokio::time::timeout(Duration::from_secs(6), command.output())
+        .await
+        .map_err(|_| failed("timeout".into()))?
+        .map_err(|error| failed(error.to_string()))?;
+    if output.status.success() { Ok(()) } else { Err(failed(String::from_utf8_lossy(&output.stderr).trim().chars().take(300).collect())) }
 }
 
 /// A guest accepts nothing from the room and forwards `local_port` on this
@@ -428,8 +541,16 @@ mod tests {
         for bad in ["", "tcp://", "225284.xyz:11010", "-p tcp://x", "ftp://x", "tcp://a b", "tcp://x;rm"] {
             assert!(!valid_node(bad), "{bad}");
         }
-        assert_eq!(nodes(&[" udp://my.node:1 ".into(), "junk".into()]), vec!["udp://my.node:1".to_string()]);
-        assert_eq!(nodes(&["junk".into()]).len(), DEFAULT_NODES.len());
+        let none = Remote::default();
+        assert_eq!(nodes(&[" udp://my.node:1 ".into(), "junk".into()], &none), vec!["udp://my.node:1".to_string()]);
+        assert_eq!(nodes(&["junk".into()], &none).len(), DEFAULT_NODES.len());
+        let published = Remote { nodes: vec!["tcp://new.node:1".into(), "junk".into()], sources: vec!["https://cdn.example/et/{name}".into(), "http://plain/{name}".into(), "https://no-placeholder/".into()] }.clean();
+        assert_eq!(nodes(&[], &published), vec!["tcp://new.node:1".to_string()]);
+        assert_eq!(published.sources, vec!["https://cdn.example/et/{name}".to_string()]);
+        assert_eq!(Remote::source(&published.sources[0], "easytier-x.zip", "https://github.com/x"), "https://cdn.example/et/easytier-x.zip");
+        let room = room_nodes(vec!["tcp://public.easytier.top:11010".into()]);
+        assert_eq!(room.len(), crate::core::p2p::scaffolding::NODES.len());
+        assert!(room.iter().all(|n| valid_node(n)));
     }
 
     #[test]
@@ -454,6 +575,9 @@ mod tests {
         assert!(guest.contains(" -d "));
         assert!(guest.contains("--tcp-whitelist 0 --udp-whitelist 0"));
         assert!(guest.contains("--port-forward tcp://0.0.0.0:40000/10.126.126.1:25565"));
+        let host = scaffolding_host_args(&net, 31234, 25565).join(" ");
+        assert!(host.contains("--tcp-whitelist 31234 25565 --udp-whitelist 25565"));
+        assert!(!scaffolding_guest_args(&net).join(" ").contains("--port-forward"));
     }
 
     #[test]

@@ -24,6 +24,16 @@ describe("p2p room codes", () => {
     expect(codeComplete("7K3M9QX-2HV8RTA-4NBWZ6")).toBe(false);
   });
 
+  it("formats Scaffolding codes, as other launchers share them", () => {
+    expect(formatCode("u")).toBe("U/");
+    expect(formatCode("U/")).toBe("U/");
+    expect(formatCode("u/abcd e")).toBe("U/ABCD-E");
+    expect(formatCode(" U/YNZE-U61D-2206-HXRG 来玩")).toBe("U/YNZE-U61D-2206-HXRG");
+    expect(formatCode("u/oi00-0000-0000-0000")).toBe("U/0100-0000-0000-0000");
+    expect(codeComplete("U/YNZE-U61D-2206-HXRG")).toBe(true);
+    expect(codeComplete("U/YNZE-U61D-2206-HXR")).toBe(false);
+  });
+
   it("accepts node addresses the backend accepts", () => {
     expect(validNode("tcp://example.com:11010")).toBe(true);
     expect(validNode("wss://et.example.cn")).toBe(true);

@@ -1456,7 +1456,17 @@ impl AppServices {
         report: Option<crate::core::p2p::easytier::Progress>,
     ) -> AppResult<crate::core::p2p::easytier::Binaries> {
         let mirror = matches!(self.settings.get().download_source, DownloadSource::Bmclapi);
-        crate::core::p2p::easytier::ensure(&self.http()?, &self.paths, mirror, cancel, report).await
+        let http = self.http()?;
+        let extra = if crate::core::p2p::easytier::installed(&self.paths).is_some() { Vec::new() } else { self.p2p_remote().await.sources };
+        crate::core::p2p::easytier::ensure(&http, &self.paths, mirror, &extra, cancel, report).await
+    }
+
+    /// The published P2P node list and download sources (cached for hours).
+    pub async fn p2p_remote(&self) -> crate::core::p2p::easytier::Remote {
+        match self.http() {
+            Ok(http) => crate::core::p2p::easytier::remote(&http, &self.paths).await,
+            Err(_) => Default::default(),
+        }
     }
 
     /// Asks the game to close the way its window's close button does, so it

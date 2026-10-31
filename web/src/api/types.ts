@@ -588,6 +588,19 @@ export interface P2pStatus {
   uptimeSeconds: number;
   health: P2pReport | null;
   world: P2pWorld | null;
+  /** Everyone in the room, by the launcher they use. */
+  members: P2pMember[];
+  /** Guest: what holds the link to the host back, while something does. */
+  notice: string | null;
+}
+
+export interface P2pMember {
+  name: string;
+  /** The launcher they play with, e.g. "HMCL 3.6". */
+  vendor: string;
+  host: boolean;
+  /** This computer. */
+  me: boolean;
 }
 
 export interface P2pDefaults {

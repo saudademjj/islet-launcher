@@ -5,3 +5,4 @@ pub mod easytier;
 pub mod health;
 pub mod lan;
 pub mod room;
+pub mod scaffolding;

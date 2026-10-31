@@ -293,8 +293,8 @@ let installing: { task: string; timer: number } | null = null;
 let lastModChange: { createdMs: number; added: number; replaced: number } | null = { createdMs: Date.now() - 42 * 60_000, added: 2, replaced: 2 };
 
 // P2P rooms: the first room downloads the component, then health climbs
-// from "connecting" as nodes and players arrive. A code starting ZZZZZZZ
-// plays a guest whose host never shows up; PPPPPPP one on a weak relay.
+// from "connecting" as nodes and players arrive. A code starting (U/)ZZZZ
+// plays a guest whose host never shows up; PPPP one on a weak relay.
 const P2P_SIZE = 32_657_720;
 let p2pInstalled = false;
 let p2pPrepStart: number | null = null;
@@ -316,7 +316,7 @@ function p2pCheck(id: string, level: string, label: string, detail: string) {
 
 function p2pStatus() {
   const download = p2pPrepStart === null ? null : { done: Math.min(P2P_SIZE, Math.round(((Date.now() - p2pPrepStart) / 3200) * P2P_SIZE)), total: P2P_SIZE };
-  if (!p2pRoom) return { active: false, preparing: p2pPrepStart !== null, download, role: null, code: null, hostname: "", gamePort: 0, address: null, uptimeSeconds: 0, health: null, world: null };
+  if (!p2pRoom) return { active: false, preparing: p2pPrepStart !== null, download, role: null, code: null, hostname: "", gamePort: 0, address: null, uptimeSeconds: 0, health: null, world: null, members: [], notice: null };
   const e = (Date.now() - p2pRoom.started) / 1000;
   const core = p2pCheck("core", "good", "联机组件", "EasyTier 2.6.4 运行中");
   const nodes = e < 4 ? p2pCheck("nodes", "starting", "共享节点", "正在连接共享节点…") : p2pCheck("nodes", "good", "共享节点", "已连接 3 个，最快 38 ms");
@@ -336,10 +336,10 @@ function p2pStatus() {
     level = e < 4 ? "starting" : players.length > 1 ? "fair" : "good";
     summary = e < 4 ? "正在连接共享节点…" : players.length > 1 ? "可以联机。玩家：2 人已连接，其中 1 人走中转" : players.length ? "1 位玩家已连接，一切正常" : "房间已就绪，等待玩家加入";
   } else {
-    const lost = p2pRoom.code.startsWith("ZZZZZZZ");
+    const lost = /^(U\/)?ZZZZ/.test(p2pRoom.code);
     const found = !lost && e >= 3;
     const ip = e < 3 ? p2pCheck("ip", "starting", "房间内地址", "正在分配地址…") : p2pCheck("ip", "good", "房间内地址", "10.126.126.2");
-    const weak = p2pRoom.code.startsWith("PPPPPPP");
+    const weak = /^(U\/)?PPPP/.test(p2pRoom.code);
     const host = found && weak
       ? p2pCheck("host", "poor", "房主连接", "中转 · 286 ms · 丢包 9%：试试「换节点」，或让双方都允许防火墙。")
       : found
@@ -365,14 +365,27 @@ function p2pStatus() {
     address: p2pRoom.role === "guest" ? `127.0.0.1:${p2pRoom.local}` : null,
     uptimeSeconds: Math.floor(e),
     health: { level, summary, checks, players, ip: p2pRoom.role === "host" ? "10.126.126.1" : e >= 3 ? "10.126.126.2" : null },
-    world: p2pRoom.role === "guest" && !(e >= 3 && !p2pRoom.code.startsWith("ZZZZZZZ")) ? null : world,
+    world: p2pRoom.role === "guest" && !(e >= 3 && !/^(U\/)?ZZZZ/.test(p2pRoom.code)) ? null : world,
+    members: p2pRoom.code.startsWith("U/") && (p2pRoom.role === "host" || e >= 3)
+      ? [
+          { name: p2pRoom.role === "host" ? p2pRoom.name : "Steve", vendor: p2pRoom.role === "host" ? "Islet 0.4.0" : "HMCL 3.6.12", host: true, me: p2pRoom.role === "host" },
+          ...players.filter((p) => !p.host).map((p, i) => ({ name: p.name, vendor: i ? "PCL CE 2.10" : "Islet 0.4.0", host: false, me: false })),
+        ]
+      : [],
+    notice: p2pRoom.role === "guest" && p2pRoom.code.startsWith("U/ZZZZ") && e >= 8 ? "连不上房主的房间服务。" : null,
   };
 }
 
+// A Scaffolding code: 16 characters whose value (first one lowest) is a
+// multiple of 7, as the backend makes them.
 const randomCode = () => {
-  const alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-  const chars = Array.from({ length: 21 }, () => alphabet[Math.floor(Math.random() * 32)]).join("");
-  return `${chars.slice(0, 7)}-${chars.slice(7, 14)}-${chars.slice(14)}`;
+  const alphabet = "0123456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+  for (;;) {
+    const values = Array.from({ length: 16 }, () => Math.floor(Math.random() * 34));
+    if (values.reduceRight((rest, v) => (rest * 34 + v) % 7, 0) !== 0) continue;
+    const chars = values.map((v) => alphabet[v]).join("");
+    return `U/${chars.match(/.{4}/g)!.join("-")}`;
+  }
 };
 
 const commands: Record<string, (args: any) => unknown> = {
@@ -687,7 +700,9 @@ const commands: Record<string, (args: any) => unknown> = {
     p2pRoom = { role: "host", code: randomCode(), started: Date.now(), port, local: 0, name: name || "Steve" };
   },
   p2p_join: async ({ code, name }) => {
-    if (String(code).replace(/[^0-9A-Za-z]/g, "").length !== 21) return fail("房间码不对：应为 21 位字母数字（可带横线），请向房主重新要一次。");
+    const scaffolding = String(code).startsWith("U/");
+    if (scaffolding ? String(code).slice(2).replace(/[^0-9A-Za-z]/g, "").length !== 16 : String(code).replace(/[^0-9A-Za-z]/g, "").length !== 21)
+      return fail(scaffolding ? "房间码不对：应为 U/ 开头的 16 位字母数字，请向房主重新要一次。" : "房间码不对：应为 21 位字母数字（可带横线），请向房主重新要一次。");
     if (p2pRoom) return fail("已经在房间里了，请先退出当前房间。");
     await p2pPrepare();
     p2pRoom = { role: "guest", code: String(code).toUpperCase(), started: Date.now(), port: 51234, local: 50123, name: name || "Alex" };

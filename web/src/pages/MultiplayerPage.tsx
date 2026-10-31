@@ -300,7 +300,7 @@ function JoinCard({ name }: { name: string }) {
         <span className="room-card-index">2</span>
         <div className="col" style={{ gap: 2 }}>
           <span className="room-card-title">{t("加入房间", "Join a room")}</span>
-          <span className="room-card-text">{t("向房主要房间码，粘贴到这里。", "Ask the host for the room code and paste it here.")}</span>
+          <span className="room-card-text">{t("向房主要房间码，粘贴到这里。HMCL、PCL CE 等启动器开的房间也能加入。", "Ask the host for the room code and paste it here. Rooms opened in HMCL, PCL CE and similar launchers work too.")}</span>
         </div>
       </div>
       <Input
@@ -308,7 +308,7 @@ function JoinCard({ name }: { name: string }) {
         mono
         className="code-input"
         value={code}
-        placeholder="XXXXXXX-XXXXXXX-XXXXXXX"
+        placeholder="U/XXXX-XXXX-XXXX-XXXX"
         aria-label={t("房间码", "Room code")}
         onChange={(e) => setCode(formatCode(e.target.value))}
         onKeyDown={(e) => {
@@ -360,6 +360,8 @@ function RoomView({ status, onNodes }: { status: P2pStatus; onNodes: () => void 
   const level = health?.level ?? "starting";
   const host = status.role === "host";
   const others = health?.players ?? [];
+  // Scaffolding rooms say which launcher each player uses.
+  const vendorOf = (name: string) => status.members.find((m) => !m.me && m.name.toLowerCase() === name.toLowerCase())?.vendor;
   const peer = host ? others[0] : others.find((p) => p.host);
   const right = peer ? <PlayerFace name={peer.name} size={32} /> : <span className="bridge-ghost">{host ? "…" : "?"}</span>;
   return (
@@ -401,6 +403,12 @@ function RoomView({ status, onNodes }: { status: P2pStatus; onNodes: () => void 
           ) : null}
         </div>
       </RoomHero>
+      {!host && status.notice && (
+        <motion.p className="room-hint" variants={item}>
+          <Icon name="alert" size={13} />
+          {status.notice}
+        </motion.p>
+      )}
       {!host && (
         <motion.p className="room-hint" variants={item}>
           <Icon name="info" size={13} />
@@ -449,7 +457,10 @@ function RoomView({ status, onNodes }: { status: P2pStatus; onNodes: () => void 
                   <span className="player-name truncate">
                     {player.name} {player.host && <span className="chip">{t("房主", "Host")}</span>}
                   </span>
-                  <span className="check-detail">{player.detail}</span>
+                  <span className="check-detail">
+                    {player.detail}
+                    {vendorOf(player.name) && ` · ${vendorOf(player.name)}`}
+                  </span>
                 </div>
                 <span className="check-mark" aria-hidden />
               </li>
