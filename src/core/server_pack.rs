@@ -1,7 +1,7 @@
 //! A world as a dedicated server: the official server for its game and
-//! loader, the mods a server runs (Modrinth says which are client-only),
-//! its config folders and start scripts, in a folder ready to run here or
-//! to upload to a host.
+//! loader (or Paper or Purpur for plugins), the mods a server runs
+//! (Modrinth says which are client-only), its config folders and start
+//! scripts, in a folder ready to run here or to upload to a host.
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -14,7 +14,7 @@ use tokio_util::sync::CancellationToken;
 use crate::core::download::{self, DownloadProgress, DownloadTask};
 use crate::core::error::{AppError, AppResult};
 use crate::core::i18n::pick;
-use crate::core::instances::Instance;
+use crate::core::instances::{Instance, runs_plugins};
 use crate::core::mojang::version::VersionJson;
 use crate::core::paths::AppPaths;
 use crate::core::settings::DownloadSource;
@@ -27,6 +27,7 @@ const CONFIG_DIRS: &[&str] = &["config", "defaultconfigs", "kubejs", "scripts"];
 pub struct ServerOptions {
     /// The player agreed to the Minecraft EULA in the launcher.
     pub accept_eula: bool,
+    /// MB for the server; 0 works it out on the machine it starts on.
     pub memory_mb: u32,
     /// A save (its folder under `saves`) that becomes the server's world.
     pub world: Option<String>,
@@ -108,14 +109,14 @@ pub async fn create(
         return Err(AppError::new("server_pack", pick("请选一个空文件夹放服务端。", "Choose an empty folder for the server.")));
     }
     let loader_version = match instance.loader.as_str() {
-        "vanilla" => String::new(),
+        "vanilla" | "paper" | "purpur" => String::new(),
         "fabric" | "quilt" | "forge" | "neoforge" => instance.loader_version.clone().ok_or_else(|| {
             AppError::new("server_pack", pick("先安装一次这个世界，确定加载器版本后再导出服务端。", "Install this world once so its loader version is fixed, then export the server."))
         })?,
         _ => {
             return Err(AppError::new(
                 "server_pack",
-                pick("这个加载器没有可以一键生成的服务端；原版、Fabric、Quilt、Forge 和 NeoForge 可以。", "This loader has no server Islet can set up; vanilla, Fabric, Quilt, Forge and NeoForge do."),
+                pick("这个加载器没有可以一键生成的服务端；原版、Fabric、Quilt、Forge、NeoForge、Paper 和 Purpur 可以。", "This loader has no server Islet can set up; vanilla, Fabric, Quilt, Forge, NeoForge, Paper and Purpur do."),
             ));
         }
     };
@@ -138,9 +139,11 @@ pub async fn create(
     Ok(summary)
 }
 
-/// Mods the server runs, and the config folders.
+/// Mods (or plugins) the server runs, and the config folders.
 async fn copy_content(client: &reqwest::Client, paths: &AppPaths, instance: &Instance, destination: &Path) -> AppResult<Summary> {
     let game = paths.instance_game_dir(&instance.id);
+    // A plugin server's plugins wait in the project's mods folder too.
+    let folder = if runs_plugins(&instance.loader) { "plugins" } else { "mods" };
     let mut mods = Vec::new();
     for entry in fs::read_dir(game.join("mods")).into_iter().flatten().flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
@@ -161,8 +164,8 @@ async fn copy_content(client: &reqwest::Client, paths: &AppPaths, instance: &Ins
             summary.client_only.push(name.clone());
             continue;
         }
-        fs::create_dir_all(destination.join("mods"))?;
-        fs::copy(path, destination.join("mods").join(name))?;
+        fs::create_dir_all(destination.join(folder))?;
+        fs::copy(path, destination.join(folder).join(name))?;
         summary.mods += 1;
         summary.included.push((name.clone(), hash.clone()));
     }
@@ -191,6 +194,10 @@ async fn install(
     match instance.loader.as_str() {
         "vanilla" => {
             fetch(client, crate::core::mojang::install::server_jar_task(base, source, destination.join("server.jar"))?, cancel).await?;
+            Ok(Start::Jar("server.jar".into()))
+        }
+        "paper" | "purpur" => {
+            plugin_server(client, instance, base, source, destination, cancel).await?;
             Ok(Start::Jar("server.jar".into()))
         }
         "fabric" => {
@@ -236,6 +243,85 @@ async fn install(
             }
             forge_start(destination)
         }
+    }
+}
+
+/// Paper's or Purpur's newest build for the version, checked against the
+/// hash its API gives. Both patch the vanilla server on first start; it is
+/// put where they look, from the chosen source, so they needn't fetch it.
+async fn plugin_server(client: &reqwest::Client, instance: &Instance, base: &VersionJson, source: DownloadSource, destination: &Path, cancel: &CancellationToken) -> AppResult<()> {
+    let mc = instance.version_id.as_str();
+    if !crate::core::fabric::valid_version(mc) {
+        return Err(fail("版本号无效。", "Invalid version.", mc));
+    }
+    let unsupported = || {
+        AppError::new(
+            "server_pack",
+            crate::tr!("{} 还不支持 Minecraft {mc}，换一个版本试试。", "{} doesn't support Minecraft {mc} yet; try another version.", loader_name(&instance.loader)),
+        )
+    };
+    let jar = destination.join("server.jar");
+    if instance.loader == "paper" {
+        #[derive(Deserialize)]
+        struct Checksums {
+            sha256: String,
+        }
+        #[derive(Deserialize)]
+        struct Download {
+            url: String,
+            checksums: Checksums,
+            size: Option<u64>,
+        }
+        #[derive(Deserialize)]
+        struct Build {
+            downloads: std::collections::HashMap<String, Download>,
+        }
+        let response = client.get(format!("https://fill.papermc.io/v3/projects/paper/versions/{mc}/builds/latest")).timeout(Duration::from_secs(20)).send().await?;
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
+            return Err(unsupported());
+        }
+        let build: Build = response.error_for_status()?.json().await?;
+        let download = build.downloads.get("server:default").filter(|d| d.url.starts_with("https://")).ok_or_else(unsupported)?;
+        fetch(client, DownloadTask::new("Paper", download.url.clone(), Vec::new(), jar, None, download.size).with_sha256(download.checksums.sha256.clone()), cancel).await?;
+    } else {
+        #[derive(Deserialize)]
+        struct Build {
+            build: String,
+            md5: String,
+        }
+        let response = client.get(format!("https://api.purpurmc.org/v2/purpur/{mc}/latest")).timeout(Duration::from_secs(20)).send().await?;
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
+            return Err(unsupported());
+        }
+        let build: Build = response.error_for_status()?.json().await?;
+        if !build.build.bytes().all(|b| b.is_ascii_digit()) || build.build.is_empty() {
+            return Err(fail("Purpur 返回的构建号无效。", "Purpur gave an invalid build number.", build.build));
+        }
+        fetch(client, DownloadTask::new("Purpur", format!("https://api.purpurmc.org/v2/purpur/{mc}/{}/download", build.build), Vec::new(), jar.clone(), None, None), cancel).await?;
+        let sum = format!("{:x}", md5::compute(fs::read(&jar)?));
+        if !sum.eq_ignore_ascii_case(&build.md5) {
+            let _ = fs::remove_file(&jar);
+            return Err(fail("Purpur 下载的文件校验不对，请重试。", "The Purpur download didn't match its checksum; try again.", format!("{sum} != {}", build.md5)));
+        }
+    }
+    let vanilla = destination.join("cache").join(format!("mojang_{mc}.jar"));
+    if let Err(error) = fetch(client, crate::core::mojang::install::server_jar_task(base, source, vanilla.clone())?, cancel).await {
+        // The server fetches it itself then.
+        tracing::warn!(%error, "couldn't fetch the vanilla server for patching");
+        let _ = fs::remove_file(&vanilla);
+    }
+    Ok(())
+}
+
+fn loader_name(loader: &str) -> &str {
+    match loader {
+        "paper" => "Paper",
+        "purpur" => "Purpur",
+        "fabric" => "Fabric",
+        "quilt" => "Quilt",
+        "forge" => "Forge",
+        "neoforge" => "NeoForge",
+        _ => loader,
     }
 }
 
@@ -285,26 +371,115 @@ fn console_java(java: &Path) -> PathBuf {
     java.to_path_buf()
 }
 
+/// G1 settings for game servers (Aikar's flags), the young generation
+/// sized for heaps up to and over 12 GB. Options a newer Java has dropped
+/// are skipped rather than stopping it.
+const GC_FLAGS: &str = "-XX:+IgnoreUnrecognizedVMOptions -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1";
+const GC_SMALL: &str = "-XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:InitiatingHeapOccupancyPercent=15";
+const GC_LARGE: &str = "-XX:G1NewSizePercent=40 -XX:G1MaxNewSizePercent=50 -XX:G1HeapRegionSize=16M -XX:G1ReservePercent=15 -XX:InitiatingHeapOccupancyPercent=20";
+
 /// `start.sh` and `start.bat`: the world's Java unless `JAVA` says
-/// otherwise or it isn't there (on another computer), then `java`.
+/// otherwise or it isn't there (on another computer), then `java`. The
+/// memory is `MC_MEMORY`; "auto" (from `memory_mb` 0) leaves a quarter of
+/// the machine, at least 768 MB, to everything else. How far players see
+/// follows the memory until `server.properties` says otherwise.
 fn write_scripts(destination: &Path, java: &Path, memory_mb: u32, start: &Start) -> AppResult<()> {
     let java = console_java(java);
-    let memory = format!("-Xms{0}M -Xmx{0}M", memory_mb.clamp(512, 32768));
+    let memory = if memory_mb == 0 { "auto".to_string() } else { memory_mb.clamp(512, 32768).to_string() };
     let (unix, windows) = match start {
-        Start::Jar(jar) => (format!("\"$JAVA\" {memory} -jar {jar} nogui"), format!("\"%JAVA%\" {memory} -jar {jar} nogui")),
+        Start::Jar(jar) => (format!("-jar {jar} nogui"), format!("-jar {jar} nogui")),
         Start::ArgFiles { unix, windows } => {
-            // The installer's own run scripts take the memory from here.
-            fs::write(destination.join("user_jvm_args.txt"), format!("# Memory for the server; edit as needed.\n{memory}\n"))?;
-            (format!("\"$JAVA\" @user_jvm_args.txt {unix} nogui"), format!("\"%JAVA%\" @user_jvm_args.txt {windows} nogui"))
+            fs::write(destination.join("user_jvm_args.txt"), "# More Java options for the server; start.sh and start.bat set its memory.\n")?;
+            (format!("@user_jvm_args.txt {unix} nogui"), format!("@user_jvm_args.txt {windows} nogui"))
         }
     };
     let sh = format!(
-        "#!/usr/bin/env sh\n# Starts the server. Set JAVA to use another Java.\ncd \"$(dirname \"$0\")\" || exit 1\nJAVA=\"${{JAVA:-{java}}}\"\n[ -x \"$JAVA\" ] || JAVA=java\n{unix}\n",
+        r#"#!/usr/bin/env sh
+# Starts the server. Set JAVA to use another Java, MC_MEMORY to give it
+# another amount of memory (MB, or auto).
+cd "$(dirname "$0")" || exit 1
+JAVA="${{JAVA:-{java}}}"
+[ -x "$JAVA" ] || JAVA=java
+MC_MEMORY="${{MC_MEMORY:-{memory}}}"
+if [ "$MC_MEMORY" = auto ]; then
+	total=$(awk '/^MemTotal:/ {{ print int($2 / 1024) }}' /proc/meminfo 2>/dev/null)
+	[ -n "$total" ] || total=$(( $(sysctl -n hw.memsize 2>/dev/null || echo 4294967296) / 1048576 ))
+	for f in /sys/fs/cgroup/memory.max /sys/fs/cgroup/memory/memory.limit_in_bytes; do
+		limit=$(cat "$f" 2>/dev/null)
+		case "$limit" in ''|*[!0-9]*) ;; *) [ $((limit / 1048576)) -lt "$total" ] && total=$((limit / 1048576)) ;; esac
+	done
+	reserve=$((total / 4))
+	[ "$reserve" -lt 768 ] && reserve=768
+	MC_MEMORY=$((total - reserve))
+	# What other programs hold stays theirs, and Java needs room beside
+	# the heap: it takes all of the heap at start.
+	free=$(awk '/^MemAvailable:/ {{ print int($2 / 1024) }}' /proc/meminfo 2>/dev/null)
+	if [ -n "$free" ]; then
+		room=$((free - free / 6 - 512))
+		[ "$room" -lt "$MC_MEMORY" ] && MC_MEMORY=$room
+	fi
+	[ "$MC_MEMORY" -lt 512 ] && MC_MEMORY=512
+	[ "$MC_MEMORY" -gt 32768 ] && MC_MEMORY=32768
+fi
+if ! grep -q '^view-distance=' server.properties 2>/dev/null; then
+	if [ "$MC_MEMORY" -le 2048 ]; then v=6 s=4
+	elif [ "$MC_MEMORY" -le 4096 ]; then v=8 s=6
+	elif [ "$MC_MEMORY" -le 8192 ]; then v=10 s=8
+	else v=12 s=10; fi
+	printf 'view-distance=%s\nsimulation-distance=%s\n' "$v" "$s" >> server.properties
+fi
+if [ "$MC_MEMORY" -gt 12288 ]; then G1="{large}"; else G1="{small}"; fi
+echo "Starting with ${{MC_MEMORY}} MB of memory"
+"$JAVA" -Xms${{MC_MEMORY}}M -Xmx${{MC_MEMORY}}M {flags} $G1 {unix}
+"#,
         java = java.display().to_string().replace('"', "\\\""),
+        large = GC_LARGE,
+        small = GC_SMALL,
+        flags = GC_FLAGS,
     );
     let bat = format!(
-        "@echo off\r\nrem Starts the server. Set JAVA to use another Java.\r\ncd /d \"%~dp0\"\r\nif not defined JAVA set \"JAVA={java}\"\r\nif not exist \"%JAVA%\" set \"JAVA=java\"\r\n{windows}\r\npause\r\n",
+        "@echo off\r\n\
+rem Starts the server. Set JAVA to use another Java, MC_MEMORY to give it\r\n\
+rem another amount of memory (MB, or auto).\r\n\
+cd /d \"%~dp0\"\r\n\
+if not defined JAVA set \"JAVA={java}\"\r\n\
+if not exist \"%JAVA%\" set \"JAVA=java\"\r\n\
+if not defined MC_MEMORY set \"MC_MEMORY={memory}\"\r\n\
+if /i not \"%MC_MEMORY%\"==\"auto\" goto memory\r\n\
+set \"TOTAL=4096\"\r\n\
+for /f %%m in ('powershell -NoProfile -Command \"[int]((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1MB)\"') do set \"TOTAL=%%m\"\r\n\
+set /a RESERVE=TOTAL/4\r\n\
+if %RESERVE% LSS 768 set RESERVE=768\r\n\
+set /a MC_MEMORY=TOTAL-RESERVE\r\n\
+set \"FREE=\"\r\n\
+for /f %%m in ('powershell -NoProfile -Command \"[int]((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory/1KB)\"') do set \"FREE=%%m\"\r\n\
+if not defined FREE goto clamp\r\n\
+set /a ROOM=FREE-FREE/6-512\r\n\
+if %ROOM% LSS %MC_MEMORY% set MC_MEMORY=%ROOM%\r\n\
+:clamp\r\n\
+if %MC_MEMORY% LSS 512 set MC_MEMORY=512\r\n\
+if %MC_MEMORY% GTR 32768 set MC_MEMORY=32768\r\n\
+:memory\r\n\
+findstr /b \"view-distance=\" server.properties >nul 2>&1 || call :distance\r\n\
+set \"G1={small}\"\r\n\
+if %MC_MEMORY% GTR 12288 set \"G1={large}\"\r\n\
+echo Starting with %MC_MEMORY% MB of memory\r\n\
+\"%JAVA%\" -Xms%MC_MEMORY%M -Xmx%MC_MEMORY%M {flags} %G1% {windows}\r\n\
+pause\r\n\
+exit /b\r\n\
+\r\n\
+:distance\r\n\
+set \"V=12\" & set \"S=10\"\r\n\
+if %MC_MEMORY% LEQ 8192 (set \"V=10\" & set \"S=8\")\r\n\
+if %MC_MEMORY% LEQ 4096 (set \"V=8\" & set \"S=6\")\r\n\
+if %MC_MEMORY% LEQ 2048 (set \"V=6\" & set \"S=4\")\r\n\
+>>server.properties echo view-distance=%V%\r\n\
+>>server.properties echo simulation-distance=%S%\r\n\
+exit /b\r\n",
         java = java.display(),
+        large = GC_LARGE,
+        small = GC_SMALL,
+        flags = GC_FLAGS,
     );
     let script = destination.join("start.sh");
     fs::write(&script, sh)?;
@@ -355,6 +530,7 @@ fn copy_world(save: &Path, world: &Path, host_uuid: Option<&str>) -> AppResult<W
 /// `server.properties` for a new server. Numbers for difficulty and game
 /// mode, which every version reads.
 fn properties(instance: &Instance, options: &ServerOptions, rules: &WorldRules) -> String {
+    let project = instance.server.as_ref();
     let mut lines = vec![
         "# Written by Islet; the server adds the rest on first start.".to_string(),
         format!("motd={}", properties_escape(&instance.name)),
@@ -368,14 +544,41 @@ fn properties(instance: &Instance, options: &ServerOptions, rules: &WorldRules) 
     if let Some(mode) = rules.game_mode {
         lines.push(format!("gamemode={}", mode.clamp(0, 3)));
     }
+    if let Some(project) = project {
+        // A project's own settings come last and win.
+        lines.extend(project_properties(instance).into_iter().map(|(key, value)| format!("{key}={value}")));
+        if !project.seed.trim().is_empty() {
+            lines.push(format!("level-seed={}", properties_escape(project.seed.trim())));
+        }
+    }
     if rules.hardcore {
         lines.push("hardcore=true".into());
     }
     // Mods with jetpacks, wings and the like get players kicked for flying.
-    if instance.loader != "vanilla" {
+    if instance.loader != "vanilla" && !runs_plugins(&instance.loader) {
         lines.push("allow-flight=true".into());
     }
-    lines.join("\n") + "\n"
+    // One line per key, the last one written.
+    let mut seen = std::collections::HashSet::new();
+    let mut kept: Vec<String> = lines.into_iter().rev().filter(|line| line.starts_with('#') || seen.insert(line.split('=').next().unwrap_or_default().to_string())).collect();
+    kept.reverse();
+    kept.join("\n") + "\n"
+}
+
+/// The `server.properties` lines a server project's settings decide, kept
+/// up to date on the host by every upload.
+pub fn project_properties(instance: &Instance) -> Vec<(&'static str, String)> {
+    let Some(project) = &instance.server else { return Vec::new() };
+    let motd = Some(project.motd.trim()).filter(|motd| !motd.is_empty()).unwrap_or(&instance.name);
+    vec![
+        ("motd", properties_escape(motd)),
+        ("max-players", project.max_players.clamp(1, 1000).to_string()),
+        ("difficulty", project.difficulty.min(3).to_string()),
+        ("gamemode", project.gamemode.min(3).to_string()),
+        ("pvp", project.pvp.to_string()),
+        ("white-list", project.whitelist.to_string()),
+        ("enforce-whitelist", project.whitelist.to_string()),
+    ]
 }
 
 /// `.properties` values are Latin-1; anything else goes as `\uXXXX`.
@@ -456,9 +659,68 @@ mod tests {
         write_scripts(dir.path(), Path::new("/opt/java/bin/java"), 4096, &Start::ArgFiles { unix, windows }).unwrap();
         let sh = fs::read_to_string(dir.path().join("start.sh")).unwrap();
         assert!(sh.contains("JAVA=\"${JAVA:-/opt/java/bin/java}\""));
-        assert!(sh.contains("\"$JAVA\" @user_jvm_args.txt @libraries/net/neoforged/neoforge/21.1.1/unix_args.txt nogui"));
-        assert!(fs::read_to_string(dir.path().join("user_jvm_args.txt")).unwrap().contains("-Xmx4096M"));
+        assert!(sh.contains("$G1 @user_jvm_args.txt @libraries/net/neoforged/neoforge/21.1.1/unix_args.txt nogui"));
+        assert!(sh.contains("MC_MEMORY=\"${MC_MEMORY:-4096}\""));
+        assert!(sh.contains("-Xmx${MC_MEMORY}M"));
+        assert!(!fs::read_to_string(dir.path().join("user_jvm_args.txt")).unwrap().contains("-Xmx"));
         assert!(fs::read_to_string(dir.path().join("start.bat")).unwrap().contains("win_args.txt nogui"));
+    }
+
+    /// The automatic memory and view distance, run by `sh` with a made-up
+    /// machine.
+    #[cfg(unix)]
+    #[test]
+    fn automatic_memory_follows_the_machine() {
+        let dir = tempfile::tempdir().unwrap();
+        write_scripts(dir.path(), Path::new("/nonexistent/java"), 0, &Start::Jar("server.jar".into())).unwrap();
+        let sh = fs::read_to_string(dir.path().join("start.sh")).unwrap();
+        assert!(sh.contains("MC_MEMORY=\"${MC_MEMORY:-auto}\""));
+        // Swap the Java for one that prints its arguments, and the machine's
+        // memory for a fixed size.
+        let script = sh.replace("[ -x \"$JAVA\" ] || JAVA=java", "JAVA=echo").replace("$(awk '/^MemTotal:/ { print int($2 / 1024) }' /proc/meminfo 2>/dev/null)", "${FAKE_TOTAL}").replace("/sys/fs/cgroup/memory.max /sys/fs/cgroup/memory/memory.limit_in_bytes", "/nonexistent").replace("$(awk '/^MemAvailable:/ { print int($2 / 1024) }' /proc/meminfo 2>/dev/null)", "${FAKE_FREE}");
+        fs::write(dir.path().join("start.sh"), script).unwrap();
+        // (total, available, heap, view distance); no MemAvailable goes by the total alone.
+        for (total, free, heap, view) in [
+            (1024, "", 512, 6),
+            (2048, "", 1280, 6),
+            (4096, "", 3072, 8),
+            (8192, "", 6144, 10),
+            (16384, "", 12288, 12),
+            (32768, "", 24576, 12),
+            // An idle 8 GB host: Java's own room comes off what is free.
+            (8192, "7680", 5888, 10),
+            // Busy: the heap fits what is left.
+            (8192, "3072", 2048, 6),
+            (2048, "900", 512, 6),
+        ] {
+            let _ = fs::remove_file(dir.path().join("server.properties"));
+            let output = std::process::Command::new("sh").arg(dir.path().join("start.sh")).env("FAKE_TOTAL", total.to_string()).env("FAKE_FREE", free).env_remove("MC_MEMORY").output().unwrap();
+            let text = String::from_utf8_lossy(&output.stdout);
+            assert!(text.contains(&format!("-Xmx{heap}M")), "{total}/{free}: {text}");
+            assert_eq!(text.contains("G1NewSizePercent=40"), heap > 12288, "{total}/{free}: {text}");
+            let properties = fs::read_to_string(dir.path().join("server.properties")).unwrap();
+            assert!(properties.contains(&format!("view-distance={view}\n")), "{total}/{free}: {properties}");
+        }
+        // The host's own choice stays.
+        fs::write(dir.path().join("server.properties"), "view-distance=3\n").unwrap();
+        let output = std::process::Command::new("sh").arg(dir.path().join("start.sh")).env("FAKE_TOTAL", "4096").env("MC_MEMORY", "2000").output().unwrap();
+        assert!(String::from_utf8_lossy(&output.stdout).contains("-Xmx2000M"));
+        assert_eq!(fs::read_to_string(dir.path().join("server.properties")).unwrap(), "view-distance=3\n");
+    }
+
+    #[test]
+    fn a_server_project_sets_its_properties() {
+        let mut instance: Instance = serde_json::from_value(serde_json::json!({
+            "id": "a", "name": "Plugins", "versionId": "1.21.1", "versionType": "release", "createdAt": 0, "loader": "paper"
+        }))
+        .unwrap();
+        instance.server = Some(crate::core::instances::ServerProject { motd: "Hi".into(), max_players: 8, difficulty: 3, pvp: false, whitelist: true, seed: "42".into(), ..Default::default() });
+        let text = properties(&instance, &ServerOptions::default(), &WorldRules::default());
+        for line in ["motd=Hi", "max-players=8", "difficulty=3", "gamemode=0", "pvp=false", "white-list=true", "enforce-whitelist=true", "level-seed=42"] {
+            assert!(text.lines().any(|l| l == line), "{line} in {text}");
+        }
+        assert!(!text.contains("allow-flight"), "plugin servers keep the anti-fly check");
+        assert_eq!(text.matches("motd=").count(), 1, "{text}");
     }
 
     #[test]

@@ -7,6 +7,7 @@
 #   sh islet.sh log [LINES]   the end of the console log
 #   sh islet.sh backup        a copy of the world in backups/
 #   sh islet.sh set-prop KEY VALUE | memory MB | schedule AUTOSTART BACKUP
+#   sh islet.sh setup         install Java, start now and at boot, back up nightly
 cd "$(dirname "$0")" || exit 1
 HERE=$(pwd)
 mkdir -p .islet logs backups
@@ -84,17 +85,73 @@ status() {
 set_prop() {
 	touch server.properties
 	if grep -q "^$1=" server.properties; then
-		sed -i "s|^$1=.*|$1=$2|" server.properties
+		# The value goes into sed's replacement: \ & and | are taken literally.
+		v=$(printf '%s' "$2" | sed 's/[\\&|]/\\&/g')
+		sed -i "s|^$1=.*|$1=$v|" server.properties
 	else
-		echo "$1=$2" >> server.properties
+		printf '%s=%s\n' "$1" "$2" >> server.properties
 	fi
 }
 
+# MB, or 0 to fit the machine.
 memory() {
-	for f in start.sh user_jvm_args.txt; do
+	m=$1
+	[ "$m" = 0 ] && m=auto
+	[ -f start.sh ] && sed -i "s/^MC_MEMORY=.*/MC_MEMORY=\"\${MC_MEMORY:-$m}\"/" start.sh
+	# Servers from before start.sh chose the memory.
+	[ "$m" != auto ] && for f in start.sh user_jvm_args.txt; do
 		[ -f "$f" ] && sed -i "s/-Xms[0-9]*[MmGg]/-Xms$1M/; s/-Xmx[0-9]*[MmGg]/-Xmx$1M/" "$f"
 	done
 	true
+}
+
+sha256() {
+	if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi | cut -d ' ' -f 1
+}
+
+# The Java listed in .islet/java-ARCH (its SHA-256, then where to get it)
+# goes in java/, unless there is one already.
+java_setup() {
+	[ -x java/bin/java ] && return 0
+	list=".islet/java-$(uname -m)"
+	if [ ! -f "$list" ]; then
+		command -v java >/dev/null 2>&1 && return 0
+		echo "No Java for $(uname -m) is listed; install one." >&2
+		return 1
+	fi
+	sum=$(head -n 1 "$list")
+	for u in $(tail -n +2 "$list"); do
+		rm -f .islet/jre.tar.gz
+		if command -v curl >/dev/null 2>&1; then curl -fsSL --retry 2 --connect-timeout 15 -o .islet/jre.tar.gz "$u" || continue
+		elif command -v wget >/dev/null 2>&1; then wget -q -T 15 -O .islet/jre.tar.gz "$u" || continue
+		else echo "Neither curl nor wget is installed." >&2; return 1; fi
+		[ "$(sha256 .islet/jre.tar.gz)" = "$sum" ] || continue
+		rm -rf java.new && mkdir java.new && tar -xzf .islet/jre.tar.gz -C java.new --strip-components=1 && rm -rf java && mv java.new java
+		rm -f .islet/jre.tar.gz
+		[ -x java/bin/java ] && return 0
+	done
+	rm -f .islet/jre.tar.gz
+	echo "Java couldn't be downloaded." >&2
+	return 1
+}
+
+# Everything for a server folder copied here by hand.
+setup() {
+	echo "Installing Java..."
+	java_setup || return 1
+	chmod +x start.sh islet.sh 2>/dev/null
+	echo "Starting at boot and backing up nightly: $(schedule 1 1)"
+	start >/dev/null || return 1
+	echo "Starting the server..."
+	i=0
+	while running && ! grep -q 'Done (' "$LOG" 2>/dev/null && [ $i -lt 600 ]; do sleep 2; i=$((i + 2)); done
+	if ! running; then
+		tail -n 30 "$LOG" >&2
+		echo "The server stopped; see the log above." >&2
+		return 1
+	fi
+	port=$(sed -n 's/^server-port=//p' server.properties | tail -n 1)
+	echo "The server is running on port ${port:-25565}. Allow TCP ${port:-25565} in the firewall or security group so players can join."
 }
 
 # Starting at boot and a backup every night: cron when there is one, else
@@ -139,5 +196,6 @@ case "$1" in
 	set-prop) set_prop "$2" "$3" ;;
 	memory) memory "$2" ;;
 	schedule) schedule "$2" "$3" ;;
-	*) sed -n '2,9p' "$0"; exit 2 ;;
+	setup) setup ;;
+	*) sed -n '2,10p' "$0"; exit 2 ;;
 esac

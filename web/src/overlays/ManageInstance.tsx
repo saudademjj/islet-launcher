@@ -28,7 +28,7 @@ import { useShots } from "../lib/screenshots";
 import { OptionsTab } from "./OptionsTab";
 import { ScreenshotsTab } from "./Screenshots";
 import { ServersTab } from "./ServersTab";
-import { useAutoMemory, usePick, useStore, type ManageTab, type SearchSource } from "../store";
+import { findInstance, useAutoMemory, usePick, useStore, type ManageTab, type SearchSource } from "../store";
 import { isEnglish, t } from "../lib/i18n";
 
 const PAGE_SIZE = 10;
@@ -39,7 +39,7 @@ const SKELETON_ROWS = 6;
 
 export function ManageInstance({ id, tab }: { id: string; tab: ManageTab }) {
   const s = usePick((s) => ({
-    instance: s.instances.find((i) => i.id === id) ?? null,
+    instance: findInstance(s, id),
     modCount: s.localMods.length,
     busy: s.fileBusy || s.runningIds.includes(id) || s.launchPending === id || s.install?.instanceId === id,
     closeModal: s.closeModal,
@@ -54,6 +54,9 @@ export function ManageInstance({ id, tab }: { id: string; tab: ManageTab }) {
     void useShots.getState().load(id);
   }, [id]);
   if (!s.instance) return null;
+  // A server project only keeps its mods or plugins here.
+  const project = !!s.instance.server;
+  const plugins = isPluginServer(s.instance.loader);
   const setTab = (next: ManageTab) => useStore.getState().setManageTab(next);
   // Jump to the download page for a kind of content, optionally searching.
   const browse = (kind: ContentKind, query = "") => {
@@ -72,15 +75,15 @@ export function ManageInstance({ id, tab }: { id: string; tab: ManageTab }) {
       scene={
         <SceneHeader
           seed={s.instance.id}
-          eyebrow={t("管理世界", "Manage world")}
+          eyebrow={project ? t("开服项目", "Server project") : t("管理世界", "Manage world")}
           title={s.instance.name}
           meta={
             <>
               <span className="mono">{s.instance.versionId}</span>
               <span className="dot" />
               {loaderLabel(s.instance.loader)}
-              <span className="dot" />
-              {formatRelative(s.instance.lastLaunchedAt)}
+              {!project && <span className="dot" />}
+              {!project && formatRelative(s.instance.lastLaunchedAt)}
               {s.instance.playSeconds >= 60 && (
                 <>
                   <span className="dot" />
@@ -97,7 +100,10 @@ export function ManageInstance({ id, tab }: { id: string; tab: ManageTab }) {
             <Tabs
               value={tab}
               onChange={setTab}
-              tabs={[
+              tabs={project ? [
+                { value: "mods", label: <>{plugins ? t("插件", "Plugins") : t("模组", "Mods")}{s.modCount > 0 && <span className="tab-count">{s.modCount}</span>}</> },
+                { value: "browse", label: t("下载", "Download") },
+              ] : [
                 { value: "general", label: t("常规", "General") },
                 { value: "options", label: t("游戏选项", "Game options") },
                 { value: "mods", group: true, label: <>{t("模组", "Mods")}{s.modCount > 0 && <span className="tab-count">{s.modCount}</span>}</> },
@@ -587,6 +593,7 @@ function ModsTab({ instance, busy, browse }: { instance: Instance; busy: boolean
   const [metas, setMetas] = useState<Record<string, ModMeta>>({});
   const [lastChange, setLastChange] = useState<LastModChange | null>(null);
   const vanilla = instance.loader === "vanilla";
+  const plugins = isPluginServer(instance.loader);
   const icons = useModIcons(instance.id, vanilla ? [] : s.mods);
   // Identify the files once per visit; later checks are on request.
   useEffect(() => {
@@ -711,7 +718,7 @@ function ModsTab({ instance, busy, browse }: { instance: Instance; busy: boolean
           <span className="mods-count mono">{s.mods.length}</span>
           <div className="col" style={{ gap: 2, minWidth: 0 }}>
             <span className="mods-title">
-              {t("个模组 · ", " mods · ")}{s.mods.length - disabled}{t(" 个启用", " enabled")}
+              {plugins ? t("个插件 · ", " plugins · ") : t("个模组 · ", " mods · ")}{s.mods.length - disabled}{t(" 个启用", " enabled")}
             </span>
             <span className="mods-state">{state}</span>
           </div>
@@ -724,13 +731,15 @@ function ModsTab({ instance, busy, browse }: { instance: Instance; busy: boolean
               {t("全部更新", "Update all")}
             </Button>
           )}
-          <Button size="sm" variant="ghost" icon="edit" disabled={vanilla} onClick={() => s.openModal({ kind: "configs", id: instance.id })}>
-            {t("配置文件", "Configs")}
-          </Button>
-          <Button size="sm" variant="ghost" icon="folder" aria-label={t("打开模组文件夹", "Open the mods folder")} title={t("打开模组文件夹", "Open the mods folder")} onClick={() => void s.open({ kind: "contentDir", id: instance.id, content: "mod" })} />
+          {!plugins && (
+            <Button size="sm" variant="ghost" icon="edit" disabled={vanilla} onClick={() => s.openModal({ kind: "configs", id: instance.id })}>
+              {t("配置文件", "Configs")}
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" icon="folder" aria-label={plugins ? t("打开插件文件夹", "Open the plugins folder") : t("打开模组文件夹", "Open the mods folder")} title={plugins ? t("打开插件文件夹", "Open the plugins folder") : t("打开模组文件夹", "Open the mods folder")} onClick={() => void s.open({ kind: "contentDir", id: instance.id, content: "mod" })} />
           {s.mods.length > 0 && (
             <Button size="sm" icon="search" onClick={() => browse("mod")}>
-              {t("下载模组", "Find mods")}
+              {plugins ? t("下载插件", "Find plugins") : t("下载模组", "Find mods")}
             </Button>
           )}
           <Button
@@ -761,7 +770,7 @@ function ModsTab({ instance, busy, browse }: { instance: Instance; busy: boolean
             <div className="spacer" />
             {s.mods.length > 6 && (
               <div style={{ width: 220 }}>
-                <Input icon="search" placeholder={t("筛选模组，可用拼音", "Filter mods")} value={query} onChange={(e) => setQuery(e.target.value)} />
+                <Input icon="search" placeholder={plugins ? t("筛选插件", "Filter plugins") : t("筛选模组，可用拼音", "Filter mods")} value={query} onChange={(e) => setQuery(e.target.value)} />
               </div>
             )}
             <Button size="sm" variant={picked ? "default" : "ghost"} icon={picked ? "close" : "check"} onClick={() => setPicked(picked ? null : new Set())}>
@@ -827,17 +836,19 @@ function ModsTab({ instance, busy, browse }: { instance: Instance; busy: boolean
       {s.mods.length === 0 ? (
         <Empty
           art={<BrandMark size={44} />}
-          title={t("还没有模组", "No mods yet")}
+          title={plugins ? t("还没有插件", "No plugins yet") : t("还没有模组", "No mods yet")}
           actions={
             <Button size="sm" variant="primary" icon="search" onClick={() => browse("mod")}>
-              {t("去下载模组", "Find mods")}
+              {plugins ? t("去下载插件", "Find plugins") : t("去下载模组", "Find mods")}
             </Button>
           }
         >
-          {t("从 Modrinth 下载时，必需的前置模组会自动一起安装；也可以点「添加 .jar」导入本地文件。", "Required dependencies install along with mods from Modrinth; you can also add local files with \"Add .jar\".")}
+          {plugins
+            ? t("从 Modrinth 下载 Paper、Spigot 和 Bukkit 插件，需要的前置插件会一起装上；也可以点「添加 .jar」导入本地文件。", "Download Paper, Spigot and Bukkit plugins from Modrinth, with the plugins they need; you can also add local files with \"Add .jar\".")
+            : t("从 Modrinth 下载时，必需的前置模组会自动一起安装；也可以点「添加 .jar」导入本地文件。", "Required dependencies install along with mods from Modrinth; you can also add local files with \"Add .jar\".")}
         </Empty>
       ) : shown.length === 0 ? (
-        <div className="saves-empty muted">{t("没有符合条件的模组。", "No mods match.")}</div>
+        <div className="saves-empty muted">{plugins ? t("没有符合条件的插件。", "No plugins match.") : t("没有符合条件的模组。", "No mods match.")}</div>
       ) : (
         <div className="list mod-list">
           {shown.map((row) => {
@@ -1254,6 +1265,9 @@ interface ChineseResolution {
   applied: ModName;
 }
 
+/** Paper and Purpur take plugins where other servers take mods. */
+const isPluginServer = (loader: string) => loader === "paper" || loader === "purpur";
+
 const KIND_OPTIONS: { value: ContentKind; label: string }[] = [
   { value: "mod", label: t("模组", "Mods") },
   { value: "resourcepack", label: t("资源包", "Resource packs") },
@@ -1311,6 +1325,7 @@ function BrowseTab({ instance, busy }: { instance: Instance; busy: boolean }) {
   const [chosen, setChosen] = useState<ModName | null>(null);
   const [unfolded, setUnfolded] = useState<Record<string, boolean>>({});
   const kind = s.search.kind;
+  const kindName = isPluginServer(instance.loader) && kind === "mod" ? t("插件", "Plugins") : KIND_NAME[kind];
   const vanilla = instance.loader === "vanilla";
   const blocked = vanilla && kind === "mod";
   // Datapacks go into one save; the most recently played is preselected.
@@ -1473,15 +1488,18 @@ function BrowseTab({ instance, busy }: { instance: Instance; busy: boolean }) {
   return (
     <div className="manage-scroll">
       <div className="row">
-        <Segmented value={kind} onChange={switchKind} options={KIND_OPTIONS} />
-        <Segmented
-          value={source}
-          onChange={switchSource}
-          options={[
-            { value: "modrinth", label: "Modrinth" },
-            { value: "curseforge", label: "CurseForge" },
-          ]}
-        />
+        {/* A server project only takes mods or plugins, and plugins only come from Modrinth. */}
+        {!instance.server && <Segmented value={kind} onChange={switchKind} options={KIND_OPTIONS} />}
+        {!isPluginServer(instance.loader) && (
+          <Segmented
+            value={source}
+            onChange={switchSource}
+            options={[
+              { value: "modrinth", label: "Modrinth" },
+              { value: "curseforge", label: "CurseForge" },
+            ]}
+          />
+        )}
         <span className="faint" style={{ fontSize: "var(--text-xs)" }}>
           {t("只显示适配 ", "Showing only results for ")}{instance.versionId}
           {kind === "mod" && !vanilla ? ` · ${loaderLabel(instance.loader)}` : ""}{t(" 的结果", "")}
@@ -1519,7 +1537,7 @@ function BrowseTab({ instance, busy }: { instance: Instance; busy: boolean }) {
             <div style={{ flex: 1 }}>
               <Input
                 icon="search"
-                placeholder={KIND_PLACEHOLDER[kind]}
+                placeholder={isPluginServer(instance.loader) ? t("搜索插件，如 EssentialsX、LuckPerms", "Search plugins, like EssentialsX or LuckPerms") : KIND_PLACEHOLDER[kind]}
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);
@@ -1634,7 +1652,7 @@ function BrowseTab({ instance, busy }: { instance: Instance; busy: boolean }) {
           )}
           <OperationLine />
           {!searched ? (
-            <Empty icon="search" title={t(`从 ${curseforge ? "CurseForge" : "Modrinth"} 下载${KIND_NAME[kind]}`, `Download ${KIND_NAME[kind]} from ${curseforge ? "CurseForge" : "Modrinth"}`)}>
+            <Empty icon="search" title={t(`从 ${curseforge ? "CurseForge" : "Modrinth"} 下载${kindName}`, `Download ${kindName} from ${curseforge ? "CurseForge" : "Modrinth"}`)}>
               {t("输入关键词后搜索；留空搜索可以浏览热门内容。", "Type keywords and search; search with nothing typed to browse what's popular.")}
             </Empty>
           ) : detail ? (

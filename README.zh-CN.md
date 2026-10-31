@@ -107,6 +107,7 @@ Modrinth、CurseForge 一起搜，中文名也认得。前置自动带上，全�
 - **加载器**：Fabric、Quilt、Forge、NeoForge、OptiFine、Legacy Fabric、LiteLoader、Cleanroom
 - **整合包与开服**：浏览 Modrinth 和 CurseForge，导入 `.mrpack` / `.zip`；把自己的世界导出成整合包，或一键生成能直接运行的服务端（自动去掉只在客户端运行的模组，单人存档和背包一起带进去）
 - **从单机到开服一条龙**：通过 SSH 一键部署到自己的 Linux 云服务器（自动装 Java），在启动器里开关、备份、看控制台、同步模组；朋友拿到的整合包已填好服务器地址，进服前缺的模组自动补齐
+- **开服页面**：从零建一台服务器——原版、Fabric、Quilt、Forge、NeoForge，或者跑插件的 Paper、Purpur——从 Modrinth 添加模组或插件，设好介绍、难度、白名单，然后导出成文件夹（上传后 `sh islet.sh setup` 即开服）或通过 SSH 一键部署；内存、JVM 参数和视距按那台机器的配置自动调整
 - **资源包与光影**：调整资源包顺序；光影缺 Iris / Oculus 时会提醒
 - **存档与地图**：玩完自动备份，也能手动备份、恢复、导入导出；从 CurseForge 下载地图；1.20 以上可以直接进入某个存档
 - **模组配置**：在启动器里直接改 `config/` 里的配置文件，每次保存前自动留一份旧版

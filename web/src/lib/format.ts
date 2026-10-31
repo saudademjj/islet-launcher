@@ -68,6 +68,10 @@ export function loaderLabel(loader: string): string {
       return "Forge";
     case "neoforge":
       return "NeoForge";
+    case "paper":
+      return "Paper";
+    case "purpur":
+      return "Purpur";
     default:
       return t("原版", "Vanilla");
   }

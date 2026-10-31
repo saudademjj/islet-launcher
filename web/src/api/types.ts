@@ -95,6 +95,25 @@ export interface Instance {
   favorite: boolean;
   /** The group it sits in on the worlds page. */
   group: string | null;
+  /** Set for a server project from the server page, which is never played. */
+  server: ServerProject | null;
+}
+
+/** How a server project's server is set up. */
+export interface ServerProject {
+  motd: string;
+  maxPlayers: number;
+  /** 0 peaceful, 1 easy, 2 normal, 3 hard. */
+  difficulty: number;
+  /** 0 survival, 1 creative, 2 adventure, 3 spectator. */
+  gamemode: number;
+  pvp: boolean;
+  whitelist: boolean;
+  onlineMode: boolean;
+  port: number;
+  /** 0 fits the memory to the machine the server runs on. */
+  memoryMb: number;
+  seed: string;
 }
 
 /** Options for starting the game, kept globally and per world. */

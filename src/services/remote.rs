@@ -7,7 +7,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use tokio_util::sync::CancellationToken;
 
-use super::{AppServices, UiEvent, lock, load_version};
+use super::{AppServices, UiEvent, lock};
 use crate::core::error::{AppError, AppResult};
 use crate::core::i18n::pick;
 use crate::core::remote::{self, Probe, Session, State, Target};
@@ -269,8 +269,7 @@ impl AppServices {
                 None => None,
             };
 
-            let version = load_version(&self.paths, &instance)?;
-            let major = crate::core::mojang::version::java_major(&version);
+            let major = self.server_java_major(&instance)?;
             if probe.java.as_ref().is_none_or(|(_, have)| *have != major) {
                 report("在服务器上安装 Java", "Installing Java on the server", 0, 0);
                 self.remote_java(id, &session, &target, &probe, major, cancel)?;
@@ -292,6 +291,16 @@ impl AppServices {
                 return Err(AppError::detail("remote", pick("上传后解压失败。", "Unpacking the upload failed."), output.stderr));
             }
             runtime.block_on(session.run_ok(&remote::configure_script(&target), "设置服务器失败。", "Couldn't set the server up."))?;
+            // A project's settings follow it to a server that already has its
+            // own server.properties.
+            let properties: Vec<String> = crate::core::server_pack::project_properties(&instance)
+                .into_iter()
+                .map(|(key, value)| format!("sh islet.sh set-prop {key} {}", remote::quote(&value)))
+                .collect();
+            if update && !properties.is_empty() {
+                let script = format!("{}&& {}", remote::cd(&target.dir), properties.join(" && "));
+                runtime.block_on(session.run_ok(&script, "设置服务器失败。", "Couldn't set the server up."))?;
+            }
 
             report("启动服务器", "Starting the server", 0, 0);
             runtime.block_on(session.run_ok(&format!("{}&& sh islet.sh start", remote::cd(&target.dir)), "服务器启动失败。", "The server didn't start."))?;
@@ -322,10 +331,11 @@ impl AppServices {
             target.deployed_at = Some(crate::core::util::now_millis());
             remote::save(&self.paths, id, &target)?;
 
+            let what = if crate::core::instances::runs_plugins(&instance.loader) { crate::core::i18n::pick("插件", "plugins") } else { crate::core::i18n::pick("模组", "mods") };
             let mut message = if update {
-                crate::tr!("服务器已更新并重新启动，带 {} 个模组。", "The server is updated and running again with {} mods.", summary.mods)
+                crate::tr!("服务器已更新并重新启动，带 {} 个{what}。", "The server is updated and running again with {} {what}.", summary.mods)
             } else {
-                crate::tr!("服务器已经在 {address} 运行，带 {} 个模组。", "The server is running at {address} with {} mods.", summary.mods)
+                crate::tr!("服务器已经在 {address} 运行，带 {} 个{what}。", "The server is running at {address} with {} {what}.", summary.mods)
             };
             if let Some(pack) = &pack {
                 message += &crate::tr!("把「{}」发给朋友，导入后就能进服。", " Send \"{}\" to friends; once imported they can join.", pack.file_name().unwrap_or_default().to_string_lossy());

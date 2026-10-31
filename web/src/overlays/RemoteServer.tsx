@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { call, toError } from "../api/backend";
-import type { ErrorPayload, RemoteInfo, RemoteProbe, RemoteStatus, RemoteTarget } from "../api/types";
+import type { ErrorPayload, Instance, RemoteInfo, RemoteProbe, RemoteStatus, RemoteTarget } from "../api/types";
 import { Modal } from "../components/overlay";
 import { WorldChoice } from "../components/WorldChoice";
 import { Button, Field, Input, Notice, ProgressBar, Segmented, Status, Switch, Tabs } from "../components/ui";
 import { formatBytes, formatRelative } from "../lib/format";
 import { t } from "../lib/i18n";
-import { usePick } from "../store";
+import { findInstance, usePick, useStore } from "../store";
 
 const EULA = "https://aka.ms/MinecraftEULA";
-const SUPPORTED = ["vanilla", "fabric", "quilt", "forge", "neoforge"];
+const SUPPORTED = ["vanilla", "fabric", "quilt", "forge", "neoforge", "paper", "purpur"];
 const portOk = (text: string) => /^\d{1,5}$/.test(text) && Number(text) > 0 && Number(text) < 65536;
 const digits = (text: string, max: number) => text.replace(/\D/g, "").slice(0, max);
+/** "0" is automatic: the start script sizes it to the host. */
+export const memoryValid = (text: string) => text === "0" || (Number(text) >= 512 && Number(text) <= 32768);
 
 type Form = {
   host: string;
@@ -31,8 +33,10 @@ type Form = {
   keep: string;
 };
 
-function formFrom(info: RemoteInfo, memoryMb: number): Form {
+/** A new server starts from the project's settings, or automatic memory. */
+function formFrom(info: RemoteInfo, instance: Instance | null): Form {
   const saved = info.target;
+  const project = instance?.server;
   return {
     host: saved?.host ?? "",
     port: String(saved?.port ?? 22),
@@ -41,10 +45,10 @@ function formFrom(info: RemoteInfo, memoryMb: number): Form {
     keyPath: saved?.keyPath ?? "",
     secret: "",
     dir: saved?.dir || info.defaultDir,
-    gamePort: String(saved?.gamePort ?? 25565),
+    gamePort: String(saved?.gamePort ?? project?.port ?? 25565),
     address: saved?.address ?? "",
-    memory: String(saved?.memoryMb ?? memoryMb),
-    onlineMode: saved?.onlineMode ?? true,
+    memory: String(saved?.memoryMb ?? project?.memoryMb ?? 0),
+    onlineMode: saved?.onlineMode ?? project?.onlineMode ?? true,
     autostart: saved?.autostart ?? true,
     dailyBackup: saved?.dailyBackup ?? true,
     keep: String(saved?.keepBackups ?? 7),
@@ -76,12 +80,12 @@ function targetFrom(form: Form, saved: RemoteTarget | null): RemoteTarget {
     from here. Nothing in between but the host itself. */
 export function RemoteServer({ id }: { id: string }) {
   const s = usePick((s) => ({
-    instance: s.instances.find((i) => i.id === id) ?? null,
+    instance: findInstance(s, id),
     fileBusy: s.fileBusy,
     filesChanged: s.filesChanged,
     progress: s.remoteProgress?.instanceId === id ? s.remoteProgress : null,
-    memory: s.settings.memoryAuto ? 4096 : s.settings.memoryMb,
     openModal: s.openModal,
+    closeModal: s.closeModal,
     openUrl: s.openUrl,
     chooseFiles: s.chooseFiles,
     chooseSavePath: s.chooseSavePath,
@@ -107,11 +111,11 @@ export function RemoteServer({ id }: { id: string }) {
     try {
       const value = await call<RemoteInfo>("remote_info", { id });
       setInfo(value);
-      setForm((old) => old ?? formFrom(value, s.memory));
+      setForm((old) => old ?? formFrom(value, findInstance(useStore.getState(), id)));
     } catch (e) {
       setError(toError(e));
     }
-  }, [id, s.memory]);
+  }, [id]);
   useEffect(() => {
     void load();
   }, [load, s.filesChanged]);
@@ -146,7 +150,8 @@ export function RemoteServer({ id }: { id: string }) {
   if (!s.instance || !info || !form) return null;
   const instance = s.instance;
   const set = (patch: Partial<Form>) => setForm({ ...form, ...patch });
-  const back = () => s.openModal({ kind: "manage", id, tab: "data" });
+  // A project's dialog opens from the server page and goes back to it.
+  const back = () => (instance.server ? s.closeModal() : s.openModal({ kind: "manage", id, tab: "data" }));
   const run = async (label: string, work: () => Promise<void>) => {
     setBusy(label);
     setError(null);
@@ -160,7 +165,7 @@ export function RemoteServer({ id }: { id: string }) {
   };
 
   const supported = SUPPORTED.includes(instance.loader);
-  const memoryOk = Number(form.memory) >= 512 && Number(form.memory) <= 32768;
+  const memoryOk = memoryValid(form.memory);
   const keepOk = Number(form.keep) >= 1 && Number(form.keep) <= 100;
   const connectionOk = !!form.host.trim() && portOk(form.port) && !!form.user.trim() && !!form.dir.trim() && (form.auth === "password" ? !!form.secret || info.hasSecret : !!form.keyPath);
   const settingsOk = portOk(form.gamePort) && memoryOk && keepOk;
@@ -216,7 +221,7 @@ export function RemoteServer({ id }: { id: string }) {
       setEditing(false);
       const value = await call<RemoteInfo>("remote_info", { id });
       setInfo(value);
-      setForm(formFrom(value, s.memory));
+      setForm(formFrom(value, instance));
     });
 
   const errorNotice = error && (
@@ -274,10 +279,15 @@ export function RemoteServer({ id }: { id: string }) {
           ) : (
             <>
               <span className="field-hint">
-                {t(
-                  "租一台 Linux 云服务器（2 核 4G 起），把它的 IP、用户名和密码填在这里。启动器会把这个世界的服务端、模组和存档传上去，装好 Java 并启动；之后在这里开关、备份和更新。不经过任何第三方中转。",
-                  "Rent a Linux cloud server (2 cores and 4 GB or more) and fill in its IP, user and password. The launcher uploads this world's server, mods and save, installs Java and starts it; start, stop, back up and update it from here later. Nothing sits in between.",
-                )}
+                {instance.server
+                  ? t(
+                      "租一台 Linux 云服务器（2 核 4G 起），把它的 IP、用户名和密码填在这里。启动器会把服务端和模组、插件传上去，装好 Java，按服务器的内存调好参数并启动；之后在这里开关、备份和更新。不经过任何第三方中转。",
+                      "Rent a Linux cloud server (2 cores and 4 GB or more) and fill in its IP, user and password. The launcher uploads the server with its mods or plugins, installs Java, tunes it to the host's memory and starts it; start, stop, back up and update it from here later. Nothing sits in between.",
+                    )
+                  : t(
+                      "租一台 Linux 云服务器（2 核 4G 起），把它的 IP、用户名和密码填在这里。启动器会把这个世界的服务端、模组和存档传上去，装好 Java 并启动；之后在这里开关、备份和更新。不经过任何第三方中转。",
+                      "Rent a Linux cloud server (2 cores and 4 GB or more) and fill in its IP, user and password. The launcher uploads this world's server, mods and save, installs Java and starts it; start, stop, back up and update it from here later. Nothing sits in between.",
+                    )}
               </span>
               {!supported && <span className="field-hint bad">{t("这个加载器没有可以一键生成的服务端；原版、Fabric、Quilt、Forge 和 NeoForge 可以。", "This loader has no server Islet can set up; vanilla, Fabric, Quilt, Forge and NeoForge do.")}</span>}
               {errorNotice}
@@ -344,7 +354,7 @@ export function RemoteServer({ id }: { id: string }) {
                       .filter(Boolean)
                       .join(" · ")}
                   </Notice>
-                  {first && (
+                  {first && !instance.server && (
                     <Field label={t("服务器的世界", "The server's world")} hint={world ? t("复制这个存档上传；你在单人里的背包和位置会跟着你进服务器", "A copy of this save is uploaded; your singleplayer inventory and spot come with you") : undefined}>
                       <WorldChoice instance={instance} value={world} onChange={setWorld} />
                     </Field>
@@ -526,9 +536,34 @@ export function RemoteServer({ id }: { id: string }) {
   );
 }
 
+/** The server's memory: automatic (sized to the host when it starts) or
+    a fixed number of MB. */
+export function MemoryField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const auto = value === "0";
+  const ok = memoryValid(value);
+  return (
+    <Field
+      label={t("内存", "Memory")}
+      tone={ok ? undefined : "bad"}
+      hint={auto ? t("每次启动按机器内存分配，留出 1/4 给系统，视距也随之调整", "Sized to the machine at each start, leaving a quarter for the system; view distance follows") : ok ? t("单位 MB；比机器总内存少 1G 左右", "In MB; about 1 GB under the machine's total") : t("512 到 32768 MB", "512 to 32768 MB")}
+    >
+      <div className="row" style={{ gap: 8 }}>
+        <Segmented
+          value={auto ? "auto" : "fixed"}
+          options={[
+            { value: "auto", label: t("自动", "Automatic") },
+            { value: "fixed", label: t("固定", "Fixed") },
+          ]}
+          onChange={(mode) => onChange(mode === "auto" ? "0" : "4096")}
+        />
+        {!auto && <Input mono inputMode="numeric" aria-label={t("内存（MB）", "Memory (MB)")} value={value} style={{ width: 90 }} invalid={!ok} onChange={(e) => onChange(digits(e.target.value, 5))} />}
+      </div>
+    </Field>
+  );
+}
+
 /** How the server is kept: shared by the first upload and later changes. */
 function ServerSettings({ form, set }: { form: Form; set: (patch: Partial<Form>) => void }) {
-  const memoryOk = Number(form.memory) >= 512 && Number(form.memory) <= 32768;
   const keepOk = Number(form.keep) >= 1 && Number(form.keep) <= 100;
   return (
     <>
@@ -536,9 +571,7 @@ function ServerSettings({ form, set }: { form: Form; set: (patch: Partial<Form>)
         <Field label={t("游戏端口", "Game port")} tone={portOk(form.gamePort) ? undefined : "bad"} hint={t("记得在安全组里放行", "Allow it in the security group")}>
           <Input mono inputMode="numeric" value={form.gamePort} style={{ width: 100 }} invalid={!portOk(form.gamePort)} onChange={(e) => set({ gamePort: digits(e.target.value, 5) })} />
         </Field>
-        <Field label={t("内存（MB）", "Memory (MB)")} tone={memoryOk ? undefined : "bad"} hint={memoryOk ? t("比服务器总内存少 1G 左右", "About 1 GB under the host's total") : t("512 到 32768", "512 to 32768")}>
-          <Input mono inputMode="numeric" value={form.memory} style={{ width: 110 }} invalid={!memoryOk} onChange={(e) => set({ memory: digits(e.target.value, 5) })} />
-        </Field>
+        <MemoryField value={form.memory} onChange={(memory) => set({ memory })} />
         <Field label={t("朋友连接的地址（可不填）", "Address friends join (optional)")} hint={t("有域名就填域名；不填用 IP 和端口", "A domain if you have one; else the IP and port")}>
           <Input mono value={form.address} placeholder="mc.example.com" style={{ width: 220 }} onChange={(e) => set({ address: e.target.value.trim().slice(0, 255) })} />
         </Field>

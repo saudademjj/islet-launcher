@@ -107,6 +107,7 @@ Get them from the **[latest release](https://github.com/saudademjj/islet-launche
 - **Loaders**: Fabric, Quilt, Forge, NeoForge, OptiFine, Legacy Fabric, LiteLoader, Cleanroom
 - **Modpacks and servers**: browse Modrinth and CurseForge, import `.mrpack` and `.zip`; export a world as a modpack, or as a server ready to run (client-only mods left out, your save and inventory brought along)
 - **From singleplayer to your own server**: deploy a world to a Linux cloud server over SSH in one step (Java installed for you), then start, stop, back up, use the console and sync mods from the launcher; friends get a pack with the address filled in, and missing mods are fetched before they join
+- **Server page**: start a server project from scratch — vanilla, Fabric, Quilt, Forge, NeoForge, or Paper and Purpur for plugins — add mods or plugins from Modrinth, set the MOTD, difficulty and whitelist, then export a folder with `islet.sh setup` or deploy over SSH; memory, JVM flags and view distance fit the machine it runs on
 - **Packs and shaders**: reorder resource packs; Islet tells you when a shader needs Iris or Oculus
 - **Saves and maps**: automatic backups after you play, plus manual backup, restore, import and export; maps from CurseForge; jump straight into a save on 1.20+
 - **Mod configs**: edit the files in `config/` inside the launcher, with the previous version kept on every save

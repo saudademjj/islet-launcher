@@ -325,14 +325,19 @@ pub async fn search(
 /// only the game version (which shader loader is needed shows as a tag).
 /// Each chosen category is one more condition.
 fn search_facets(instance: &Instance, kind: ContentKind, categories: &[String]) -> AppResult<serde_json::Value> {
+    let plugins = kind == ContentKind::Mod && crate::core::instances::runs_plugins(&instance.loader);
     let mut facets = vec![
-        vec![format!("project_type:{}", kind.project_type())],
+        vec![format!("project_type:{}", if plugins { "plugin" } else { kind.project_type() })],
         vec![format!("versions:{}", instance.version_id)],
     ];
     if kind == ContentKind::Mod {
         check_loader(instance)?;
         // One OR group: any loader this world can run.
         facets.push(mod_loaders(&instance.loader).iter().map(|loader| format!("categories:{loader}")).collect());
+        // A server project has no use for client-only mods.
+        if instance.server.is_some() && !plugins {
+            facets.push(vec!["server_side:required".into(), "server_side:optional".into()]);
+        }
     }
     for category in categories {
         // Modrinth tags: "optimization", "iris", "16x", "512x+", "8x-".
@@ -373,10 +378,13 @@ pub async fn versions(
         .filter(|v| compatible(v, instance, kind))
         .collect())
 }
-/// The mod loaders whose mods a world can load: Quilt also runs Fabric mods.
+/// The mod loaders whose mods a world can load: Quilt also runs Fabric
+/// mods, and Paper and Purpur run the plugins of the servers they grew from.
 pub fn mod_loaders(loader: &str) -> Vec<&str> {
     match loader {
         "quilt" => vec!["quilt", "fabric"],
+        "paper" => vec!["paper", "spigot", "bukkit"],
+        "purpur" => vec!["purpur", "paper", "spigot", "bukkit"],
         "legacyfabric" => vec!["legacy-fabric"],
         "cleanroom" => vec!["forge"],
         other => vec![other],
@@ -392,7 +400,7 @@ pub fn no_maps() -> AppError {
 }
 
 fn check_loader(instance: &Instance) -> AppResult<()> {
-    if ["fabric", "quilt", "forge", "neoforge", "legacyfabric", "cleanroom", "liteloader"].contains(&instance.loader.as_str()) {
+    if ["fabric", "quilt", "forge", "neoforge", "legacyfabric", "cleanroom", "liteloader", "paper", "purpur"].contains(&instance.loader.as_str()) {
         Ok(())
     } else {
         Err(AppError::new(
@@ -1242,6 +1250,17 @@ mod tests {
         );
         assert!(search_facets(&vanilla, ContentKind::Shader, &["a\"b".into()]).is_err());
         assert!(search_facets(&vanilla, ContentKind::Shader, &["".into()]).is_err());
+        // Server projects: plugins for plugin servers, server mods for mod ones.
+        let paper = Instance { loader: "paper".into(), server: Some(Default::default()), ..vanilla.clone() };
+        assert_eq!(
+            search_facets(&paper, ContentKind::Mod, &[]).unwrap(),
+            serde_json::json!([["project_type:plugin"], ["versions:1.21.1"], ["categories:paper", "categories:spigot", "categories:bukkit"]])
+        );
+        let server = Instance { server: Some(Default::default()), ..fabric };
+        assert_eq!(
+            search_facets(&server, ContentKind::Mod, &[]).unwrap(),
+            serde_json::json!([["project_type:mod"], ["versions:1.21.1"], ["categories:fabric"], ["server_side:required", "server_side:optional"]])
+        );
     }
 
     #[test]

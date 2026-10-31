@@ -854,7 +854,7 @@ function GlobalLaunchOptions({ value, onChange, changed }: { value: LaunchConfig
 
 /** Shown in the save bar when the player tried to switch pages, or to quit
     the launcher, with edits unsaved. */
-function LeaveQuestion({ count }: { count: number }) {
+export function LeaveQuestion({ count }: { count: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const leavePage = useStore((s) => s.leavePage);
   const quitting = useStore((s) => s.leavingPage === "quit");

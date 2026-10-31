@@ -94,8 +94,8 @@ impl Target {
         if self.auth == "key" && self.key_path.as_deref().is_none_or(|p| p.trim().is_empty()) {
             return bad("请选择私钥文件。", "Choose the private key file.");
         }
-        if !(512..=65536).contains(&self.memory_mb) {
-            return bad("内存要在 512 到 65536 MB 之间。", "Memory goes from 512 to 65536 MB.");
+        if self.memory_mb != 0 && !(512..=65536).contains(&self.memory_mb) {
+            return bad("内存要在 512 到 65536 MB 之间，或者选自动。", "Memory goes from 512 to 65536 MB, or automatic.");
         }
         Ok(())
     }
@@ -458,9 +458,9 @@ pub fn pack(source: &Path, archive: &Path, update: bool) -> AppResult<u64> {
 }
 
 /// The shell lines that unpack an upload into the server folder. An update
-/// replaces the mods outright, so removed mods go too.
+/// replaces the mods and plugins outright, so removed ones go too.
 pub fn unpack_script(dir: &str, update: bool) -> String {
-    let clear = if update { "rm -rf mods && " } else { "" };
+    let clear = if update { "rm -rf mods && rm -f plugins/*.jar && " } else { "" };
     format!("mkdir -p {d} && cd \"$HOME\" && cd {d} && {clear}tar -xzf - && chmod +x start.sh islet.sh", d = quote(dir))
 }
 

@@ -7849,3 +7849,101 @@ button.lan-game:hover {
   flex: 1;
   min-width: 0;
 }
+
+/* ---------- server page: projects beside the one being edited ---------- */
+
+.server-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.server-layout.single {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 860px;
+}
+
+.server-list {
+  position: sticky;
+  top: 0;
+  overflow: hidden;
+}
+
+.server-list .list-row {
+  width: 100%;
+  text-align: left;
+  color: var(--text);
+}
+
+.server-list-name {
+  max-width: 100%;
+  overflow: hidden;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.server-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  flex-wrap: wrap;
+}
+
+.server-head-name {
+  font-size: var(--text-lg);
+  font-weight: 750;
+}
+
+.server-kinds {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.server-kind-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 7px;
+}
+
+.server-versions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.server-version {
+  min-width: 64px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 2px 0 var(--border);
+  color: var(--text);
+  font-size: var(--text-sm);
+  transition: border-color var(--dur-fast), background var(--dur-fast), box-shadow var(--dur-fast);
+}
+
+.server-version:hover {
+  border-color: var(--border-strong);
+}
+
+.server-version[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 2px 0 var(--accent-edge);
+  font-weight: 700;
+}
+
+@media (max-width: 999px) {
+  .server-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .server-list {
+    position: static;
+  }
+}

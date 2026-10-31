@@ -11,8 +11,10 @@ use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
 use async_channel::Receiver;
+use islet::core::instances::ServerProject;
 use islet::core::paths::AppPaths;
 use islet::core::remote::{Session, Target};
+use islet::core::server_pack::ServerOptions;
 use islet::core::settings::{DownloadSource, Settings};
 use islet::services::{AppServices, DeployOptions, FileOperation, UiEvent};
 
@@ -84,7 +86,12 @@ fn operation(events: &Receiver<UiEvent>, runtime: &tokio::runtime::Runtime) -> S
 
 /// The newest Fabric API for the version, from Modrinth.
 fn fabric_api(runtime: &tokio::runtime::Runtime, into: &Path) {
-    let url = format!("https://api.modrinth.com/v2/project/fabric-api/version?loaders=[\"fabric\"]&game_versions=[\"{VERSION}\"]");
+    modrinth(runtime, "fabric-api", "fabric", into);
+}
+
+/// The newest file of a Modrinth project for the version and loader.
+fn modrinth(runtime: &tokio::runtime::Runtime, project: &str, loader: &str, into: &Path) -> String {
+    let url = format!("https://api.modrinth.com/v2/project/{project}/version?loaders=[\"{loader}\"]&game_versions=[\"{VERSION}\"]");
     let (name, bytes) = runtime.block_on(async {
         let client = reqwest::Client::builder().user_agent("saudademjj/islet-launcher e2e").build().unwrap();
         let versions: serde_json::Value = client.get(url).send().await.unwrap().error_for_status().unwrap().json().await.unwrap();
@@ -93,7 +100,16 @@ fn fabric_api(runtime: &tokio::runtime::Runtime, into: &Path) {
         (file["filename"].as_str().unwrap().to_string(), bytes)
     });
     std::fs::create_dir_all(into).unwrap();
-    std::fs::write(into.join(name), bytes).unwrap();
+    std::fs::write(into.join(&name), bytes).unwrap();
+    name
+}
+
+/// Runs `islet.sh` in a server folder, as someone would after uploading it.
+fn islet(dir: &Path, args: &[&str]) -> String {
+    let out = Command::new("sh").arg("islet.sh").args(args).current_dir(dir).output().unwrap();
+    let text = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
+    assert!(out.status.success(), "islet.sh {args:?} failed:\n{text}");
+    text
 }
 
 #[test]
@@ -214,4 +230,91 @@ fn deploy_manage_update_and_join() {
 
     services.remote_forget(&world.id).unwrap();
     assert!(services.remote_info(&world.id).unwrap().target.is_none());
+}
+
+#[test]
+#[ignore = "runs sshd and two Paper servers; downloads about 250 MB"]
+fn paper_project_kit_and_deploy() {
+    let root = tempfile::tempdir().unwrap();
+    let ssh = root.path().join("ssh");
+    std::fs::create_dir_all(&ssh).unwrap();
+    let ssh_port = 23000 + (std::process::id() % 1000) as u16;
+    let game_port = 25900 + (std::process::id() % 300) as u16;
+    let _sshd = sshd(&ssh, ssh_port);
+
+    let paths = AppPaths::from_root(root.path().join("data")).unwrap();
+    let settings = Settings { download_source: DownloadSource::Official, ..Settings::default() };
+    std::fs::write(paths.settings_file(), serde_json::to_vec(&settings).unwrap()).unwrap();
+    let (sender, events) = async_channel::unbounded();
+    let services = AppServices::new(paths.clone(), sender).unwrap();
+    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+
+    // A Paper project with a plugin: no install, never in the world list.
+    let project = services.create_server_project("Paper", VERSION, "paper").unwrap();
+    let settings = ServerProject { motd: "Islet Paper".into(), port: game_port, online_mode: false, memory_mb: 0, ..ServerProject::default() };
+    services.configure_server_project(&project.id, "Paper", VERSION, "paper", settings).unwrap();
+    let plugin = modrinth(&runtime, "chunky", "paper", &paths.instance_game_dir(&project.id).join("mods"));
+    assert!(services.install_instance(&project.id).is_err(), "a project is never installed or played");
+
+    // Exported: the server, its plugin and the deploy kit.
+    let kit = root.path().join("kit");
+    std::fs::create_dir_all(&kit).unwrap();
+    let options = ServerOptions { accept_eula: true, memory_mb: 0, world: None, port: game_port, online_mode: false, client_pack: false, address: String::new(), ..Default::default() };
+    services.file_operation(&project.id, FileOperation::ExportServer { destination: kit.clone(), options }).unwrap();
+    println!("export: {}", operation(&events, &runtime));
+    for file in ["server.jar", "start.sh", "start.bat", "islet.sh", ".islet/java-x86_64", ".islet/java-aarch64", "eula.txt"] {
+        assert!(kit.join(file).exists(), "{file} is in the kit");
+    }
+    assert!(kit.join("plugins").join(&plugin).exists(), "the plugin goes into plugins/");
+    assert!(!kit.join("mods").exists());
+    assert!(kit.join(format!("cache/mojang_{VERSION}.jar")).exists(), "Paper doesn't fetch the game again");
+    assert!(std::fs::read_to_string(kit.join("start.sh")).unwrap().contains("MC_MEMORY=\"${MC_MEMORY:-auto}\""));
+    let properties = std::fs::read_to_string(kit.join("server.properties")).unwrap();
+    assert!(properties.contains("motd=Islet Paper") && properties.contains(&format!("server-port={game_port}")), "{properties}");
+
+    // `sh islet.sh setup` by hand: Java, schedule, start.
+    let setup = islet(&kit, &["setup"]);
+    println!("setup: {setup}");
+    assert!(setup.contains(&format!("running on port {game_port}")), "{setup}");
+    assert!(kit.join("java/bin/java").exists());
+    let log = std::fs::read_to_string(kit.join("logs/latest.log")).unwrap();
+    assert!(log.contains("Enabling Chunky"), "the plugin loads:\n{log}");
+    assert!(std::net::TcpStream::connect(("127.0.0.1", game_port)).is_ok());
+    let tuned = std::fs::read_to_string(kit.join("server.properties")).unwrap();
+    assert!(tuned.contains("view-distance=") && tuned.contains("simulation-distance="), "{tuned}");
+    islet(&kit, &["schedule", "0", "0"]);
+    islet(&kit, &["stop"]);
+
+    // The same project deployed over SSH with memory left to the host.
+    let host_dir = root.path().join("host").join("paper");
+    let target = Target {
+        host: "127.0.0.1".into(),
+        port: ssh_port,
+        user: std::env::var("USER").unwrap(),
+        auth: "key".into(),
+        key_path: Some(ssh.join("client").display().to_string()),
+        dir: host_dir.display().to_string(),
+        game_port,
+        memory_mb: 0,
+        ..Target::default()
+    };
+    runtime.block_on(services.remote_connect(&project.id, target, None)).unwrap();
+    services.file_operation(&project.id, FileOperation::DeployServer(DeployOptions { accept_eula: true, world: None })).unwrap();
+    println!("deploy: {}", operation(&events, &runtime));
+    let status = runtime.block_on(services.remote_status(&project.id)).unwrap();
+    assert!(status.state.running && status.state.ready, "{status:?}");
+    assert!(status.ping.is_some(), "the server answers at {}", status.address);
+    assert!(host_dir.join("plugins").join(&plugin).exists());
+    assert!(std::fs::read_to_string(host_dir.join("start.sh")).unwrap().contains("MC_MEMORY=\"${MC_MEMORY:-auto}\""));
+
+    // A plugin removed in the launcher leaves the host on update.
+    std::fs::write(host_dir.join("plugins/stale.jar"), b"old").unwrap();
+    services.file_operation(&project.id, FileOperation::DeployServer(DeployOptions { accept_eula: true, world: None })).unwrap();
+    println!("update: {}", operation(&events, &runtime));
+    assert!(!host_dir.join("plugins/stale.jar").exists(), "plugins are replaced, not merged");
+    assert!(host_dir.join("plugins").join(&plugin).exists());
+
+    runtime.block_on(services.remote_action(&project.id, "stop")).unwrap();
+    islet(&host_dir, &["schedule", "0", "0"]);
+    services.remote_forget(&project.id).unwrap();
 }

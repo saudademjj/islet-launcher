@@ -19,8 +19,9 @@ const NAV: { page: Page; label: string; icon: PixelIconName; key: string }[] = [
   { page: "home", label: t("开始", "Home"), icon: "play", key: "1" },
   { page: "instances", label: t("世界", "Worlds"), icon: "block", key: "2" },
   { page: "multiplayer", label: t("联机", "Multiplayer"), icon: "signal", key: "3" },
-  { page: "accounts", label: t("账号", "Accounts"), icon: "player", key: "4" },
-  { page: "settings", label: t("设置", "Settings"), icon: "gear", key: "5" },
+  { page: "server", label: t("开服", "Server"), icon: "rack", key: "4" },
+  { page: "accounts", label: t("账号", "Accounts"), icon: "player", key: "5" },
+  { page: "settings", label: t("设置", "Settings"), icon: "gear", key: "6" },
 ];
 
 export function Sidebar() {

@@ -234,6 +234,19 @@ pub async fn build_plan(
     })
 }
 
+/// Just a version's profile, for a server that needs no client: kept in
+/// the versions folder as an install would.
+pub async fn fetch_version_json(client: &reqwest::Client, paths: &AppPaths, version_id: &str, cancel: &CancellationToken) -> AppResult<VersionJson> {
+    let manifest = manifest::load_manifest(client, paths, false).await?;
+    let summary = manifest
+        .versions
+        .iter()
+        .find(|version| version.id == version_id)
+        .cloned()
+        .ok_or_else(|| AppError::new("version_not_found", crate::core::i18n::pick("找不到该 Minecraft 版本。", "Minecraft version not found.")))?;
+    load_version_json(client, paths, &summary, cancel).await
+}
+
 async fn load_version_json(
     client: &reqwest::Client,
     paths: &AppPaths,

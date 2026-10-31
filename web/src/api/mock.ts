@@ -57,11 +57,22 @@ let accounts: Account[] = [
   account("ms:alex", "microsoft", "Alex_Builds", "ec561538-f3fd-461d-aff5-086b22154bce"),
 ];
 
+const projectDefaults = { motd: "", maxPlayers: 20, difficulty: 2, gamemode: 0, pvp: true, whitelist: false, onlineMode: true, port: 25565, memoryMb: 0, seed: "" };
+
 let instances: Instance[] = [
   instance("i-survival", "生存 1.21", "1.21.4", "fabric", true, now - 2 * HOUR),
   { ...instance("i-skyblock", "空岛整合包", "1.20.1", "fabric", false, null), group: "整合包" },
   instance("i-vanilla", "原版 26.3", "26.3", "vanilla", true, now - 50 * HOUR),
   { ...instance("i-create", "机械动力", "1.20.1", "forge", true, now - 9 * 24 * HOUR), favorite: true, group: "整合包" },
+  { ...instance("s-paper", "朋友们的生存服", "1.21.4", "paper", false, null), server: { ...projectDefaults, motd: "欢迎来玩" } },
+  { ...instance("s-fabric", "模组服", "1.21.1", "fabric", false, null), loaderVersion: "0.16.10", server: { ...projectDefaults } },
+];
+
+const plugins: LocalMod[] = [
+  { name: "EssentialsX-2.21.0.jar", enabled: true, bytes: 1_402_118 },
+  { name: "LuckPerms-Bukkit-5.4.152.jar", enabled: true, bytes: 2_004_331 },
+  { name: "worldedit-bukkit-7.3.10.jar", enabled: true, bytes: 3_120_500 },
+  { name: "CoreProtect-23.1.jar", enabled: false, bytes: 880_210 },
 ];
 
 const recycled: Instance[] = [instance("i-old", "旧存档测试", "1.19.2", "vanilla", true, now - 40 * 24 * HOUR)];
@@ -157,8 +168,9 @@ function account(id: string, provider: Account["provider"], username: string, uu
 }
 
 function instance(id: string, name: string, versionId: string, loader: string, installed: boolean, last: number | null): Instance {
-  return { id, name, versionId, versionType: "release", createdAt: now - 60 * 24 * HOUR, lastLaunchedAt: last, installed, loader, loaderVersion: null, memoryMb: null, javaPath: null, playSeconds: last ? Math.round((now - last) / 40_000) : 0, launch: { ...settings.launch }, accountId: null, favorite: false, group: null };
+  return { id, name, versionId, versionType: "release", createdAt: now - 60 * 24 * HOUR, lastLaunchedAt: last, installed, loader, loaderVersion: null, memoryMb: null, javaPath: null, playSeconds: last ? Math.round((now - last) / 40_000) : 0, launch: { ...settings.launch }, accountId: null, favorite: false, group: null, server: null };
 }
+
 
 function versions(): VersionSummary[] {
   const ids: [string, string][] = [];
@@ -553,7 +565,20 @@ const commands: Record<string, (args: any) => unknown> = {
     return "task-update";
   },
   install_mod: () => (later(1800, () => emit({ type: "operationComplete", data: { Ok: "模组已安装，必需依赖已一并添加。" } })), "task-mod"),
-  list_mods: () => [...mods],
+  list_mods: ({ id }) => (id === "s-paper" ? [...plugins] : id === "s-fabric" ? mods.slice(1, 2) : [...mods]),
+  create_server_project: ({ name, versionId, loader }) => {
+    const created = { ...instance(`s-${Date.now()}`, name, versionId, loader, false, null), server: { ...projectDefaults } };
+    instances = [...instances, created];
+    return [snapshot(), created.id];
+  },
+  configure_server_project: ({ id, name, versionId, loader, project }) => {
+    instances = instances.map((i) => (i.id === id ? { ...i, name, versionId, loader, server: project, loaderVersion: i.loader === loader && i.versionId === versionId ? i.loaderVersion : null } : i));
+    return snapshot();
+  },
+  server_versions: async ({ loader }) => {
+    await sleep(300);
+    return loader === "paper" || loader === "purpur" ? ["1.21.4", "1.21.3", "1.21.1", "1.21", "1.20.6", "1.20.4", "1.20.1", "1.19.4", "1.18.2", "1.16.5", "1.12.2", "1.8.8"] : [];
+  },
   last_mod_change: () => lastModChange,
   mod_meta: () => {
     const meta = (id: string, name: string, version: string, description: string, depends: string[] = [], provides: string[] = []) => ({ id, name, version, description, depends, provides });

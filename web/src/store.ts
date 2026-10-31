@@ -36,7 +36,7 @@ import { copyToClipboard } from "./lib/clipboard";
 import { filterCategories, type FilterChoice, type SearchSort } from "./lib/contentFilters";
 import { t } from "./lib/i18n";
 
-export type Page = "home" | "instances" | "multiplayer" | "accounts" | "settings";
+export type Page = "home" | "instances" | "multiplayer" | "server" | "accounts" | "settings";
 
 // install_instance starts the task before it returns its id, so a task that
 // finishes at once can report before the UI knows the id. Such final events
@@ -195,7 +195,11 @@ interface State {
   page: Page;
   settings: Settings;
   accounts: Account[];
+  /** Worlds to play; server projects are kept apart in `serverProjects`. */
   instances: Instance[];
+  serverProjects: Instance[];
+  /** The project open on the server page. */
+  serverProject: string | null;
   appInfo: AppInfo;
   systemMemory: SystemMemory | null;
 
@@ -422,6 +426,8 @@ export const useStore = create<State & Actions>()((set, get) => ({
   settings: emptySettings,
   accounts: [],
   instances: [],
+  serverProjects: [],
+  serverProject: null,
   appInfo: { version: "", dataDir: "", platform: "", arch: "" },
   systemMemory: null,
 
@@ -550,7 +556,8 @@ export const useStore = create<State & Actions>()((set, get) => ({
     set({
       settings: snapshot.settings,
       accounts: snapshot.accounts,
-      instances: snapshot.instances,
+      instances: snapshot.instances.filter((i) => !i.server),
+      serverProjects: snapshot.instances.filter((i) => i.server),
       appInfo: snapshot.appInfo,
     });
   },
@@ -1186,7 +1193,7 @@ export const useStore = create<State & Actions>()((set, get) => ({
   },
 
   openManage(id, tab = "general", query = "", kind) {
-    const instance = get().instances.find((i) => i.id === id);
+    const instance = findInstance(get(), id);
     // Vanilla cannot load mods, so its downloads start at resource packs.
     const browseKind = kind ?? (instance?.loader === "vanilla" ? "resourcepack" : "mod");
     set({
@@ -1477,6 +1484,12 @@ export function instanceState(instance: Instance, s: Pick<State, "runningIds" | 
   if (s.install?.instanceId === instance.id) return "installing";
   if (s.installQueue.some((queued) => queued.id === instance.id)) return "queued";
   return instance.installed ? "ready" : "notInstalled";
+}
+
+/** A world or a server project: the dialogs that manage content, build a
+    server or deploy one take either. */
+export function findInstance(state: { instances: Instance[]; serverProjects: Instance[] }, id: string): Instance | null {
+  return state.instances.find((i) => i.id === id) ?? state.serverProjects.find((i) => i.id === id) ?? null;
 }
 
 export function useActiveInstance(): Instance | null {

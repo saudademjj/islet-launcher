@@ -32,6 +32,7 @@ import { AccountsPage } from "./pages/AccountsPage";
 import { HomePage } from "./pages/HomePage";
 import { InstancesPage } from "./pages/InstancesPage";
 import { MultiplayerPage } from "./pages/MultiplayerPage";
+import { ServerPage } from "./pages/ServerPage";
 import { useP2pPolling } from "./lib/p2p";
 import { SettingsPage } from "./pages/SettingsPage";
 import { overlayOpen, usePick, useStore, type Page } from "./store";
@@ -72,6 +73,7 @@ export function App() {
               {page === "home" && <HomePage />}
               {page === "instances" && <InstancesPage />}
               {page === "multiplayer" && <MultiplayerPage />}
+              {page === "server" && <ServerPage />}
               {page === "accounts" && <AccountsPage />}
               {page === "settings" && <SettingsPage />}
             </motion.div>
@@ -145,7 +147,7 @@ function useTheme(preference: Theme) {
   }, [preference]);
 }
 
-const PAGE_KEYS: Record<string, Page> = { "1": "home", "2": "instances", "3": "multiplayer", "4": "accounts", "5": "settings", ",": "settings" };
+const PAGE_KEYS: Record<string, Page> = { "1": "home", "2": "instances", "3": "multiplayer", "4": "server", "5": "accounts", "6": "settings", ",": "settings" };
 
 function useShortcuts() {
   useEffect(() => {

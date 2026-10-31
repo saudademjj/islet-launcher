@@ -34,6 +34,71 @@ pub struct Instance {
     pub favorite: bool,
     /// The shelf it sits on in the worlds page; none for ungrouped.
     pub group: Option<String>,
+    /// A server project from the server page rather than a world to play:
+    /// it is never installed or launched, only built into a server.
+    pub server: Option<ServerProject>,
+}
+
+/// How a server project's server is set up, for `server.properties` and
+/// its start scripts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ServerProject {
+    /// The line under the name in the server list; the project's name when
+    /// empty.
+    pub motd: String,
+    pub max_players: u32,
+    /// 0 peaceful, 1 easy, 2 normal, 3 hard.
+    pub difficulty: u8,
+    /// 0 survival, 1 creative, 2 adventure, 3 spectator.
+    pub gamemode: u8,
+    pub pvp: bool,
+    pub whitelist: bool,
+    pub online_mode: bool,
+    pub port: u16,
+    /// MB for the server; 0 works it out from the machine it runs on.
+    pub memory_mb: u32,
+    pub seed: String,
+}
+
+impl Default for ServerProject {
+    fn default() -> Self {
+        Self { motd: String::new(), max_players: 20, difficulty: 2, gamemode: 0, pvp: true, whitelist: false, online_mode: true, port: 25565, memory_mb: 0, seed: String::new() }
+    }
+}
+
+impl ServerProject {
+    pub fn validate(&self) -> AppResult<()> {
+        let bad = |zh, en| Err(AppError::new("server_project", crate::core::i18n::pick(zh, en)));
+        if self.motd.chars().count() > 120 || self.motd.contains(['\n', '\r']) {
+            return bad("服务器简介最多 120 个字，写在一行里。", "The description is one line of at most 120 characters.");
+        }
+        if !(1..=1000).contains(&self.max_players) {
+            return bad("人数上限要在 1 到 1000 之间。", "Max players goes from 1 to 1000.");
+        }
+        if self.difficulty > 3 || self.gamemode > 3 {
+            return bad("难度或游戏模式无效。", "Invalid difficulty or game mode.");
+        }
+        if self.port == 0 {
+            return bad("端口要在 1 到 65535 之间。", "Ports go from 1 to 65535.");
+        }
+        if self.memory_mb != 0 && !(512..=65536).contains(&self.memory_mb) {
+            return bad("内存要在 512 到 65536 MB 之间，或者选自动。", "Memory goes from 512 to 65536 MB, or automatic.");
+        }
+        if self.seed.chars().count() > 64 || self.seed.contains(['\n', '\r']) {
+            return bad("种子最多 64 个字符。", "Seeds have at most 64 characters.");
+        }
+        Ok(())
+    }
+}
+
+/// Server kinds a server project can be: the mod loaders that have a
+/// server, and the plugin servers.
+pub const SERVER_LOADERS: [&str; 7] = ["vanilla", "fabric", "quilt", "forge", "neoforge", "paper", "purpur"];
+
+/// Paper and Purpur run Bukkit plugins, kept in `plugins` on the server.
+pub fn runs_plugins(loader: &str) -> bool {
+    matches!(loader, "paper" | "purpur")
 }
 
 /// Options for starting the game, kept globally and per world.
@@ -135,6 +200,7 @@ impl Default for Instance {
             account_id: None,
             favorite: false,
             group: None,
+            server: None,
         }
     }
 }
@@ -363,6 +429,35 @@ impl InstanceStore {
             .map(|p| p.trim().to_string())
             .filter(|p| !p.is_empty());
         self.update(&instance)
+    }
+
+    /// A server project's name, game version, server kind and settings. A
+    /// new version or kind picks its loader version afresh.
+    pub fn configure_server(&self, id: &str, name: &str, version_id: &str, loader: &str, project: ServerProject) -> AppResult<Instance> {
+        let mut instance = self.get(id)?;
+        if instance.server.is_none() {
+            return Err(AppError::new("server_project", crate::core::i18n::pick("这不是开服项目。", "This isn't a server project.")));
+        }
+        let name = name.trim();
+        if name.is_empty() || name.chars().count() > 40 {
+            return Err(AppError::new("instance_name", crate::core::i18n::pick("名称需要 1–40 个字符。", "Names need 1–40 characters.")));
+        }
+        if !SERVER_LOADERS.contains(&loader) {
+            return Err(AppError::new("loader", crate::core::i18n::pick("暂不支持这种服务端。", "This kind of server isn't supported.")));
+        }
+        if !crate::core::fabric::valid_version(version_id) {
+            return Err(AppError::new("version", crate::core::i18n::pick("请选择 Minecraft 版本。", "Choose a Minecraft version.")));
+        }
+        project.validate()?;
+        if instance.loader != loader || instance.version_id != version_id {
+            instance.loader_version = None;
+        }
+        instance.name = name.to_string();
+        instance.version_id = version_id.to_string();
+        instance.loader = loader.to_string();
+        instance.server = Some(project);
+        self.update(&instance)?;
+        Ok(instance)
     }
 
     /// Launch options and the account this world plays with.

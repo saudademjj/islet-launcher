@@ -487,12 +487,13 @@ function useItems(query: string): { items: Item[]; quick: Item[] } {
     }
     list.push(action("data-dir", t("打开数据目录", "Open data folder"), "folder", () => void store.open({ kind: "dataDir" }), { keywords: "data folder 数据 目录" }));
 
-    const pages: [string, "home" | "instances" | "multiplayer" | "accounts" | "settings", IconName, string][] = [
+    const pages: [string, "home" | "instances" | "multiplayer" | "server" | "accounts" | "settings", IconName, string][] = [
       [t("开始", "Home"), "home", "home", "1"],
       [t("世界", "Worlds"), "instances", "layers", "2"],
       [t("联机", "Multiplayer"), "multiplayer", "globe", "3"],
-      [t("账号", "Accounts"), "accounts", "user", "4"],
-      [t("设置", "Settings"), "settings", "settings", "5"],
+      [t("开服", "Server"), "server", "server", "4"],
+      [t("账号", "Accounts"), "accounts", "user", "5"],
+      [t("设置", "Settings"), "settings", "settings", "6"],
     ];
     for (const [label, page, icon, key] of pages) {
       list.push({ id: `page:${page}`, kind: "page", label: t(`前往「${label}」`, `Go to ${label}`), keywords: `go page ${page} 前往 页面`, icon: glyph(icon), shortcut: `${MOD_KEY}${key}`, primary: { label: t("前往", "Go to"), run: () => store.setPage(page) } });

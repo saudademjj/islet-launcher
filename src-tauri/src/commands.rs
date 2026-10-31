@@ -249,6 +249,33 @@ pub async fn create_instance(
     Ok(services.snapshot())
 }
 
+/// A new server project; the snapshot and the project's id.
+#[tauri::command]
+pub async fn create_server_project(state: State<'_, LauncherState>, name: String, version_id: String, loader: String) -> CmdResult<(LocalSnapshot, String)> {
+    let services = state.services();
+    let project = services.create_server_project(&name, &version_id, &loader).map_err(fail)?;
+    Ok((services.snapshot(), project.id))
+}
+
+#[tauri::command]
+pub async fn configure_server_project(
+    state: State<'_, LauncherState>,
+    id: String,
+    name: String,
+    version_id: String,
+    loader: String,
+    project: islet::core::instances::ServerProject,
+) -> CmdResult<LocalSnapshot> {
+    let services = state.services();
+    services.configure_server_project(&id, &name, &version_id, &loader, project).map_err(fail)?;
+    Ok(services.snapshot())
+}
+
+#[tauri::command]
+pub async fn server_versions(state: State<'_, LauncherState>, loader: String) -> CmdResult<Vec<String>> {
+    state.services().server_versions(&loader).await.map_err(fail)
+}
+
 #[tauri::command]
 pub async fn delete_instance(state: State<'_, LauncherState>, id: String) -> CmdResult<LocalSnapshot> {
     let services = state.services();

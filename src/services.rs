@@ -1,3 +1,4 @@
+mod projects;
 mod remote;
 pub use remote::{DeployOptions, RemoteInfo, RemoteStatus};
 
@@ -510,8 +511,16 @@ impl AppServices {
                         ))
                     }
                     FileOperation::ExportServer { destination, options } => {
-                        let (summary, pack) = this.export_server(&id, &destination, options.clone(), &CancellationToken::new())?;
-                        let mut message = crate::tr!("服务端已生成，带 {} 个模组：运行文件夹里的 start.bat（Windows）或 start.sh 启动。", "Server ready with {} mods: run start.bat (Windows) or start.sh in its folder.", summary.mods);
+                        let cancel = CancellationToken::new();
+                        let (summary, pack) = this.export_server(&id, &destination, options.clone(), &cancel)?;
+                        let instance = this.instances.get(&id)?;
+                        let what = if crate::core::instances::runs_plugins(&instance.loader) { crate::core::i18n::pick("插件", "plugins") } else { crate::core::i18n::pick("模组", "mods") };
+                        let mut message = if instance.server.is_some() {
+                            this.write_deploy_kit(&destination, this.server_java_major(&instance)?, &cancel)?;
+                            crate::tr!("服务端已生成，带 {} 个{what}：上传到 Linux 服务器后运行 sh islet.sh setup 即可开服，详见文件夹里的说明。", "Server ready with {} {what}: upload it to a Linux server and run sh islet.sh setup; the folder's readme has more.", summary.mods)
+                        } else {
+                            crate::tr!("服务端已生成，带 {} 个{what}：运行文件夹里的 start.bat（Windows）或 start.sh 启动。", "Server ready with {} {what}: run start.bat (Windows) or start.sh in its folder.", summary.mods)
+                        };
                         if !summary.client_only.is_empty() {
                             message += &crate::tr!("{} 个只在客户端运行的模组没有放进去。", " {} client-only mods were left out.", summary.client_only.len());
                         }
@@ -803,7 +812,7 @@ impl AppServices {
         let remaining = self.instances.list();
         let settings = self.settings.update(|settings| {
             if settings.active_instance_id.as_deref() == Some(id) {
-                settings.active_instance_id = remaining.first().map(|instance| instance.id.clone());
+                settings.active_instance_id = remaining.iter().find(|instance| instance.server.is_none()).map(|instance| instance.id.clone());
             }
         })?;
         Ok((remaining, settings))
@@ -812,7 +821,9 @@ impl AppServices {
     pub fn set_active_instance(&self, id: Option<String>) -> AppResult<Settings> {
         self.ensure_storage_idle()?;
         if let Some(ref instance_id) = id {
-            self.instances.get(instance_id)?;
+            if self.instances.get(instance_id)?.server.is_some() {
+                return Err(projects::not_playable());
+            }
         }
         self.settings
             .update(|settings| settings.active_instance_id = id)
@@ -1342,6 +1353,9 @@ impl AppServices {
     pub fn install_instance(self: &Arc<Self>, instance_id: &str) -> AppResult<String> {
         self.ensure_idle(instance_id)?;
         let instance = self.instances.get(instance_id)?;
+        if instance.server.is_some() {
+            return Err(projects::not_playable());
+        }
         let settings = self.settings.get();
         {
             let mut installing = lock(&self.installing);
@@ -1420,6 +1434,9 @@ impl AppServices {
         offline: bool,
     ) -> AppResult<()> {
         self.ensure_idle(instance_id)?;
+        if self.instances.get(instance_id)?.server.is_some() {
+            return Err(projects::not_playable());
+        }
         if world.is_some() && server.is_some() {
             return Err(AppError::new("launch", crate::core::i18n::pick("不能同时进入存档和服务器。", "Can't open a save and a server at the same time.")));
         }
@@ -1507,13 +1524,22 @@ impl AppServices {
         mut options: crate::core::server_pack::ServerOptions,
         cancel: &CancellationToken,
     ) -> AppResult<(crate::core::server_pack::Summary, Option<PathBuf>)> {
-        let instance = self.instances.get(id)?;
+        let mut instance = self.instances.get(id)?;
         let settings = self.settings.get();
-        let base: VersionJson = std::fs::read(self.paths.version_json(&instance.version_id))
-            .ok()
-            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-            .ok_or_else(|| AppError::new("version_missing", crate::core::i18n::pick("版本文件不存在，请先下载这个世界。", "The version file is missing; install this world first.")))?;
-        let version = load_version(&self.paths, &instance)?;
+        let (base, version) = if instance.server.is_some() {
+            let base = self.prepare_server_project(&mut instance, cancel)?;
+            // Only mod servers need friends to bring anything.
+            if matches!(instance.loader.as_str(), "vanilla" | "paper" | "purpur") {
+                options.client_pack = false;
+            }
+            (base.clone(), base)
+        } else {
+            let base: VersionJson = std::fs::read(self.paths.version_json(&instance.version_id))
+                .ok()
+                .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+                .ok_or_else(|| AppError::new("version_missing", crate::core::i18n::pick("版本文件不存在，请先下载这个世界。", "The version file is missing; install this world first.")))?;
+            (base, load_version(&self.paths, &instance)?)
+        };
         let (http, runtime) = (self.http()?, tokio::runtime::Handle::current());
         let java = runtime.block_on(runtime::ensure_java_with_source(
             &http,
