@@ -408,7 +408,7 @@ export function StatusBar() {
       {task}
       {activity > 0 && (
         <button type="button" className="status-seg status-tasks" aria-expanded={tasksOpen} onClick={() => setTasksOpen(!tasksOpen)}>
-          {activity}{t(" 个任务 ", " tasks ")}{tasksOpen ? "▾" : "▴"}
+          {activity}{t(" 个任务 ", activity === 1 ? " task " : " tasks ")}{tasksOpen ? "▾" : "▴"}
         </button>
       )}
       {tasksOpen && activity > 0 && <TaskPanel onClose={() => setTasksOpen(false)} />}
