@@ -1,5 +1,7 @@
 # 安装说明
 
+[English](INSTALL.en.md)
+
 安装包在 [Releases](https://github.com/saudademjj/islet-launcher/releases/latest) 页面。安装包目前没有代码签名，第一次打开时系统可能会提示风险，下面写了各系统的处理方法。
 
 想确认下载的文件完整无误，可以和 Release 页 `SHA256SUMS.txt` 里的 SHA-256 核对：
