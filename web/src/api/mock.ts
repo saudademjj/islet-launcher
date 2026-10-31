@@ -49,6 +49,7 @@ const settings: Settings = {
   proxyUrl: "",
   autoBackup: true,
   autoBackupKeep: 5,
+  dedicatedGpu: true,
 };
 
 let accounts: Account[] = [

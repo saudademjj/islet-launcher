@@ -165,6 +165,47 @@ pub fn quiet_command(program: impl AsRef<std::ffi::OsStr>) -> Command {
     command
 }
 
+/// Asks Windows to run `exe` on the high-performance GPU, as Settings →
+/// System → Display → Graphics does. The choice is per user and per
+/// program, and does nothing on a computer with one GPU.
+#[cfg(windows)]
+pub fn prefer_dedicated_gpu(exe: &std::path::Path) -> std::io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::System::Registry::{RegCloseKey, RegCreateKeyExW, RegSetValueExW, HKEY, HKEY_CURRENT_USER, KEY_SET_VALUE, REG_OPTION_NON_VOLATILE, REG_SZ};
+
+    let wide = |text: &std::ffi::OsStr| text.encode_wide().chain([0]).collect::<Vec<u16>>();
+    let key_name = wide(std::ffi::OsStr::new(r"Software\Microsoft\DirectX\UserGpuPreferences"));
+    let value_name = wide(exe.as_os_str());
+    let data = wide(std::ffi::OsStr::new("GpuPreference=2;"));
+    let mut key: HKEY = std::ptr::null_mut();
+    // SAFETY: every pointer is to a live, NUL-terminated buffer or a local.
+    unsafe {
+        let status = RegCreateKeyExW(HKEY_CURRENT_USER, key_name.as_ptr(), 0, std::ptr::null(), REG_OPTION_NON_VOLATILE, KEY_SET_VALUE, std::ptr::null(), &mut key, std::ptr::null_mut());
+        if status != 0 {
+            return Err(std::io::Error::from_raw_os_error(status as i32));
+        }
+        let status = RegSetValueExW(key, value_name.as_ptr(), 0, REG_SZ, data.as_ptr().cast(), (data.len() * 2) as u32);
+        RegCloseKey(key);
+        if status != 0 {
+            return Err(std::io::Error::from_raw_os_error(status as i32));
+        }
+    }
+    Ok(())
+}
+
+/// Linux renders on the first GPU unless told otherwise; with a second one
+/// present (a laptop's discrete card), Mesa's `DRI_PRIME=1` picks it.
+#[cfg(target_os = "linux")]
+pub fn has_second_gpu() -> bool {
+    std::fs::read_dir("/sys/class/drm").is_ok_and(|entries| {
+        entries
+            .flatten()
+            .filter(|e| e.file_name().to_str().and_then(|n| n.strip_prefix("card")).is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit())))
+            .count()
+            >= 2
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

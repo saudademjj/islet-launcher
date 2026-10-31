@@ -382,6 +382,23 @@ export function SettingsPage() {
                 onChange={(autoBackup) => void s.mutate("update_settings", { settings: { ...s.settings, autoBackup } }, autoBackup ? t("游戏退出后会自动备份玩过的存档", "Saves you play will be backed up after the game exits") : t("不再自动备份存档", "Saves are no longer backed up automatically"))}
               />
             </div>
+            {s.appInfo.platform !== "macos" && (
+              <div className="setting-row">
+                <div className="col">
+                  <span className="setting-name">{t("用独立显卡运行游戏", "Play on the discrete GPU")}</span>
+                  <span className="field-hint">
+                    {s.appInfo.platform === "windows"
+                      ? t("有两块显卡的笔记本上，让 Java 用性能更好的那块，帧数通常高得多；只有一块显卡时没有影响", "On laptops with two GPUs, Java runs on the faster one, usually for far more frames; no effect with a single GPU")
+                      : t("检测到两块显卡时设置 DRI_PRIME=1；NVIDIA 专有驱动请在启动选项里用 prime-run", "Sets DRI_PRIME=1 when two GPUs are found; with NVIDIA's own driver, use prime-run as the wrapper in launch options")}
+                  </span>
+                </div>
+                <Switch
+                  label={t("用独立显卡运行游戏", "Play on the discrete GPU")}
+                  checked={s.settings.dedicatedGpu}
+                  onChange={(dedicatedGpu) => void s.mutate("update_settings", { settings: { ...s.settings, dedicatedGpu } }, dedicatedGpu ? t("下次开始游戏时使用独立显卡", "The discrete GPU is used from the next start") : t("不再指定显卡", "The GPU is no longer chosen"))}
+                />
+              </div>
+            )}
             <div className="setting-row">
               <div className="col">
                 <span className="setting-name">{t("游戏启动后隐藏启动器", "Hide the launcher while playing")}</span>

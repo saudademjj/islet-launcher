@@ -396,6 +396,7 @@ const emptySettings: Settings = {
   proxyUrl: "",
   autoBackup: true,
   autoBackupKeep: 5,
+  dedicatedGpu: true,
 };
 
 let toastSeq = 0;

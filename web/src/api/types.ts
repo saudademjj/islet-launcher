@@ -33,6 +33,8 @@ export interface Settings {
   autoBackup: boolean;
   /** Automatic backups kept per save. */
   autoBackupKeep: number;
+  /** Run the game on a laptop's discrete GPU (Windows and Linux). */
+  dedicatedGpu: boolean;
 }
 
 export type AccountProvider = "microsoft" | "offline" | "yggdrasil";

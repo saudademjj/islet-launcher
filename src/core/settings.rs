@@ -72,6 +72,8 @@ pub struct Settings {
     pub auto_backup: bool,
     /// Automatic backups kept per save; older ones are deleted.
     pub auto_backup_keep: u32,
+    /// Run the game on a laptop's discrete GPU (Windows and Linux).
+    pub dedicated_gpu: bool,
 }
 
 fn legacy_schema_version() -> u32 {
@@ -110,6 +112,7 @@ impl Default for Settings {
             proxy_url: String::new(),
             auto_backup: true,
             auto_backup_keep: 5,
+            dedicated_gpu: true,
         }
     }
 }

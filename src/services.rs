@@ -2074,6 +2074,16 @@ impl AppServices {
             .env_remove("_JAVA_OPTIONS")
             .env_remove("JDK_JAVA_OPTIONS")
             .envs(launch_config.env_pairs());
+        if settings.dedicated_gpu {
+            #[cfg(windows)]
+            if let Err(error) = crate::core::platform::prefer_dedicated_gpu(&spec.java_path) {
+                tracing::warn!(%error, "could not set the GPU preference for Java");
+            }
+            #[cfg(target_os = "linux")]
+            if crate::core::platform::has_second_gpu() && !launch_config.env_pairs().iter().any(|(key, _)| key == "DRI_PRIME") {
+                command.env("DRI_PRIME", "1");
+            }
+        }
         let mut child = command.spawn().map_err(|err| {
             AppError::detail(
                 "launch",
