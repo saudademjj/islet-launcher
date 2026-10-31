@@ -45,6 +45,7 @@ const PATHS: Record<string, string[]> = {
   grid: ["M4 4h7v7H4z", "M13 4h7v7h-7z", "M4 13h7v7H4z", "M13 13h7v7h-7z"],
   rows: ["M4 4h16v6H4z", "M4 14h16v6H4z"],
   tag: ["M3 3h8l10 10-8 8L3 11z", "M7.5 7.5h.01"],
+  server: ["M4 4h16v6H4z", "M4 14h16v6H4z", "M8 7h.01", "M8 17h.01"],
 };
 
 export type IconName = keyof typeof PATHS | "play";

@@ -774,6 +774,7 @@ const commands: Record<string, (args: any) => unknown> = {
       updatePack: "整合包已更新，开始游戏时会下载新文件。",
       updateModpackOnline: "整合包已更新到新版本，开始游戏时会下载新文件。",
       exportPack: "已导出：118 个文件从 Modrinth 下载，24 个直接打包。",
+      exportServer: "服务端已生成，带 112 个模组：运行文件夹里的 start.bat（Windows）或 start.sh 启动。6 个只在客户端运行的模组没有放进去。",
       changeVersion: `已换成 ${operation.versionId}；换之前把 3 个存档各备份了一份，在存档的「备份」里可以恢复。`,
       undoModUpdate: `已撤销上次模组更新：移除 ${undone?.added ?? 0} 个文件，恢复 ${undone?.replaced ?? 0} 个旧文件。`,
     };

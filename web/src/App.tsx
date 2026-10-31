@@ -16,6 +16,7 @@ import { SaveDialog } from "./overlays/SaveDialog";
 import { ConfigDialog } from "./overlays/ConfigDialog";
 import { ImportDialog } from "./overlays/ImportDialog";
 import { ExportPack } from "./overlays/ExportPack";
+import { ExportServer } from "./overlays/ExportServer";
 import { AddYggdrasil, SkinDialog } from "./overlays/AccountDialogs";
 import { CommandPalette } from "./overlays/CommandPalette";
 import { CrashDialog } from "./overlays/CrashDialog";
@@ -108,6 +109,7 @@ function Overlays() {
       {modal?.kind === "shot" && <ShotViewer key="shot" id={modal.id} name={modal.name} back={modal.back} />}
       {modal?.kind === "import" && <ImportDialog key="import" />}
       {modal?.kind === "exportPack" && <ExportPack key="export-pack" id={modal.id} />}
+      {modal?.kind === "exportServer" && <ExportServer key="export-server" id={modal.id} />}
       {modal?.kind === "addYggdrasil" && <AddYggdrasil key="add-yggdrasil" />}
       {modal?.kind === "tunnel" && <TunnelDialog key={`tunnel-${modal.id}`} id={modal.id} />}
       {modal?.kind === "group" && <GroupDialog key={`group-${modal.id}`} id={modal.id} />}

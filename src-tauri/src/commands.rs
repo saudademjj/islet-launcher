@@ -579,6 +579,7 @@ pub enum FileOp {
     UpdatePack { path: String },
     UpdateModpackOnline { version: String },
     ExportPack { destination: String, options: islet::core::modpacks::ExportOptions },
+    ExportServer { destination: String, options: islet::core::server_pack::ServerOptions },
     ChangeVersion { version_id: String, version_type: String },
     UndoModUpdate,
 }
@@ -623,6 +624,7 @@ pub async fn file_operation(
         FileOp::UpdatePack { path } => FileOperation::UpdatePack(path.into()),
         FileOp::UpdateModpackOnline { version } => FileOperation::UpdateModpackOnline(version),
         FileOp::ExportPack { destination, options } => FileOperation::ExportPack { destination: destination.into(), options },
+        FileOp::ExportServer { destination, options } => FileOperation::ExportServer { destination: destination.into(), options },
         FileOp::ChangeVersion { version_id, version_type } => FileOperation::ChangeVersion { version_id, version_type },
         FileOp::UndoModUpdate => FileOperation::UndoModUpdate,
     };

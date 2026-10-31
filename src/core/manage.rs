@@ -146,7 +146,7 @@ fn copy_into(dir: &Path, sources: &[PathBuf], extensions: &[&str]) -> AppResult<
     Ok(copied)
 }
 
-fn copy_tree(source: &Path, target: &Path) -> AppResult<()> {
+pub(crate) fn copy_tree(source: &Path, target: &Path) -> AppResult<()> {
     fs::create_dir_all(target)?;
     for entry in fs::read_dir(source)? {
         let entry = entry?;

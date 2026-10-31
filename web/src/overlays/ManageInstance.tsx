@@ -1848,6 +1848,16 @@ function DataTab({ instance, busy }: { instance: Instance; busy: boolean }) {
         </Button>
       ),
     },
+    {
+      icon: "server",
+      title: t("导出为服务端", "Export as server"),
+      text: t("生成可以直接运行的服务器：官方服务端、服务器需要的模组和配置、启动脚本；只在客户端运行的模组会去掉", "Makes a server ready to run: the official server, the mods and configs it needs, start scripts; client-only mods are left out"),
+      action: (
+        <Button size="sm" disabled={busy} onClick={() => s.openModal({ kind: "exportServer", id: instance.id })}>
+          {t("导出…", "Export…")}
+        </Button>
+      ),
+    },
   ];
   if (pack) {
     const from = t(`来自「${pack.name}」${pack.version ? ` ${pack.version}` : ""}。`, `From "${pack.name}"${pack.version ? ` ${pack.version}` : ""}. `);

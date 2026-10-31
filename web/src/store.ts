@@ -118,6 +118,7 @@ export type Modal =
   | { kind: "configs"; id: string; query?: string }
   | { kind: "import" }
   | { kind: "exportPack"; id: string }
+  | { kind: "exportServer"; id: string }
   | { kind: "addYggdrasil" }
   | { kind: "tunnel"; id: string }
   /** Which group a world sits in on the worlds page. */
@@ -166,6 +167,7 @@ export type FilePurpose =
   | "saveZip"
   | "saveFolder"
   | "gameDir"
+  | "serverDir"
   | "skin";
 
 export type InstanceState = "running" | "starting" | "installing" | "queued" | "ready" | "notInstalled";
@@ -1346,6 +1348,7 @@ export const useStore = create<State & Actions>()((set, get) => ({
       saveZip: { title: t("导入存档", "Import save"), filters: [{ name: t("存档压缩包", "Save archive"), extensions: ["zip"] }] },
       saveFolder: { title: t("选择存档文件夹（里面有 level.dat）", "Choose a save folder (one with level.dat)"), directory: true },
       gameDir: { title: t("选择游戏目录（.minecraft、版本文件夹或其他启动器的实例）", "Choose a game folder (.minecraft, a version folder, or another launcher's instance)"), directory: true },
+      serverDir: { title: t("选择一个空文件夹放服务端", "Choose an empty folder for the server"), directory: true },
       skin: { title: t("选择皮肤图片", "Choose skin image"), filters: [{ name: t("皮肤 PNG", "Skin PNG"), extensions: ["png"] }] },
     }[purpose];
     try {

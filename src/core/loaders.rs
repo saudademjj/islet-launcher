@@ -201,33 +201,10 @@ pub fn installer_url(loader: &str, mc: &str, version: &str) -> AppResult<String>
     }
 }
 
-/// Run the official installer in the shared cache, where no user saves live.
-pub async fn install(
-    client: &reqwest::Client,
-    paths: &AppPaths,
-    base: &VersionJson,
-    loader: &str,
-    pinned: Option<&str>,
-    java: &JavaInstallation,
-    cancel: &CancellationToken,
-    report: crate::core::java::runtime::JavaProgress,
-) -> AppResult<(VersionJson, String)> {
-    let versions = list(client, loader, &base.id).await?;
-    let selected = match pinned {
-        Some(v) if versions.iter().any(|e| e.version == v) => v.to_string(),
-        Some(_) => {
-            return Err(AppError::new(
-                "loader",
-                crate::core::i18n::pick("所选加载器与 Minecraft 版本不匹配，请刷新版本列表。", "The chosen loader doesn't match the Minecraft version; refresh the version list."),
-            ));
-        }
-        None => versions
-            .first()
-            .ok_or_else(|| AppError::new("loader", crate::core::i18n::pick("这个 Minecraft 版本没有可用的加载器。", "No loader is available for this Minecraft version.")))?
-            .version
-            .clone(),
-    };
-    let url = installer_url(loader, &base.id, &selected)?;
+/// The official Forge or NeoForge installer in the shared cache, checked
+/// against the SHA-1 its maven (or the mirror) publishes.
+pub async fn fetch_installer(client: &reqwest::Client, paths: &AppPaths, loader: &str, mc: &str, version: &str, cancel: &CancellationToken) -> AppResult<std::path::PathBuf> {
+    let url = installer_url(loader, mc, version)?;
     let official_hash = async {
         client
             .get(format!("{url}.sha1"))
@@ -267,7 +244,7 @@ pub async fn install(
     let installer = paths
         .cache
         .join("installers")
-        .join(format!("{loader}-{}-{selected}.jar", base.id));
+        .join(format!("{loader}-{mc}-{version}.jar"));
     let task = DownloadTask::new(
         crate::core::i18n::pick("加载器安装器", "Loader installer"),
         mirror_attempt(&mirror),
@@ -276,7 +253,6 @@ pub async fn install(
         Some(hash),
         None,
     );
-    report(crate::core::i18n::pick("正在下载并校验加载器安装器", "Downloading and verifying the loader installer"), 0, 0);
     download::download_all(
         vec![task.clone()],
         client.clone(),
@@ -285,6 +261,37 @@ pub async fn install(
         Arc::new(DownloadProgress::new(&[task])),
     )
     .await?;
+    Ok(installer)
+}
+
+/// Run the official installer in the shared cache, where no user saves live.
+pub async fn install(
+    client: &reqwest::Client,
+    paths: &AppPaths,
+    base: &VersionJson,
+    loader: &str,
+    pinned: Option<&str>,
+    java: &JavaInstallation,
+    cancel: &CancellationToken,
+    report: crate::core::java::runtime::JavaProgress,
+) -> AppResult<(VersionJson, String)> {
+    let versions = list(client, loader, &base.id).await?;
+    let selected = match pinned {
+        Some(v) if versions.iter().any(|e| e.version == v) => v.to_string(),
+        Some(_) => {
+            return Err(AppError::new(
+                "loader",
+                crate::core::i18n::pick("所选加载器与 Minecraft 版本不匹配，请刷新版本列表。", "The chosen loader doesn't match the Minecraft version; refresh the version list."),
+            ));
+        }
+        None => versions
+            .first()
+            .ok_or_else(|| AppError::new("loader", crate::core::i18n::pick("这个 Minecraft 版本没有可用的加载器。", "No loader is available for this Minecraft version.")))?
+            .version
+            .clone(),
+    };
+    report(crate::core::i18n::pick("正在下载并校验加载器安装器", "Downloading and verifying the loader installer"), 0, 0);
+    let installer = fetch_installer(client, paths, loader, &base.id, &selected, cancel).await?;
     let (profile_id, dependency_tasks) = {
         let mut archive = zip::ZipArchive::new(std::fs::File::open(&installer)?)
             .map_err(|e| AppError::detail("loader", crate::core::i18n::pick("安装器损坏。", "The installer is damaged."), e.to_string()))?;

@@ -441,6 +441,7 @@ export type FileOp =
   | { kind: "updatePack"; path: string }
   | { kind: "updateModpackOnline"; version: string }
   | { kind: "exportPack"; destination: string; options: ExportOptions }
+  | { kind: "exportServer"; destination: string; options: { acceptEula: boolean; memoryMb: number } }
   | { kind: "changeVersion"; versionId: string; versionType: string }
   | { kind: "undoModUpdate" };
 

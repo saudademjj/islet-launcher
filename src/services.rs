@@ -227,6 +227,8 @@ pub enum FileOperation {
     UpdateModpackOnline(String),
     /// The world as a Modrinth pack (.mrpack).
     ExportPack { destination: PathBuf, options: crate::core::modpacks::ExportOptions },
+    /// The world as a dedicated server in an empty folder.
+    ExportServer { destination: PathBuf, options: crate::core::server_pack::ServerOptions },
     /// A game from another launcher (a version folder or Prism instance).
     ImportGame(PathBuf),
     /// Another game version, after backing up every save: opening a save in
@@ -489,6 +491,35 @@ impl AppServices {
                             destination.file_name().unwrap_or_default().to_string_lossy(),
                             if bundled > 0 { crate::tr!("，{bundled} 个直接打包", ", {bundled} are packed in") } else { String::new() }
                         ))
+                    }
+                    FileOperation::ExportServer { destination, options } => {
+                        let instance = this.instances.get(&id)?;
+                        let settings = this.settings.get();
+                        let base: VersionJson = std::fs::read(this.paths.version_json(&instance.version_id))
+                            .ok()
+                            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+                            .ok_or_else(|| AppError::new("version_missing", crate::core::i18n::pick("版本文件不存在，请先下载这个世界。", "The version file is missing; install this world first.")))?;
+                        let version = load_version(&this.paths, &instance)?;
+                        let (http, cancel, runtime) = (this.http()?, CancellationToken::new(), tokio::runtime::Handle::current());
+                        let java = runtime.block_on(runtime::ensure_java_with_source(
+                            &http,
+                            &this.paths,
+                            java_major(&version),
+                            instance.java_path.as_deref().or(settings.java_path.as_deref()),
+                            crate::core::mojang::version::game_arch(&version),
+                            &cancel,
+                            None,
+                            settings.download_source,
+                        ))?;
+                        let summary = runtime.block_on(crate::core::server_pack::create(&http, &this.paths, &instance, &base, Path::new(&java.path), settings.download_source, &options, &destination, &cancel))?;
+                        let mut message = crate::tr!("服务端已生成，带 {} 个模组：运行文件夹里的 start.bat（Windows）或 start.sh 启动。", "Server ready with {} mods: run start.bat (Windows) or start.sh in its folder.", summary.mods);
+                        if !summary.client_only.is_empty() {
+                            message += &crate::tr!("{} 个只在客户端运行的模组没有放进去。", " {} client-only mods were left out.", summary.client_only.len());
+                        }
+                        if !options.accept_eula {
+                            message += crate::core::i18n::pick("首次启动后要在 eula.txt 里同意 EULA。", " Agree to the EULA in eula.txt after the first start.");
+                        }
+                        Ok(message)
                     }
                     FileOperation::UpdatePack(path) => this.update_pack(&id, &path),
                     FileOperation::UpdateModpackOnline(version) => {

@@ -29,6 +29,7 @@ pub mod p2p;
 pub mod paths;
 pub mod platform;
 pub mod screenshots;
+pub mod server_pack;
 pub mod servers;
 pub mod settings;
 pub mod storage;

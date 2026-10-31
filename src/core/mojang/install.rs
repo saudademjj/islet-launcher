@@ -324,6 +324,16 @@ async fn fetch_bytes(
     Ok(bytes.to_vec())
 }
 
+/// The dedicated server's jar for a version, from the chosen source.
+pub fn server_jar_task(version: &VersionJson, source: DownloadSource, dest: PathBuf) -> AppResult<DownloadTask> {
+    let server = version.downloads.server.as_ref().filter(|server| server.url.is_some()).ok_or_else(|| {
+        AppError::new("server_jar", crate::core::i18n::pick("这个 Minecraft 版本没有官方服务端。", "This Minecraft version has no official server."))
+    })?;
+    let mirror = format!("{BMCLAPI_BASE}/version/{}/server", version.id);
+    let (primary, fallback) = url_for_source(source, &mirror, server.url.as_deref().unwrap_or_default());
+    Ok(DownloadTask::new(crate::core::i18n::pick("Minecraft 服务端", "Minecraft server"), primary, fallback, dest, server.sha1.clone(), server.size))
+}
+
 fn url_for_source(
     source: DownloadSource,
     mirror_url: &str,

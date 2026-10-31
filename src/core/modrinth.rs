@@ -837,6 +837,33 @@ pub async fn files_by_hash(client: &reqwest::Client, hashes: &[String]) -> AppRe
         .collect())
 }
 
+/// Whether each file's project runs on a server ("required", "optional",
+/// "unsupported" or "unknown"), by the file's SHA-1. Files Modrinth doesn't
+/// know are left out.
+pub async fn server_sides(client: &reqwest::Client, hashes: &[String]) -> AppResult<HashMap<String, String>> {
+    if hashes.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let found: HashMap<String, ModVersion> = post(client, "/version_files", &serde_json::json!({ "hashes": hashes, "algorithm": "sha1" })).await?;
+    let mut ids: Vec<&str> = found.values().map(|v| v.project_id.as_str()).collect();
+    ids.sort_unstable();
+    ids.dedup();
+    if ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    #[derive(Deserialize)]
+    struct Sides {
+        id: String,
+        #[serde(default)]
+        server_side: String,
+    }
+    let projects: Vec<Sides> = get(client, "/projects", &[("ids", serde_json::json!(ids).to_string())]).await?;
+    Ok(found
+        .into_iter()
+        .filter_map(|(hash, version)| projects.iter().find(|p| p.id == version.project_id).map(|p| (hash, p.server_side.clone())))
+        .collect())
+}
+
 type Hashes<'a> = &'a [(String, String)];
 
 /// Records identified local files as the installed copy of their project.
