@@ -38,7 +38,7 @@ struct PackFile {
     #[serde(default)]
     env: HashMap<String, String>,
 }
-fn trusted_url(value: &str) -> bool {
+pub(crate) fn trusted_url(value: &str) -> bool {
     url::Url::parse(value).is_ok_and(|url| {
         url.scheme() == "https"
             && url.username().is_empty()
@@ -367,6 +367,9 @@ pub struct ExportOptions {
     pub options: bool,
     pub servers: bool,
     pub saves: bool,
+    /// More files for the overrides, by path in the game folder.
+    #[serde(skip)]
+    pub extra: Vec<(String, Vec<u8>)>,
 }
 
 impl ExportOptions {
@@ -547,6 +550,10 @@ pub fn export(
         }
         if options.saves {
             add("saves")?;
+        }
+        for (path, bytes) in &options.extra {
+            zip.start_file(format!("overrides/{path}"), deflate).map_err(zip_error)?;
+            zip.write_all(bytes)?;
         }
         zip.finish().map_err(zip_error)?.sync_all()?;
         Ok(())

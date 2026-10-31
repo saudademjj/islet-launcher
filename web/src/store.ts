@@ -25,6 +25,8 @@ import type {
   ModProject,
   ModVersion,
   PackLists,
+  RemoteProgress,
+  ServerModCheck,
   Settings,
   Snapshot,
   SystemMemory,
@@ -119,6 +121,10 @@ export type Modal =
   | { kind: "import" }
   | { kind: "exportPack"; id: string }
   | { kind: "exportServer"; id: string }
+  /** A world's server on a Linux host: set up, upload, keep running. */
+  | { kind: "remote"; id: string }
+  /** The server about to be joined runs mods this world lacks. */
+  | { kind: "serverMods"; id: string; address: string; check: ServerModCheck; offline: boolean }
   | { kind: "addYggdrasil" }
   | { kind: "tunnel"; id: string }
   /** Which group a world sits in on the worlds page. */
@@ -168,6 +174,7 @@ export type FilePurpose =
   | "saveFolder"
   | "gameDir"
   | "serverDir"
+  | "sshKey"
   | "skin";
 
 export type InstanceState = "running" | "starting" | "installing" | "queued" | "ready" | "notInstalled";
@@ -258,6 +265,10 @@ interface State {
   /** A newer launcher, once a check found one. */
   update: Release | null;
   operationTask: string | null;
+  /** A server upload under way: its stage and bytes or seconds. */
+  remoteProgress: RemoteProgress | null;
+  /** Join this server once the missing mods are in. */
+  joinAfterFix: { id: string; address: string; offline: boolean } | null;
 
   loader: { key: string; versions: LoaderVersion[]; loading: boolean; error: string | null };
   modSearch: ModSearch;
@@ -311,7 +322,7 @@ interface Actions {
   cancelInstall(): void;
   /** With `world`, opens that singleplayer world directly (1.20+); with
       `server`, joins that multiplayer server. */
-  launchInstance(id: string, world?: string, server?: string, offline?: boolean): Promise<void>;
+  launchInstance(id: string, world?: string, server?: string, offline?: boolean, skipModCheck?: boolean): Promise<void>;
   /** The one thing to do about a failed launch's error code, if there is one
       beyond reading the log: sign in again, or play offline. */
   launchFix(id: string, code: string | undefined): Toast["action"] | null;
@@ -459,6 +470,8 @@ export const useStore = create<State & Actions>()((set, get) => ({
   lastOperationOk: true,
   update: null,
   operationTask: null,
+  remoteProgress: null,
+  joinAfterFix: null,
 
   loader: { key: "", versions: [], loading: false, error: null },
   modSearch: emptySearch(),
@@ -566,9 +579,14 @@ export const useStore = create<State & Actions>()((set, get) => ({
       case "launchRequest":
         s.launchFromShortcut(event.data.instanceId);
         break;
+      case "remoteProgress":
+        set({ remoteProgress: event.data });
+        break;
       case "operationComplete": {
         operationEnds++;
-        set({ operationTask: null, fileBusy: false, filesChanged: s.filesChanged + 1, lastOperationOk: "Ok" in event.data });
+        const join = s.joinAfterFix;
+        set({ operationTask: null, fileBusy: false, filesChanged: s.filesChanged + 1, lastOperationOk: "Ok" in event.data, remoteProgress: null, joinAfterFix: null });
+        if (join && "Ok" in event.data) void s.launchInstance(join.id, undefined, join.address, join.offline, true);
         void s.refresh().then(() => {
           const { modal } = get();
           if (modal?.kind === "manage") {
@@ -943,7 +961,15 @@ export const useStore = create<State & Actions>()((set, get) => ({
     get().toast(t("正在取消…", "Cancelling…"));
   },
 
-  async launchInstance(id, world, server, offline = false) {
+  async launchInstance(id, world, server, offline = false, skipModCheck = false) {
+    // A server made with Islet lists its mods; the world gets them first.
+    if (server && !skipModCheck) {
+      const check = await call<ServerModCheck | null>("check_server_mods", { id, address: server }).catch(() => null);
+      if (check) {
+        set({ modal: { kind: "serverMods", id, address: server, check, offline } });
+        return;
+      }
+    }
     // Set pending state before the command so a fast launchStarted or
     // launchError event cannot be overwritten by the code after the await.
     const token = get().launchToken + 1;
@@ -1349,6 +1375,7 @@ export const useStore = create<State & Actions>()((set, get) => ({
       saveFolder: { title: t("选择存档文件夹（里面有 level.dat）", "Choose a save folder (one with level.dat)"), directory: true },
       gameDir: { title: t("选择游戏目录（.minecraft、版本文件夹或其他启动器的实例）", "Choose a game folder (.minecraft, a version folder, or another launcher's instance)"), directory: true },
       serverDir: { title: t("选择一个空文件夹放服务端", "Choose an empty folder for the server"), directory: true },
+      sshKey: { title: t("选择 SSH 私钥", "Choose an SSH private key") },
       skin: { title: t("选择皮肤图片", "Choose skin image"), filters: [{ name: t("皮肤 PNG", "Skin PNG"), extensions: ["png"] }] },
     }[purpose];
     try {

@@ -1372,6 +1372,11 @@ button.status-seg:hover {
   line-height: 1.6;
 }
 
+/* A wide dialog's body takes the room above its footer. */
+.modal-body.fill {
+  flex: 1;
+}
+
 .modal-footer {
   display: flex;
   align-items: center;

@@ -1858,6 +1858,16 @@ function DataTab({ instance, busy }: { instance: Instance; busy: boolean }) {
         </Button>
       ),
     },
+    {
+      icon: "globe",
+      title: t("部署到云服务器", "Deploy to a cloud server"),
+      text: t("把这个世界连同存档和模组传到你租的 Linux 云服务器上一直运行；在这里开关、备份、看控制台，改了模组一键同步", "Uploads this world with its save and mods to a Linux cloud server you rent and keeps it running; start, stop, back up and use the console from here, and sync mods in one click"),
+      action: (
+        <Button size="sm" onClick={() => s.openModal({ kind: "remote", id: instance.id })}>
+          {t("打开…", "Open…")}
+        </Button>
+      ),
+    },
   ];
   if (pack) {
     const from = t(`来自「${pack.name}」${pack.version ? ` ${pack.version}` : ""}。`, `From "${pack.name}"${pack.version ? ` ${pack.version}` : ""}. `);

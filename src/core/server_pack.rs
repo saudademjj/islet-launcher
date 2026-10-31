@@ -23,11 +23,30 @@ use crate::core::settings::DownloadSource;
 const CONFIG_DIRS: &[&str] = &["config", "defaultconfigs", "kubejs", "scripts"];
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", default)]
 pub struct ServerOptions {
     /// The player agreed to the Minecraft EULA in the launcher.
     pub accept_eula: bool,
     pub memory_mb: u32,
+    /// A save (its folder under `saves`) that becomes the server's world.
+    pub world: Option<String>,
+    pub port: u16,
+    /// Only players signed in with Microsoft get in.
+    pub online_mode: bool,
+    /// Also write the pack friends import to play on the server.
+    pub client_pack: bool,
+    /// Where friends join, written into their pack.
+    pub address: String,
+    /// The UUID the host plays as on the server, so their inventory and
+    /// position in the save come along. Filled in by the launcher.
+    #[serde(skip)]
+    pub host_uuid: Option<String>,
+}
+
+impl Default for ServerOptions {
+    fn default() -> Self {
+        Self { accept_eula: false, memory_mb: 4096, world: None, port: 25565, online_mode: true, client_pack: true, address: String::new(), host_uuid: None }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -35,6 +54,18 @@ pub struct Summary {
     pub mods: usize,
     /// Mods left out because they only run on the client.
     pub client_only: Vec<String>,
+    /// The mods the server runs, as (file name, SHA-1).
+    pub included: Vec<(String, String)>,
+    /// A save became the server's world.
+    pub world: bool,
+}
+
+/// What a save says about how it is played, for `server.properties`.
+#[derive(Debug, Default, PartialEq)]
+struct WorldRules {
+    difficulty: Option<i8>,
+    game_mode: Option<i32>,
+    hardcore: bool,
 }
 
 /// How the start scripts run the server.
@@ -88,14 +119,19 @@ pub async fn create(
             ));
         }
     };
+    let save = options.world.as_deref().map(|folder| crate::core::content::world_dir(paths, &instance.id, folder)).transpose()?;
     fs::create_dir_all(destination)?;
-    let summary = copy_content(client, paths, instance, destination).await?;
+    let mut summary = copy_content(client, paths, instance, destination).await?;
     let start = install(client, paths, instance, base, &loader_version, java, source, destination, cancel).await?;
     write_scripts(destination, java, options.memory_mb, &start)?;
-    let properties = destination.join("server.properties");
-    if !properties.exists() {
-        fs::write(&properties, format!("motd={}\n", properties_escape(&instance.name)))?;
-    }
+    let rules = match &save {
+        Some(save) => {
+            summary.world = true;
+            copy_world(save, &destination.join("world"), options.host_uuid.as_deref())?
+        }
+        None => WorldRules::default(),
+    };
+    fs::write(destination.join("server.properties"), properties(instance, options, &rules))?;
     if options.accept_eula {
         fs::write(destination.join("eula.txt"), "# Agreed to in Islet: https://aka.ms/MinecraftEULA\neula=true\n")?;
     }
@@ -128,6 +164,7 @@ async fn copy_content(client: &reqwest::Client, paths: &AppPaths, instance: &Ins
         fs::create_dir_all(destination.join("mods"))?;
         fs::copy(path, destination.join("mods").join(name))?;
         summary.mods += 1;
+        summary.included.push((name.clone(), hash.clone()));
     }
     for folder in CONFIG_DIRS {
         let from = game.join(folder);
@@ -280,6 +317,67 @@ fn write_scripts(destination: &Path, java: &Path, memory_mb: u32, start: &Start)
     Ok(())
 }
 
+/// A save as the server's world. The host's player lives in `level.dat` in
+/// singleplayer; it moves to `playerdata` so they keep their things.
+fn copy_world(save: &Path, world: &Path, host_uuid: Option<&str>) -> AppResult<WorldRules> {
+    use crate::core::servers::nbt::{self, Tag};
+    use std::io::{Read, Write};
+    crate::core::manage::copy_tree(save, world)?;
+    let _ = fs::remove_file(world.join("session.lock"));
+    let mut bytes = Vec::new();
+    flate2::read::GzDecoder::new(fs::File::open(world.join("level.dat"))?).read_to_end(&mut bytes)?;
+    let Ok((_, root)) = nbt::read(&bytes) else {
+        return Ok(WorldRules::default());
+    };
+    let Some(data) = root.get("Data") else {
+        return Ok(WorldRules::default());
+    };
+    let rules = WorldRules {
+        difficulty: data.get("Difficulty").and_then(Tag::as_byte),
+        game_mode: match data.get("GameType") {
+            Some(Tag::Int(mode)) => Some(*mode),
+            _ => None,
+        },
+        hardcore: data.get("hardcore").and_then(Tag::as_byte).is_some_and(|flag| flag != 0),
+    };
+    if let (Some(uuid), Some(player @ Tag::Compound(_))) = (host_uuid, data.get("Player")) {
+        let file = world.join("playerdata").join(format!("{uuid}.dat"));
+        if !file.exists() {
+            fs::create_dir_all(world.join("playerdata"))?;
+            let mut out = flate2::write::GzEncoder::new(fs::File::create(&file)?, flate2::Compression::default());
+            out.write_all(&nbt::write("", player))?;
+            out.finish()?;
+        }
+    }
+    Ok(rules)
+}
+
+/// `server.properties` for a new server. Numbers for difficulty and game
+/// mode, which every version reads.
+fn properties(instance: &Instance, options: &ServerOptions, rules: &WorldRules) -> String {
+    let mut lines = vec![
+        "# Written by Islet; the server adds the rest on first start.".to_string(),
+        format!("motd={}", properties_escape(&instance.name)),
+        format!("server-port={}", if options.port == 0 { 25565 } else { options.port }),
+        format!("online-mode={}", options.online_mode),
+        "level-name=world".to_string(),
+    ];
+    if let Some(difficulty) = rules.difficulty {
+        lines.push(format!("difficulty={}", difficulty.clamp(0, 3)));
+    }
+    if let Some(mode) = rules.game_mode {
+        lines.push(format!("gamemode={}", mode.clamp(0, 3)));
+    }
+    if rules.hardcore {
+        lines.push("hardcore=true".into());
+    }
+    // Mods with jetpacks, wings and the like get players kicked for flying.
+    if instance.loader != "vanilla" {
+        lines.push("allow-flight=true".into());
+    }
+    lines.join("\n") + "\n"
+}
+
 /// `.properties` values are Latin-1; anything else goes as `\uXXXX`.
 fn properties_escape(text: &str) -> String {
     let mut out = String::new();
@@ -300,6 +398,50 @@ mod tests {
     fn properties_are_escaped() {
         assert_eq!(properties_escape("My World"), "My World");
         assert_eq!(properties_escape("生存=1"), "\\u751f\\u5b58\\u003d1");
+    }
+
+    #[test]
+    fn a_save_becomes_the_world_with_the_hosts_player() {
+        use crate::core::servers::nbt::{self, Tag};
+        use std::io::{Read, Write};
+        let dir = tempfile::tempdir().unwrap();
+        let save = dir.path().join("save");
+        fs::create_dir_all(save.join("region")).unwrap();
+        fs::write(save.join("region/r.0.0.mca"), b"chunks").unwrap();
+        fs::write(save.join("session.lock"), b"").unwrap();
+        let player = Tag::Compound(vec![("XpLevel".into(), Tag::Int(30))]);
+        let level = Tag::Compound(vec![(
+            "Data".into(),
+            Tag::Compound(vec![
+                ("Difficulty".into(), Tag::Byte(3)),
+                ("GameType".into(), Tag::Int(1)),
+                ("hardcore".into(), Tag::Byte(0)),
+                ("Player".into(), player.clone()),
+            ]),
+        )]);
+        let mut gz = flate2::write::GzEncoder::new(fs::File::create(save.join("level.dat")).unwrap(), flate2::Compression::default());
+        gz.write_all(&nbt::write("", &level)).unwrap();
+        gz.finish().unwrap();
+
+        let world = dir.path().join("server/world");
+        let rules = copy_world(&save, &world, Some("069a79f4-44e9-4726-a5be-fca90e38aaf5")).unwrap();
+        assert_eq!(rules, WorldRules { difficulty: Some(3), game_mode: Some(1), hardcore: false });
+        assert!(world.join("region/r.0.0.mca").is_file());
+        assert!(!world.join("session.lock").exists());
+        let mut bytes = Vec::new();
+        flate2::read::GzDecoder::new(fs::File::open(world.join("playerdata/069a79f4-44e9-4726-a5be-fca90e38aaf5.dat")).unwrap()).read_to_end(&mut bytes).unwrap();
+        assert_eq!(nbt::read(&bytes).unwrap().1, player);
+
+        let instance: Instance = serde_json::from_value(serde_json::json!({
+            "id": "a", "name": "生存", "versionId": "1.21.1", "versionType": "release", "createdAt": 0, "installed": true, "loader": "fabric"
+        }))
+        .unwrap();
+        let options = ServerOptions { online_mode: false, port: 25570, ..Default::default() };
+        let text = properties(&instance, &options, &rules);
+        for line in ["motd=\\u751f\\u5b58", "server-port=25570", "online-mode=false", "difficulty=3", "gamemode=1", "allow-flight=true"] {
+            assert!(text.lines().any(|l| l == line), "{line} in {text}");
+        }
+        assert!(!text.contains("hardcore"));
     }
 
     #[test]

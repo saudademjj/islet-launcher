@@ -17,6 +17,8 @@ import { ConfigDialog } from "./overlays/ConfigDialog";
 import { ImportDialog } from "./overlays/ImportDialog";
 import { ExportPack } from "./overlays/ExportPack";
 import { ExportServer } from "./overlays/ExportServer";
+import { RemoteServer } from "./overlays/RemoteServer";
+import { ServerModsDialog } from "./overlays/ServerModsDialog";
 import { AddYggdrasil, SkinDialog } from "./overlays/AccountDialogs";
 import { CommandPalette } from "./overlays/CommandPalette";
 import { CrashDialog } from "./overlays/CrashDialog";
@@ -110,6 +112,8 @@ function Overlays() {
       {modal?.kind === "import" && <ImportDialog key="import" />}
       {modal?.kind === "exportPack" && <ExportPack key="export-pack" id={modal.id} />}
       {modal?.kind === "exportServer" && <ExportServer key="export-server" id={modal.id} />}
+      {modal?.kind === "remote" && <RemoteServer key={`remote-${modal.id}`} id={modal.id} />}
+      {modal?.kind === "serverMods" && <ServerModsDialog key={`server-mods-${modal.id}`} id={modal.id} address={modal.address} check={modal.check} offline={modal.offline} />}
       {modal?.kind === "addYggdrasil" && <AddYggdrasil key="add-yggdrasil" />}
       {modal?.kind === "tunnel" && <TunnelDialog key={`tunnel-${modal.id}`} id={modal.id} />}
       {modal?.kind === "group" && <GroupDialog key={`group-${modal.id}`} id={modal.id} />}

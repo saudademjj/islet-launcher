@@ -44,8 +44,8 @@ fn valid_name(name: &str, major: u32, arch: &str, os: &str) -> bool {
         && safe_archive_path(name).is_ok_and(|p| p.components().count() == 1)
 }
 
-fn check(package: Package, major: u32, arch: &str) -> AppResult<Package> {
-    if !valid_name(&package.name, major, arch, platform::adoptium_os())
+fn check_for(package: Package, major: u32, arch: &str, os: &str) -> AppResult<Package> {
+    if !valid_name(&package.name, major, arch, os)
         || package.checksum.len() != 64
         || !package.checksum.bytes().all(|b| b.is_ascii_hexdigit())
         || !url::Url::parse(&package.link).is_ok_and(|u| u.scheme() == "https"
@@ -65,18 +65,25 @@ async fn text(client: &reqwest::Client, url: &str, cancel: &CancellationToken) -
 
 pub(super) async fn resolve(client: &reqwest::Client, major: u32, arch: &str, source: DownloadSource,
     cancel: &CancellationToken) -> AppResult<Package> {
-    let url = format!("https://api.adoptium.net/v3/assets/latest/{major}/hotspot?architecture={}&image_type=jre&os={}&vendor=eclipse&project=jdk",
-        platform::adoptium_arch_for(arch), platform::adoptium_os());
+    resolve_for(client, major, arch, platform::adoptium_os(), source, cancel).await
+}
+
+/// A runtime for `os` in Adoptium's naming ("linux", "mac", "windows"),
+/// which may be another computer's.
+pub(super) async fn resolve_for(client: &reqwest::Client, major: u32, arch: &str, os: &str, source: DownloadSource,
+    cancel: &CancellationToken) -> AppResult<Package> {
+    let url = format!("https://api.adoptium.net/v3/assets/latest/{major}/hotspot?architecture={}&image_type=jre&os={os}&vendor=eclipse&project=jdk",
+        platform::adoptium_arch_for(arch));
     let result = async {
         let assets: Vec<Asset> = serde_json::from_str(&text(client, &url, cancel).await?)?;
-        check(assets.into_iter().next().ok_or_else(invalid)?.binary.package, major, arch)
+        check_for(assets.into_iter().next().ok_or_else(invalid)?.binary.package, major, arch, os)
     }.await;
     match result {
         Ok(package) => Ok(package),
         Err(error) if error.code() == "cancelled" || source == DownloadSource::Official => Err(error),
         Err(_) => {
             tracing::warn!(major, "Adoptium metadata unavailable; querying the domestic release catalogue");
-            mirror_package(client, major, arch, cancel).await
+            mirror_package_for(client, major, arch, os, cancel).await
         }
     }
 }
@@ -97,23 +104,32 @@ fn catalogue_names(html: &str, major: u32, arch: &str, os: &str) -> Vec<String> 
 
 pub(super) async fn mirror_package(client: &reqwest::Client, major: u32, arch: &str,
     cancel: &CancellationToken) -> AppResult<Package> {
+    mirror_package_for(client, major, arch, platform::adoptium_os(), cancel).await
+}
+
+async fn mirror_package_for(client: &reqwest::Client, major: u32, arch: &str, os: &str,
+    cancel: &CancellationToken) -> AppResult<Package> {
     let base = format!("{USTC}/temurin{major}-binaries/LatestRelease");
     let html = text(client, &format!("{base}/"), cancel).await?;
-    let name = catalogue_names(&html, major, arch, platform::adoptium_os())
+    let name = catalogue_names(&html, major, arch, os)
         .into_iter().next().ok_or_else(invalid)?;
     // These are the upstream release's checksum sidecars, mirrored together
     // with the archive. TUNA itself does not mirror checksum sidecars.
     let checksum = text(client, &format!("{base}/{name}.sha256.txt"), cancel).await?;
     let fields: Vec<_> = checksum.split_whitespace().collect();
     if fields.len() != 2 || fields[1].trim_start_matches('*') != name { return Err(invalid()); }
-    check(Package { link: format!("{base}/{name}"), checksum: fields[0].into(), name, size: None }, major, arch)
+    check_for(Package { link: format!("{base}/{name}"), checksum: fields[0].into(), name, size: None }, major, arch, os)
 }
 
 pub(super) fn download_urls(package: &Package, major: u32, arch: &str, source: DownloadSource) -> Vec<String> {
+    download_urls_for(package, major, arch, platform::adoptium_os(), source)
+}
+
+pub(super) fn download_urls_for(package: &Package, major: u32, arch: &str, os: &str, source: DownloadSource) -> Vec<String> {
     if source == DownloadSource::Official { return vec![package.link.clone()]; }
     let tuna_arch = if platform::normalize_arch(arch) == "x86" { "x32" } else { platform::adoptium_arch_for(arch) };
     let mut urls = vec![
-        format!("{TUNA}/{major}/jre/{tuna_arch}/{}/{}", platform::adoptium_os(), package.name),
+        format!("{TUNA}/{major}/jre/{tuna_arch}/{os}/{}", package.name),
         format!("{USTC}/temurin{major}-binaries/LatestRelease/{}", package.name),
         package.link.clone(),
     ];
@@ -140,9 +156,9 @@ mod tests {
     fn runtime_metadata_must_have_a_checksum_and_correct_major() {
         let name = format!("{}25.0.5_8{}", package_prefix(25, std::env::consts::ARCH, platform::adoptium_os()), if cfg!(windows) { ".zip" } else { ".tar.gz" });
         let p = || Package { name: name.clone(), link: "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25/test".into(), checksum: "a".repeat(64), size: None };
-        assert!(check(p(), 25, std::env::consts::ARCH).is_ok());
-        assert!(check(p(), 21, std::env::consts::ARCH).is_err());
-        let mut bad = p(); bad.checksum = "<html>".into(); assert!(check(bad, 25, std::env::consts::ARCH).is_err());
+        assert!(check_for(p(), 25, std::env::consts::ARCH, platform::adoptium_os()).is_ok());
+        assert!(check_for(p(), 21, std::env::consts::ARCH, platform::adoptium_os()).is_err());
+        let mut bad = p(); bad.checksum = "<html>".into(); assert!(check_for(bad, 25, std::env::consts::ARCH, platform::adoptium_os()).is_err());
         let urls = download_urls(&p(), 25, std::env::consts::ARCH, DownloadSource::Bmclapi);
         assert!(urls[0].starts_with(TUNA)); assert!(urls[1].starts_with(USTC));
         assert_eq!(download_urls(&p(), 25, std::env::consts::ARCH, DownloadSource::Official), [p().link]);

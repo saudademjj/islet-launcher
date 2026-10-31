@@ -580,6 +580,8 @@ pub enum FileOp {
     UpdateModpackOnline { version: String },
     ExportPack { destination: String, options: islet::core::modpacks::ExportOptions },
     ExportServer { destination: String, options: islet::core::server_pack::ServerOptions },
+    DeployServer { options: islet::services::DeployOptions },
+    FixServerMods { address: String },
     ChangeVersion { version_id: String, version_type: String },
     UndoModUpdate,
 }
@@ -625,6 +627,8 @@ pub async fn file_operation(
         FileOp::UpdateModpackOnline { version } => FileOperation::UpdateModpackOnline(version),
         FileOp::ExportPack { destination, options } => FileOperation::ExportPack { destination: destination.into(), options },
         FileOp::ExportServer { destination, options } => FileOperation::ExportServer { destination: destination.into(), options },
+        FileOp::DeployServer { options } => FileOperation::DeployServer(options),
+        FileOp::FixServerMods { address } => FileOperation::FixServerMods { address },
         FileOp::ChangeVersion { version_id, version_type } => FileOperation::ChangeVersion { version_id, version_type },
         FileOp::UndoModUpdate => FileOperation::UndoModUpdate,
     };
@@ -916,6 +920,59 @@ pub async fn ping_server(state: State<'_, LauncherState>, address: String) -> Cm
     state.services().ping_server(&address).await.map_err(fail)
 }
 
+/// The mods a world lacks for a server it was imported to join; none when
+/// it has them all.
+#[tauri::command]
+pub async fn check_server_mods(state: State<'_, LauncherState>, id: String, address: String) -> CmdResult<Option<islet::core::server_mods::Check>> {
+    let services = state.services();
+    blocking(move || services.check_server_mods(&id, &address)).await
+}
+
+#[tauri::command]
+pub async fn remote_info(state: State<'_, LauncherState>, id: String) -> CmdResult<islet::services::RemoteInfo> {
+    state.services().remote_info(&id).map_err(fail)
+}
+
+#[tauri::command]
+pub async fn remote_connect(state: State<'_, LauncherState>, id: String, target: islet::core::remote::Target, secret: Option<String>) -> CmdResult<islet::core::remote::Probe> {
+    state.services().remote_connect(&id, target, secret).await.map_err(fail)
+}
+
+#[tauri::command]
+pub async fn remote_settings(state: State<'_, LauncherState>, id: String, target: islet::core::remote::Target) -> CmdResult<()> {
+    state.services().remote_settings(&id, target).await.map_err(fail)
+}
+
+#[tauri::command]
+pub async fn remote_forget(state: State<'_, LauncherState>, id: String) -> CmdResult<()> {
+    state.services().remote_forget(&id).map_err(fail)
+}
+
+#[tauri::command]
+pub async fn remote_status(state: State<'_, LauncherState>, id: String) -> CmdResult<islet::services::RemoteStatus> {
+    state.services().remote_status(&id).await.map_err(fail)
+}
+
+#[tauri::command]
+pub async fn remote_action(state: State<'_, LauncherState>, id: String, action: String) -> CmdResult<String> {
+    state.services().remote_action(&id, &action).await.map_err(fail)
+}
+
+#[tauri::command]
+pub async fn remote_command(state: State<'_, LauncherState>, id: String, text: String) -> CmdResult<()> {
+    state.services().remote_command(&id, &text).await.map_err(fail)
+}
+
+#[tauri::command]
+pub async fn remote_log(state: State<'_, LauncherState>, id: String, lines: u32) -> CmdResult<String> {
+    state.services().remote_log(&id, lines).await.map_err(fail)
+}
+
+#[tauri::command]
+pub async fn remote_download_backup(state: State<'_, LauncherState>, id: String, name: String, destination: String) -> CmdResult<()> {
+    state.services().remote_download_backup(&id, &name, std::path::Path::new(&destination)).await.map_err(fail)
+}
+
 #[tauri::command]
 pub async fn list_screenshots(state: State<'_, LauncherState>, id: String) -> CmdResult<Vec<screenshots::Screenshot>> {
     let services = state.services();
@@ -987,6 +1044,8 @@ pub enum Location {
     ScreenshotsDir { id: String },
     /// One screenshot, opened in the system's image viewer.
     Screenshot { id: String, name: String },
+    /// The pack friends import to join a world's server.
+    ServerPack { id: String },
 }
 
 #[tauri::command]
@@ -1030,6 +1089,10 @@ pub async fn open_location(
         Location::Screenshot { id, name } => {
             services.instance_paths(&id).map_err(fail)?;
             (screenshots::file(paths, &id, &name).map_err(fail)?, islet::core::i18n::pick("截图", "Screenshot"))
+        }
+        Location::ServerPack { id } => {
+            services.instance_paths(&id).map_err(fail)?;
+            (paths.instance_dir(&id).join("server-pack"), islet::core::i18n::pick("朋友用的整合包", "The pack for friends"))
         }
     };
     if !path.exists() {

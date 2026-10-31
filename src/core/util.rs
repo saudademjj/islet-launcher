@@ -102,6 +102,14 @@ pub fn replace_file(source: &Path, dest: &Path) -> AppResult<()> {
     Ok(())
 }
 
+/// A name made fit for a file name on every system: characters Windows
+/// refuses become `_`, and trailing dots and spaces go.
+pub fn file_stem_safe(name: &str) -> String {
+    let cleaned: String = name.chars().map(|c| if c.is_control() || "<>:\"/\\|?*".contains(c) { '_' } else { c }).collect();
+    let trimmed = cleaned.trim().trim_end_matches(['.', ' ']);
+    if trimmed.is_empty() { "world".to_string() } else { trimmed.to_string() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

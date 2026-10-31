@@ -1,3 +1,6 @@
+mod remote;
+pub use remote::{DeployOptions, RemoteInfo, RemoteStatus};
+
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -130,6 +133,13 @@ pub enum LoginMode {
 )]
 pub enum UiEvent {
     OperationComplete(Result<String, ErrorPayload>),
+    /// A world's server being uploaded: the stage, and bytes or seconds.
+    RemoteProgress {
+        instance_id: String,
+        stage: String,
+        done: u64,
+        total: u64,
+    },
     /// A shortcut asked to start this world.
     LaunchRequest { instance_id: String },
     /// The window was closed while work was still running or edits were
@@ -229,6 +239,10 @@ pub enum FileOperation {
     ExportPack { destination: PathBuf, options: crate::core::modpacks::ExportOptions },
     /// The world as a dedicated server in an empty folder.
     ExportServer { destination: PathBuf, options: crate::core::server_pack::ServerOptions },
+    /// Builds the server and runs it on the world's own host.
+    DeployServer(DeployOptions),
+    /// Fetches the mods a server needs that the world lacks.
+    FixServerMods { address: String },
     /// A game from another launcher (a version folder or Prism instance).
     ImportGame(PathBuf),
     /// Another game version, after backing up every save: opening a save in
@@ -255,6 +269,8 @@ pub struct AppServices {
     starting: Mutex<HashSet<String>>,
     installing: Mutex<HashMap<String, String>>,
     operations: Mutex<HashSet<String>>,
+    /// Passwords of worlds' servers for this session, by world id.
+    remote_secrets: Mutex<HashMap<String, String>>,
 }
 
 impl AppServices {
@@ -289,6 +305,7 @@ impl AppServices {
             starting: Mutex::new(HashSet::new()),
             installing: Mutex::new(HashMap::new()),
             operations: Mutex::new(HashSet::new()),
+            remote_secrets: Mutex::new(HashMap::new()),
         }))
     }
 
@@ -493,33 +510,24 @@ impl AppServices {
                         ))
                     }
                     FileOperation::ExportServer { destination, options } => {
-                        let instance = this.instances.get(&id)?;
-                        let settings = this.settings.get();
-                        let base: VersionJson = std::fs::read(this.paths.version_json(&instance.version_id))
-                            .ok()
-                            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-                            .ok_or_else(|| AppError::new("version_missing", crate::core::i18n::pick("版本文件不存在，请先下载这个世界。", "The version file is missing; install this world first.")))?;
-                        let version = load_version(&this.paths, &instance)?;
-                        let (http, cancel, runtime) = (this.http()?, CancellationToken::new(), tokio::runtime::Handle::current());
-                        let java = runtime.block_on(runtime::ensure_java_with_source(
-                            &http,
-                            &this.paths,
-                            java_major(&version),
-                            instance.java_path.as_deref().or(settings.java_path.as_deref()),
-                            crate::core::mojang::version::game_arch(&version),
-                            &cancel,
-                            None,
-                            settings.download_source,
-                        ))?;
-                        let summary = runtime.block_on(crate::core::server_pack::create(&http, &this.paths, &instance, &base, Path::new(&java.path), settings.download_source, &options, &destination, &cancel))?;
+                        let (summary, pack) = this.export_server(&id, &destination, options.clone(), &CancellationToken::new())?;
                         let mut message = crate::tr!("服务端已生成，带 {} 个模组：运行文件夹里的 start.bat（Windows）或 start.sh 启动。", "Server ready with {} mods: run start.bat (Windows) or start.sh in its folder.", summary.mods);
                         if !summary.client_only.is_empty() {
                             message += &crate::tr!("{} 个只在客户端运行的模组没有放进去。", " {} client-only mods were left out.", summary.client_only.len());
+                        }
+                        if let Some(pack) = pack {
+                            message += &crate::tr!("把「{}」发给朋友，导入后就能进服。", " Send \"{}\" to friends; once imported they can join.", pack.file_name().unwrap_or_default().to_string_lossy());
                         }
                         if !options.accept_eula {
                             message += crate::core::i18n::pick("首次启动后要在 eula.txt 里同意 EULA。", " Agree to the EULA in eula.txt after the first start.");
                         }
                         Ok(message)
+                    }
+                    FileOperation::DeployServer(options) => this.deploy_server(&id, options, &CancellationToken::new()),
+                    FileOperation::FixServerMods { address } => {
+                        let (added, removed) = tokio::runtime::Handle::current().block_on(crate::core::server_mods::fix(&this.http()?, &this.paths, &id, &address, &CancellationToken::new()))?;
+                        Ok(crate::tr!("已补齐 {added} 个模组{}，现在可以进服了。", "Added {added} mods{}; you can join now.",
+                            if removed > 0 { crate::tr!("，{removed} 个旧版本移到了回收站", ", {removed} old versions went to the recycle bin") } else { String::new() }))
                     }
                     FileOperation::UpdatePack(path) => this.update_pack(&id, &path),
                     FileOperation::UpdateModpackOnline(version) => {
@@ -1474,6 +1482,104 @@ impl AppServices {
     }
 
     /// Live status of a server: players, latency, message of the day.
+    /// The UUID the host plays as on a server, so their things from the save
+    /// come along: the Microsoft one on an online-mode server, the one the
+    /// server derives from the name otherwise.
+    fn host_uuid(&self, instance: &Instance, online_mode: bool) -> Option<String> {
+        let account_id = instance.account_id.clone().filter(|id| self.accounts.get(id).is_some()).or_else(|| self.settings.get().active_account_id)?;
+        let account = self.accounts.get(&account_id)?;
+        let uuid = match (online_mode, account.provider) {
+            (true, crate::core::accounts::AccountProvider::Microsoft) => account.uuid.replace('-', ""),
+            (true, _) => return None,
+            (false, _) => crate::core::auth::offline::offline_uuid(&account.username).replace('-', ""),
+        };
+        let uuid = uuid::Uuid::parse_str(&uuid).ok()?;
+        Some(uuid.hyphenated().to_string())
+    }
+
+    /// Builds the server for a world in `destination`, and beside it the
+    /// pack friends import to join: every mod of the world, the server in
+    /// their list, and which mods the server runs. Runs on a blocking thread.
+    pub fn export_server(
+        self: &Arc<Self>,
+        id: &str,
+        destination: &Path,
+        mut options: crate::core::server_pack::ServerOptions,
+        cancel: &CancellationToken,
+    ) -> AppResult<(crate::core::server_pack::Summary, Option<PathBuf>)> {
+        let instance = self.instances.get(id)?;
+        let settings = self.settings.get();
+        let base: VersionJson = std::fs::read(self.paths.version_json(&instance.version_id))
+            .ok()
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+            .ok_or_else(|| AppError::new("version_missing", crate::core::i18n::pick("版本文件不存在，请先下载这个世界。", "The version file is missing; install this world first.")))?;
+        let version = load_version(&self.paths, &instance)?;
+        let (http, runtime) = (self.http()?, tokio::runtime::Handle::current());
+        let java = runtime.block_on(runtime::ensure_java_with_source(
+            &http,
+            &self.paths,
+            java_major(&version),
+            instance.java_path.as_deref().or(settings.java_path.as_deref()),
+            crate::core::mojang::version::game_arch(&version),
+            cancel,
+            None,
+            settings.download_source,
+        ))?;
+        if options.world.is_some() {
+            options.host_uuid = self.host_uuid(&instance, options.online_mode);
+        }
+        let summary = runtime.block_on(crate::core::server_pack::create(&http, &self.paths, &instance, &base, Path::new(&java.path), settings.download_source, &options, destination, cancel))?;
+        if !options.client_pack {
+            return Ok((summary, None));
+        }
+        let candidates = crate::core::modpacks::export_candidates(&self.paths, id)?;
+        let mut hashes: Vec<String> = candidates.iter().map(|c| c.sha1.clone()).collect();
+        hashes.extend(summary.included.iter().map(|(_, sha1)| sha1.clone()));
+        hashes.sort();
+        hashes.dedup();
+        // Without the lookup every file is bundled and nothing is fetched
+        // later; the pack still works.
+        let hosted = runtime.block_on(crate::core::modrinth::files_by_hash(&http, &hashes)).unwrap_or_else(|error| {
+            tracing::warn!(%error, "modrinth lookup for the client pack failed");
+            HashMap::new()
+        });
+        let meta = crate::core::content::mod_meta(&self.paths, id).unwrap_or_default();
+        let address = options.address.trim().to_string();
+        let manifest = crate::core::server_mods::Manifest {
+            name: instance.name.clone(),
+            address: address.clone(),
+            mods: summary
+                .included
+                .iter()
+                .map(|(file, sha1)| crate::core::server_mods::ManifestMod {
+                    file: file.clone(),
+                    sha1: sha1.clone(),
+                    id: meta.get(file).and_then(|m| m.id.clone()),
+                    url: hosted.get(sha1).map(|f| f.url.clone()).filter(|url| crate::core::modpacks::trusted_url(url)),
+                })
+                .collect(),
+        };
+        let mut extra = vec![(crate::core::server_mods::FILE.to_string(), serde_json::to_vec_pretty(&manifest)?)];
+        if !address.is_empty() {
+            extra.push(("servers.dat".to_string(), crate::core::server_mods::servers_dat(&instance.name, &address)));
+        }
+        let pack_options = crate::core::modpacks::ExportOptions {
+            name: instance.name.clone(),
+            version: chrono::Local::now().format("%Y.%m.%d-%H%M").to_string(),
+            summary: crate::core::i18n::pick("导入后就能进服务器。", "Import to join the server.").to_string(),
+            extra,
+            ..Default::default()
+        };
+        let file = destination.join(crate::tr!("{}-给朋友.mrpack", "{}-for-friends.mrpack", crate::core::util::file_stem_safe(&instance.name)));
+        crate::core::modpacks::export(&self.paths, &instance, &candidates, crate::core::modpacks::Hosted::Modrinth(&hosted), &pack_options, &file)?;
+        Ok((summary, Some(file)))
+    }
+
+    /// The mods a world lacks for a server it was imported to join.
+    pub fn check_server_mods(&self, id: &str, address: &str) -> AppResult<Option<crate::core::server_mods::Check>> {
+        crate::core::server_mods::check(&self.paths, id, address)
+    }
+
     pub async fn ping_server(&self, address: &str) -> AppResult<servers::ServerStatus> {
         servers::ping(&self.http()?, address).await
     }

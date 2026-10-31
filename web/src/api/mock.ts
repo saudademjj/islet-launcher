@@ -296,6 +296,13 @@ let lastModChange: { createdMs: number; added: number; replaced: number } | null
 // from "connecting" as nodes and players arrive. A code starting (U/)ZZZZ
 // plays a guest whose host never shows up; PPPP one on a weak relay.
 const P2P_SIZE = 32_657_720;
+// A cloud server the first world was deployed to.
+let remoteTarget: Record<string, unknown> | null = null;
+let remoteRunning = true;
+let remoteBackups: [string, number][] = [
+  ["backups/world-20261031-051700.tar.gz", 184_320_000],
+  ["backups/world-20261030-051700.tar.gz", 183_910_000],
+];
 let p2pInstalled = false;
 let p2pPrepStart: number | null = null;
 let p2pRoom: { role: "host" | "guest"; code: string; started: number; port: number; local: number; name: string } | null = null;
@@ -599,6 +606,55 @@ const commands: Record<string, (args: any) => unknown> = {
         300 + Math.random() * 900,
       );
     }),
+  check_server_mods: ({ address }) =>
+    address === "play.example.com"
+      ? {
+          server: "周末生存服",
+          missing: [
+            { file: "create-1.21.1-6.0.4.jar", sha1: "a".repeat(40), id: "create", url: "https://cdn.modrinth.com/data/x/create.jar" },
+            { file: "farmersdelight-1.21.1-1.2.7.jar", sha1: "b".repeat(40), id: "farmersdelight", url: "https://cdn.modrinth.com/data/y/fd.jar" },
+          ],
+          outdated: ["create-1.21.1-6.0.2.jar"],
+          fixable: true,
+        }
+      : null,
+  remote_info: () => ({ target: remoteTarget, hasSecret: !!remoteTarget, defaultDir: "islet/my-survival", pack: remoteTarget ? "/m/instances/i/server-pack/我的生存-给朋友.mrpack" : null }),
+  remote_connect: ({ target }) =>
+    new Promise((resolve) => {
+      remoteTarget = { ...target, fingerprint: "SHA256:demo" };
+      setTimeout(() => resolve({ os: "Linux", arch: "x86_64", root: true, tools: ["tar", "curl", "sha256sum", "setsid", "mkfifo", "crontab"], java: null, deployed: false, freeMb: 38_400 }), 700);
+    }),
+  remote_settings: ({ target }) => {
+    remoteTarget = { ...remoteTarget, ...target, fingerprint: remoteTarget?.fingerprint ?? null, deployedAt: remoteTarget?.deployedAt ?? null };
+  },
+  remote_forget: () => {
+    remoteTarget = null;
+  },
+  remote_status: () => ({
+    state: { running: remoteRunning, ready: remoteRunning, backups: remoteBackups, scheduled: "cron" },
+    address: String(remoteTarget?.address || remoteTarget?.host || ""),
+    ping: remoteRunning ? { latencyMs: 38, version: "1.21.1", protocol: 767, online: 2, max: 20, players: ["Steve", "Alex"], motd: [], favicon: null } : null,
+  }),
+  remote_action: ({ action }) => {
+    if (action === "stop") remoteRunning = false;
+    if (action === "start" || action === "restart") remoteRunning = true;
+    if (action === "backup") {
+      remoteBackups = [["backups/world-20261101-120000.tar.gz", 184_500_000], ...remoteBackups];
+      return "backups/world-20261101-120000.tar.gz";
+    }
+    return action === "stop" ? "stopped" : "started";
+  },
+  remote_command: () => undefined,
+  remote_log: () =>
+    [
+      "[12:00:01] [Server thread/INFO]: Starting minecraft server version 1.21.1",
+      "[12:00:02] [Server thread/INFO]: Loading properties",
+      "[12:00:19] [Server thread/INFO]: Preparing level \"world\"",
+      "[12:00:31] [Server thread/INFO]: Done (28.412s)! For help, type \"help\"",
+      "[12:04:12] [Server thread/INFO]: Steve joined the game",
+      "[12:06:40] [Server thread/INFO]: Alex joined the game",
+    ].join("\n"),
+  remote_download_backup: () => new Promise((resolve) => setTimeout(resolve, 600)),
   list_screenshots: () => [...shots],
   recycle_screenshot: ({ name }) => {
     shots = shots.filter((shot) => shot.name !== name);
@@ -774,11 +830,22 @@ const commands: Record<string, (args: any) => unknown> = {
       updatePack: "整合包已更新，开始游戏时会下载新文件。",
       updateModpackOnline: "整合包已更新到新版本，开始游戏时会下载新文件。",
       exportPack: "已导出：118 个文件从 Modrinth 下载，24 个直接打包。",
+      deployServer: "服务器已经在 203.0.113.10 运行，带 112 个模组。把「我的生存-给朋友.mrpack」发给朋友，导入后就能进服。",
+      fixServerMods: "已补齐 2 个模组，1 个旧版本移到了回收站。",
       exportServer: "服务端已生成，带 112 个模组：运行文件夹里的 start.bat（Windows）或 start.sh 启动。6 个只在客户端运行的模组没有放进去。",
       changeVersion: `已换成 ${operation.versionId}；换之前把 3 个存档各备份了一份，在存档的「备份」里可以恢复。`,
       undoModUpdate: `已撤销上次模组更新：移除 ${undone?.added ?? 0} 个文件，恢复 ${undone?.replaced ?? 0} 个旧文件。`,
     };
     if (operation.kind === "recycle" && operation.item === "mod") mods = mods.filter((m) => m.name !== operation.name);
+    if (operation.kind === "deployServer") {
+      const stages: [string, number, number][] = [["连接服务器", 0, 0], ["生成服务端", 0, 0], ["在服务器上安装 Java", 0, 0], ["上传", 40_000_000, 160_000_000], ["上传", 120_000_000, 160_000_000], ["等待服务器启动", 12, 0]];
+      stages.forEach(([stage, done, total], i) => later(600 * i, () => emit({ type: "remoteProgress", data: { instanceId: id, stage, done, total } })));
+      return later(600 * stages.length, () => {
+        if (remoteTarget) remoteTarget = { ...remoteTarget, deployedAt: Date.now() };
+        remoteRunning = true;
+        emit({ type: "operationComplete", data: { Ok: messages.deployServer } });
+      });
+    }
     later(700, () => emit({ type: "operationComplete", data: { Ok: messages[operation.kind] } }));
   },
   relocate_storage: () => later(1500, () => emit({ type: "storageChanged", data: { Ok: "/Volumes/Games/MC" } })),

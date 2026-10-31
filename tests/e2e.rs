@@ -147,7 +147,7 @@ fn install_play_and_host() {
         waiter.install(&services, &world.id);
         let dir = servers.join(loader);
         services
-            .file_operation(&world.id, FileOperation::ExportServer { destination: dir.clone(), options: ServerOptions { accept_eula: true, memory_mb: 2048 } })
+            .file_operation(&world.id, FileOperation::ExportServer { destination: dir.clone(), options: ServerOptions { accept_eula: true, memory_mb: 2048, ..Default::default() } })
             .unwrap();
         let message = waiter.operation();
         println!("{loader}: {message}");

@@ -157,6 +157,35 @@ pub async fn ensure_java_with_source(
         .ok_or_else(|| AppError::new("java_path", crate::core::i18n::pick("无法读取安装后的 Java。", "Couldn't read the installed Java.")))
 }
 
+/// A Linux Java runtime for another computer, such as a server host:
+/// its archive name, SHA-256 and where to get it, best source first.
+#[derive(Debug, Clone)]
+pub struct LinuxRuntime {
+    pub name: String,
+    pub sha256: String,
+    pub urls: Vec<String>,
+    pub size: Option<u64>,
+}
+
+pub async fn linux_runtime(client: &reqwest::Client, major: u32, arch: &str, source: DownloadSource, cancel: &CancellationToken) -> AppResult<LinuxRuntime> {
+    let package = sources::resolve_for(client, major, arch, "linux", source, cancel).await?;
+    let urls = sources::download_urls_for(&package, major, arch, "linux", source);
+    Ok(LinuxRuntime { name: package.name, sha256: package.checksum, urls, size: package.size })
+}
+
+/// Downloads that runtime here, checked against its SHA-256, for hosts that
+/// can't fetch it themselves.
+pub async fn download_linux_runtime(client: &reqwest::Client, paths: &AppPaths, runtime: &LinuxRuntime, cancel: &CancellationToken) -> AppResult<PathBuf> {
+    let archive = paths.java.join("downloads").join(safe_archive_path(&runtime.name)?);
+    let mut urls = runtime.urls.clone();
+    let task = DownloadTask::new(crate::core::i18n::pick("Java 运行时", "Java runtime"), urls.remove(0), urls, archive.clone(), None, runtime.size)
+        .with_sha256(runtime.sha256.clone())
+        .with_min_speed(64 * 1024);
+    let progress = Arc::new(DownloadProgress::new(std::slice::from_ref(&task)));
+    download_all(vec![task], client.clone(), 1, cancel.clone(), progress).await?;
+    Ok(archive)
+}
+
 async fn download_package(
     client: &reqwest::Client,
     paths: &AppPaths,

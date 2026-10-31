@@ -395,6 +395,7 @@ export interface LoginStart {
 
 export type LauncherEvent =
   | { type: "operationComplete"; data: Res<string> }
+  | { type: "remoteProgress"; data: RemoteProgress }
   | { type: "launchRequest"; data: { instanceId: string } }
   | { type: "quitRequested" }
   | { type: "quitScheduled"; data: { scheduled: boolean } }
@@ -441,7 +442,9 @@ export type FileOp =
   | { kind: "updatePack"; path: string }
   | { kind: "updateModpackOnline"; version: string }
   | { kind: "exportPack"; destination: string; options: ExportOptions }
-  | { kind: "exportServer"; destination: string; options: { acceptEula: boolean; memoryMb: number } }
+  | { kind: "exportServer"; destination: string; options: ServerOptions }
+  | { kind: "deployServer"; options: { acceptEula: boolean; world: string | null } }
+  | { kind: "fixServerMods"; address: string }
   | { kind: "changeVersion"; versionId: string; versionType: string }
   | { kind: "undoModUpdate" };
 
@@ -535,7 +538,98 @@ export type Location =
   | { kind: "world"; id: string; folder: string }
   | { kind: "contentDir"; id: string; content: ContentKind }
   | { kind: "screenshotsDir"; id: string }
-  | { kind: "screenshot"; id: string; name: string };
+  | { kind: "screenshot"; id: string; name: string }
+  | { kind: "serverPack"; id: string };
+
+// ----- Servers -----------------------------------------------------------------
+
+export interface ServerOptions {
+  acceptEula: boolean;
+  memoryMb: number;
+  /** A save folder that becomes the server's world. */
+  world: string | null;
+  port: number;
+  onlineMode: boolean;
+  /** Also make the pack friends import to join. */
+  clientPack: boolean;
+  /** Where friends join, written into their server list. */
+  address: string;
+}
+
+/** A mod a server runs that this world lacks. */
+export interface ManifestMod {
+  file: string;
+  sha1: string;
+  id: string | null;
+  url: string | null;
+}
+
+export interface ServerModCheck {
+  server: string;
+  missing: ManifestMod[];
+  /** Local files that are another version of a missing mod. */
+  outdated: string[];
+  /** Every missing mod can be downloaded. */
+  fixable: boolean;
+}
+
+/** Where a world's server lives (a Linux host reached over SSH) and how it is kept. */
+export interface RemoteTarget {
+  host: string;
+  port: number;
+  user: string;
+  auth: "password" | "key";
+  keyPath: string | null;
+  dir: string;
+  gamePort: number;
+  address: string;
+  fingerprint: string | null;
+  autostart: boolean;
+  dailyBackup: boolean;
+  keepBackups: number;
+  memoryMb: number;
+  onlineMode: boolean;
+  deployedAt: number | null;
+}
+
+export interface RemoteInfo {
+  target: RemoteTarget | null;
+  hasSecret: boolean;
+  defaultDir: string;
+  /** The pack friends import, from the last upload. */
+  pack: string | null;
+}
+
+export interface RemoteProbe {
+  os: string;
+  arch: string;
+  root: boolean;
+  tools: string[];
+  java: [string, number] | null;
+  deployed: boolean;
+  freeMb: number | null;
+}
+
+export interface RemoteState {
+  running: boolean;
+  ready: boolean;
+  /** Newest first: [file, bytes]. */
+  backups: [string, number][];
+  scheduled: string;
+}
+
+export interface RemoteStatus {
+  state: RemoteState;
+  address: string;
+  ping: ServerStatus | null;
+}
+
+export interface RemoteProgress {
+  instanceId: string;
+  stage: string;
+  done: number;
+  total: number;
+}
 
 // ----- P2P rooms -------------------------------------------------------------
 
