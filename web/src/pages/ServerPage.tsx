@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { call } from "../api/backend";
@@ -256,6 +256,20 @@ const toForm = (p: Instance): Form => {
 
 const same = (a: Form, b: Form) => (Object.keys(a) as (keyof Form)[]).every((key) => a[key] === b[key]);
 
+/** One labelled part of a long form: its name and a line about it beside
+    its fields, or above them where the card is narrow. */
+function FormSection({ title, text, children }: { title: string; text: string; children: ReactNode }) {
+  return (
+    <div className="form-section">
+      <div className="form-section-head">
+        <span className="form-section-title">{title}</span>
+        <span className="field-hint">{text}</span>
+      </div>
+      <div className="form-section-fields">{children}</div>
+    </div>
+  );
+}
+
 function ProjectView({ project, bar }: { project: Instance; bar: HTMLDivElement | null }) {
   const s = usePick((s) => ({ openModal: s.openModal, openManage: s.openManage, modalOpen: s.modal !== null, leaving: s.leavingPage }));
   const saved = useMemo(() => toForm(project), [project]);
@@ -381,33 +395,25 @@ function ProjectView({ project, bar }: { project: Instance; bar: HTMLDivElement 
       )}
       {project.loader === "vanilla" && <span className="field-hint">{t("原版服务端不加载模组和插件；想装插件，把类型换成 Paper。", "A vanilla server runs no mods or plugins; switch to Paper for plugins.")}</span>}
 
-      <section className="card">
-        <CardHeader icon="sliders" title={t("服务器设置", "Server settings")} text={t("内存、JVM 参数和视距在开服时按机器配置自动调整", "Memory, JVM flags and view distance fit the machine at start")} />
-        <div className="card-body col gap-20">
+      <section className="card form-sections">
+        <CardHeader icon="sliders" title={t("服务器设置", "Server settings")} text={t("导出和部署都按保存后的设置来", "Exports and deploys use what's saved")} />
+        <FormSection title={t("基本", "Basics")} text={t("好友在多人游戏列表里看到的样子", "What friends see in the multiplayer list")}>
           <Field label={t("名称", "Name")} tone={form.name.trim() ? undefined : "bad"}>
             <Input value={form.name} maxLength={64} invalid={!form.name.trim()} onChange={(e) => set("name", e.target.value)} />
           </Field>
+          <Field label={t("服务器介绍（MOTD）", "Message of the day")} hint={t("显示在多人游戏列表里；不填就用名称", "Shown in the multiplayer list; the name when left empty")}>
+            <Input value={form.motd} maxLength={120} placeholder={form.name} onChange={(e) => set("motd", e.target.value.replace(/[\r\n]/g, ""))} />
+          </Field>
+        </FormSection>
+        <FormSection title={t("服务端", "Server")} text={t("跑哪种服务端、哪个游戏版本", "Which server software, on which game version")}>
           <Field label={t("服务端类型", "Kind of server")} tone={kindChanged ? "bad" : undefined} hint={kindChanged ? t(`换类型后，已添加的${what}可能用不了，保存后去「管理」里检查`, `Changing the kind may leave the ${what.toLowerCase()} you added unusable; check them under Manage after saving`) : undefined}>
             <KindPicker value={form.loader} onChange={(loader) => set("loader", loader)} />
           </Field>
           <Field label={t("游戏版本", "Game version")}>
             <VersionPicker loader={form.loader} value={form.versionId} onChange={(version) => set("versionId", version)} />
           </Field>
-          <Field label={t("服务器介绍（MOTD）", "Message of the day")} hint={t("显示在多人游戏列表里；不填就用名称", "Shown in the multiplayer list; the name when left empty")}>
-            <Input value={form.motd} maxLength={120} placeholder={form.name} onChange={(e) => set("motd", e.target.value.replace(/[\r\n]/g, ""))} />
-          </Field>
-          <div className="row gap-16 items-start wrap">
-            <Field label={t("最多玩家", "Max players")} tone={maxPlayers >= 1 && maxPlayers <= 1000 ? undefined : "bad"}>
-              <Input mono inputMode="numeric" value={form.maxPlayers} style={{ width: 100 }} invalid={!(maxPlayers >= 1 && maxPlayers <= 1000)} onChange={(e) => set("maxPlayers", e.target.value.replace(/\D/g, "").slice(0, 4))} />
-            </Field>
-            <Field label={t("端口", "Port")} tone={port > 0 && port < 65536 ? undefined : "bad"} hint={t("默认 25565；记得在安全组放行", "25565 by default; open it in the security group")}>
-              <Input mono inputMode="numeric" value={form.port} style={{ width: 110 }} invalid={!(port > 0 && port < 65536)} onChange={(e) => set("port", e.target.value.replace(/\D/g, "").slice(0, 5))} />
-            </Field>
-            <Field label={t("种子（可不填）", "Seed (optional)")}>
-              <Input mono value={form.seed} maxLength={64} style={{ width: 200 }} onChange={(e) => set("seed", e.target.value)} />
-            </Field>
-          </div>
-          <MemoryField value={form.memory} onChange={(memory) => set("memory", memory)} />
+        </FormSection>
+        <FormSection title={t("玩法", "Gameplay")} text={t("种子只在第一次生成世界时用到", "The seed only counts when the world is first made")}>
           <Field label={t("难度", "Difficulty")}>
             <Segmented
               value={String(form.difficulty)}
@@ -432,11 +438,22 @@ function ProjectView({ project, bar }: { project: Instance; bar: HTMLDivElement 
               onChange={(v) => set("gamemode", Number(v))}
             />
           </Field>
+          <Field label={t("种子（可不填）", "Seed (optional)")}>
+            <Input mono value={form.seed} maxLength={64} style={{ width: 240 }} onChange={(e) => set("seed", e.target.value)} />
+          </Field>
           <div className="setting-row">
-            <div className="col">
-              <span className="setting-name">{t("玩家互相伤害（PVP）", "Player vs player")}</span>
-            </div>
+            <span className="setting-name">{t("玩家互相伤害（PVP）", "Player vs player")}</span>
             <Switch label="PVP" checked={form.pvp} onChange={(v) => set("pvp", v)} />
+          </div>
+        </FormSection>
+        <FormSection title={t("进入", "Access")} text={t("谁能进来，从哪个端口进", "Who can join, and on which port")}>
+          <div className="row gap-16 items-start wrap">
+            <Field label={t("最多玩家", "Max players")} tone={maxPlayers >= 1 && maxPlayers <= 1000 ? undefined : "bad"}>
+              <Input mono inputMode="numeric" value={form.maxPlayers} style={{ width: 100 }} invalid={!(maxPlayers >= 1 && maxPlayers <= 1000)} onChange={(e) => set("maxPlayers", e.target.value.replace(/\D/g, "").slice(0, 4))} />
+            </Field>
+            <Field label={t("端口", "Port")} tone={port > 0 && port < 65536 ? undefined : "bad"} hint={t("默认 25565；记得在安全组放行", "25565 by default; open it in the security group")}>
+              <Input mono inputMode="numeric" value={form.port} style={{ width: 110 }} invalid={!(port > 0 && port < 65536)} onChange={(e) => set("port", e.target.value.replace(/\D/g, "").slice(0, 5))} />
+            </Field>
           </div>
           <div className="setting-row">
             <div className="col">
@@ -452,7 +469,10 @@ function ProjectView({ project, bar }: { project: Instance; bar: HTMLDivElement 
             </div>
             <Switch label={t("正版验证", "Online mode")} checked={form.onlineMode} onChange={(v) => set("onlineMode", v)} />
           </div>
-        </div>
+        </FormSection>
+        <FormSection title={t("性能", "Performance")} text={t("JVM 参数和视距在开服时按机器配置自动调整", "JVM flags and view distance fit the machine at start")}>
+          <MemoryField value={form.memory} onChange={(memory) => set("memory", memory)} />
+        </FormSection>
       </section>
       <div style={{ height: 60 }} />
 

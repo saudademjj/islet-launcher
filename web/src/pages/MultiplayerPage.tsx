@@ -6,7 +6,7 @@ import type { LanGame, P2pLevel, P2pStatus } from "../api/types";
 import { Icon } from "../components/Icon";
 import { Landscape, PX } from "../components/Pixel";
 import { PlayerFace } from "../components/PlayerFace";
-import { BlockProgress, Button, Input, Notice, SectionTitle } from "../components/ui";
+import { BlockProgress, Button, CardHeader, Input, Notice, SectionTitle } from "../components/ui";
 import { Toolbar } from "../layout/Shell";
 import { formatBytes } from "../lib/format";
 import { t } from "../lib/i18n";
@@ -237,47 +237,45 @@ function HostCard({ name }: { name: string }) {
   }, [empty]);
   const valid = /^\d{1,5}$/.test(port) && Number(port) > 0 && Number(port) < 65536;
   return (
-    <section className="room-card">
-      <div className="room-card-head">
-        <span className="room-card-index">1</span>
-        <div className="col gap-2">
-          <span className="room-card-title">{t("开房间", "Host a room")}</span>
-          <span className="room-card-text">{t("在游戏里按 Esc →「对局域网开放」，再回来选中它。", "In the game, press Esc → Open to LAN, then pick it here.")}</span>
+    <section className="card room-card">
+      <CardHeader icon="home" title={t("开房间", "Host a room")} text={t("在游戏里按 Esc →「对局域网开放」，再回来选中它。", "In the game, press Esc → Open to LAN, then pick it here.")} />
+      <div className="room-card-body">
+        <div className="lan-list">
+          {scanning && !games ? (
+            <div className="lan-game skeleton" aria-hidden />
+          ) : games?.length ? (
+            games.map((game) => (
+              <button key={game.port} type="button" className="lan-game" aria-pressed={port === String(game.port)} onClick={() => setPort(String(game.port))}>
+                <Icon name={port === String(game.port) ? "check" : "monitor"} />
+                <span className="truncate" style={{ flex: 1 }}>{game.motd}</span>
+                <span className="mono faint">:{game.port}</span>
+              </button>
+            ))
+          ) : worldState === "running" || worldState === "starting" ? (
+            <div className="lan-empty waiting">
+              <span className="spinner" />
+              {t("游戏开着：按 Esc →「对局域网开放」，这里会自动出现", "The game is open: press Esc → Open to LAN and it shows up here")}
+            </div>
+          ) : (
+            <div className="lan-empty start">
+              <span>{t("还没开始游戏", "The game isn't running")}</span>
+              {world && worldState !== "installing" && worldState !== "queued" && (
+                <Button size="sm" variant="go" icon="play" onClick={() => useStore.getState().primaryAction(world.id)}>
+                  {worldState === "notInstalled" ? t(`安装并开始 ${world.name}`, `Install and play ${world.name}`) : t(`开始 ${world.name}`, `Play ${world.name}`)}
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="row gap-8">
+          <Input ref={portRef} mono value={port} inputMode="numeric" placeholder={t("端口", "Port")} aria-label={t("游戏端口", "Game port")} style={{ width: 110 }} onChange={(e) => setPort(e.target.value.replace(/\D/g, "").slice(0, 5))} />
+          <Button size="sm" variant="ghost" icon="refresh" busy={scanning} onClick={() => void scan()}>
+            {t("重新检测", "Scan again")}
+          </Button>
         </div>
       </div>
-      <div className="lan-list">
-        {scanning && !games ? (
-          <div className="lan-game skeleton" aria-hidden />
-        ) : games?.length ? (
-          games.map((game) => (
-            <button key={game.port} type="button" className="lan-game" aria-pressed={port === String(game.port)} onClick={() => setPort(String(game.port))}>
-              <Icon name={port === String(game.port) ? "check" : "monitor"} />
-              <span className="truncate" style={{ flex: 1 }}>{game.motd}</span>
-              <span className="mono faint">:{game.port}</span>
-            </button>
-          ))
-        ) : worldState === "running" || worldState === "starting" ? (
-          <div className="lan-empty waiting">
-            <span className="spinner" />
-            {t("游戏开着：按 Esc →「对局域网开放」，这里会自动出现", "The game is open: press Esc → Open to LAN and it shows up here")}
-          </div>
-        ) : (
-          <div className="lan-empty start">
-            <span>{t("还没开始游戏", "The game isn't running")}</span>
-            {world && worldState !== "installing" && worldState !== "queued" && (
-              <Button size="sm" variant="go" icon="play" onClick={() => useStore.getState().primaryAction(world.id)}>
-                {worldState === "notInstalled" ? t(`安装并开始 ${world.name}`, `Install and play ${world.name}`) : t(`开始 ${world.name}`, `Play ${world.name}`)}
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
-      <div className="row gap-8">
-        <Input ref={portRef} mono value={port} inputMode="numeric" placeholder={t("端口", "Port")} aria-label={t("游戏端口", "Game port")} style={{ width: 110 }} onChange={(e) => setPort(e.target.value.replace(/\D/g, "").slice(0, 5))} />
-        <Button size="sm" variant="ghost" icon="refresh" busy={scanning} onClick={() => void scan()}>
-          {t("重新检测", "Scan again")}
-        </Button>
-        <div className="spacer" />
+      <div className="room-card-foot">
+        <span className="room-card-text">{t("创建后会得到一个房间码，发给好友。", "You get a room code to send to friends.")}</span>
         <Button variant="primary" icon="play" busy={busy} disabled={!valid} onClick={() => void host(Number(port), name)}>
           {t("创建房间", "Create room")}
         </Button>
@@ -295,29 +293,24 @@ function JoinCard({ name }: { name: string }) {
   const ready = codeComplete(code);
   const go = () => ready && !busy && void join(code, name);
   return (
-    <section className="room-card">
-      <div className="room-card-head">
-        <span className="room-card-index">2</span>
-        <div className="col gap-2">
-          <span className="room-card-title">{t("加入房间", "Join a room")}</span>
-          <span className="room-card-text">{t("向房主要房间码，粘贴到这里。HMCL、PCL CE 等启动器开的房间也能加入。", "Ask the host for the room code and paste it here. Rooms opened in HMCL, PCL CE and similar launchers work too.")}</span>
-        </div>
+    <section className="card room-card">
+      <CardHeader icon="link" title={t("加入房间", "Join a room")} text={t("向房主要房间码，粘贴到这里。HMCL、PCL CE 等启动器开的房间也能加入。", "Ask the host for the room code and paste it here. Rooms opened in HMCL, PCL CE and similar launchers work too.")} />
+      <div className="room-card-body">
+        <Input
+          ref={codeRef}
+          mono
+          className="code-input"
+          value={code}
+          placeholder="U/XXXX-XXXX-XXXX-XXXX"
+          aria-label={t("房间码", "Room code")}
+          onChange={(e) => setCode(formatCode(e.target.value))}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) go();
+          }}
+        />
       </div>
-      <Input
-        ref={codeRef}
-        mono
-        className="code-input"
-        value={code}
-        placeholder="U/XXXX-XXXX-XXXX-XXXX"
-        aria-label={t("房间码", "Room code")}
-        onChange={(e) => setCode(formatCode(e.target.value))}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.nativeEvent.isComposing) go();
-        }}
-      />
-      <div className="row gap-8">
+      <div className="room-card-foot">
         <span className="room-card-text">{t("加入后，房间会出现在游戏的局域网世界列表里。", "Once joined, the room shows up in the game's LAN worlds.")}</span>
-        <div className="spacer" />
         <Button variant="primary" icon="link" busy={busy} disabled={!ready} onClick={go}>
           {t("加入", "Join")}
         </Button>

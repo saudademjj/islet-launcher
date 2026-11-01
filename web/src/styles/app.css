@@ -403,21 +403,85 @@ h1 {
   color: var(--on-dark-faint);
 }
 
-.sidebar-account {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  border: 0;
-  border-radius: var(--radius-xl);
-  background: var(--frame-2);
-  color: var(--on-dark-faint);
-  text-align: left;
-  transition: background var(--dur-fast) var(--ease-out);
+/* Shortcuts stay out of sight until asked for: tooltips name them, and
+   holding ⌘ (Ctrl) a moment shows them all at once. Only ⌘K, the way into
+   everything, is always on show. */
+.nav-item .kbd,
+.sidebar-dock .kbd {
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
 }
 
-.sidebar-account:hover {
-  background: var(--frame-3);
+:root[data-keys] .nav-item .kbd,
+:root[data-keys] .sidebar-dock .kbd {
+  opacity: 1;
+}
+
+/* The foot: the account and the settings, destinations like the list
+   above, so the same highlight slides down to them. */
+.sidebar-dock {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--frame-line);
+}
+
+.sidebar-account,
+.sidebar-gear {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--on-dark-faint);
+  text-align: left;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.sidebar-account {
+  flex: 1;
+  min-width: 0;
+  gap: 12px;
+  padding: 8px 12px 8px 8px;
+}
+
+.sidebar-account-add {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-lg);
+}
+
+.sidebar-gear {
+  flex: none;
+  justify-content: center;
+  width: 48px;
+  color: var(--on-dark-muted);
+}
+
+.sidebar-account:not([aria-current]):hover,
+.sidebar-gear:not([aria-current]):hover {
+  background: var(--frame-2);
+  color: var(--on-dark);
+}
+
+.sidebar-gear[aria-current="page"] {
+  color: var(--on-dark-accent);
+}
+
+.sidebar-account .kbd {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  translate: 0 -50%;
+}
+
+.sidebar-gear .kbd {
+  position: absolute;
+  top: -6px;
+  right: -4px;
 }
 
 .sidebar-account-name {
@@ -460,12 +524,21 @@ h1 {
 /* The toolbar spans the window so all of it drags, but its actions end
    where the page measure (below) does. */
 .toolbar {
+  position: relative;
+  z-index: 1;
   height: var(--toolbar-h);
   flex: none;
   display: flex;
   align-items: center;
   gap: 16px;
   padding: 8px max(32px, calc(100% - 1088px)) 0 32px;
+  transition: box-shadow var(--dur) var(--ease-out);
+}
+
+/* The scroll edge: a line under the toolbar once the page has moved up
+   beneath it, none while the page sits at its top. */
+.page-anim[data-scrolled] > .toolbar {
+  box-shadow: 0 1px 0 var(--border);
 }
 
 .toolbar-heading {
@@ -2008,6 +2081,70 @@ html.reduce-motion *::after {
   color: var(--accent-ink);
   font-size: var(--text-xs);
   font-weight: 750;
+}
+
+/* Play sits on the land itself, as a cover's play button does in a music
+   library: it rises in when the card is pointed at or focused, stays on
+   the current world, and stays while the world is busy. */
+.world-play {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
+  opacity: 0;
+  translate: 0 6px;
+  transition: opacity var(--dur-fast) var(--ease-out), translate var(--dur-fast) var(--ease-out);
+}
+
+.world:hover .world-play,
+.world:focus-within .world-play,
+.world.active .world-play,
+.world-play.live {
+  opacity: 1;
+  translate: 0 0;
+}
+
+.world-go {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: 0 3px 0 var(--accent-edge);
+  transition: background var(--dur-fast) var(--ease-out), translate 60ms var(--ease-out), box-shadow 60ms var(--ease-out);
+}
+
+.world-go:hover {
+  background: var(--accent-hover);
+}
+
+.world-go:active {
+  translate: 0 2px;
+  box-shadow: 0 1px 0 var(--accent-edge);
+}
+
+.world-go.stop {
+  background: var(--danger);
+  color: var(--on-dark);
+  box-shadow: 0 3px 0 var(--danger-edge);
+}
+
+.world-go.stop:hover {
+  background: var(--danger-hover);
+}
+
+.world-go.stop:active {
+  box-shadow: 0 1px 0 var(--danger-edge);
+}
+
+.world-go.quiet {
+  background: var(--hero-2);
+  color: var(--on-dark);
+  box-shadow: 0 3px 0 var(--hero-edge);
 }
 
 .world-body {
@@ -3565,6 +3702,122 @@ html.reduce-motion *::after {
 .stage .hero-stars {
   transform: translateX(calc(var(--px, 0) * -4px));
   transition: transform 900ms var(--ease-out);
+}
+
+/* The hotbar: the worlds along the stone, a HUD over the scene rather
+   than a part of it, so it holds still while the land pans. It starts on
+   the page's left edge, under the title and the buttons. */
+.hotbar {
+  position: absolute;
+  left: 32px;
+  bottom: 16px;
+  z-index: 2;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-lg);
+  background: var(--hero-edge);
+  box-shadow: 0 3px 0 var(--frame);
+}
+
+.hotbar-slot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--on-dark-muted);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.hotbar-slot:hover {
+  background: var(--hero-2);
+}
+
+/* Pointing at a slot lifts its world a little, the way a held item bobs. */
+.hotbar-slot .identicon {
+  transition: translate var(--dur-fast) var(--ease-out);
+}
+
+.hotbar-slot:hover .identicon {
+  translate: 0 -2px;
+}
+
+.hotbar-slot:active .identicon {
+  translate: 0 1px;
+}
+
+/* The frame around the current world slides from slot to slot. */
+.hotbar-frame {
+  position: absolute;
+  inset: -2px;
+  z-index: 1;
+  border: 3px solid var(--on-dark);
+  border-radius: var(--radius-lg);
+  pointer-events: none;
+}
+
+/* Number keys pick slots; their numbers show when the bar is pointed at
+   or tabbed into. */
+.hotbar-key {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  z-index: 2;
+  line-height: 1;
+  color: var(--on-dark);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.hotbar:hover .hotbar-key,
+.hotbar:focus-within .hotbar-key {
+  opacity: 1;
+}
+
+.hotbar-live {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  width: 6px;
+  height: 6px;
+  background: var(--on-dark-accent);
+  animation: pulse 1.4s var(--ease-out) infinite;
+}
+
+/* An install in progress runs along the slot's foot. */
+.hotbar-bar {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 3px;
+  z-index: 2;
+  height: 3px;
+  background: var(--frame);
+}
+
+.hotbar-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--on-dark-accent);
+  transition: width var(--dur) linear;
+}
+
+.hotbar-more {
+  color: var(--on-dark-muted);
+}
+
+.hotbar-more:hover {
+  color: var(--on-dark);
+}
+
+.roll {
+  display: inline-block;
 }
 
 /* The facts sit just below the cut through the ground; the stone above
@@ -6557,8 +6810,9 @@ html.reduce-motion .blocks.grow span {
 .step-index,
 .now-label,
 .room-eyebrow,
-.room-card-index,
-.settings-index-item .kbd {
+.settings-index-item .kbd,
+.hotbar-key,
+.hotbar-more {
   font-family: var(--font-pixel);
   font-size: var(--px-font);
   font-weight: 400;
@@ -7634,37 +7888,40 @@ html.reduce-motion .skin-stage.spinning {
   gap: 16px;
 }
 
+/* Two ways in, side by side and equal: neither is a step before the
+   other. Each card is header, body and a footer like a dialog's, so
+   the two actions sit on one line whatever the bodies hold. */
 .room-card {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 20px 20px 20px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  background: var(--surface);
   box-shadow: 0 3px 0 var(--border-strong);
 }
 
-.room-card-head {
+.room-card-body {
   display: flex;
-  align-items: flex-start;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+}
+
+.room-card-foot {
+  display: flex;
+  align-items: center;
   gap: 12px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 calc(var(--radius-xl) - 1px) calc(var(--radius-xl) - 1px);
+  background: var(--surface-2);
 }
 
-.room-card-index {
-  display: grid;
-  place-items: center;
+.room-card-foot > .room-card-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.room-card-foot > .btn {
   flex: none;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius);
-  background: var(--accent-soft-2);
-  color: var(--accent-text);
-}
-
-.room-card-title {
-  font-size: var(--text-md);
-  font-weight: 700;
 }
 
 .room-card-text {
@@ -7910,9 +8167,8 @@ button.lan-game:hover {
 
   .brand-name,
   .sidebar-search span,
-  .sidebar .kbd,
+  .sidebar-search .kbd,
   .sidebar-account-text,
-  .sidebar-account > .icon,
   .now-main > .col,
   .now-land {
     display: none;
@@ -7925,8 +8181,28 @@ button.lan-game:hover {
     padding: 0;
   }
 
+  /* Held-⌘ hints ride on the icons' corners. */
+  .nav-item .kbd,
+  .sidebar-account .kbd {
+    position: absolute;
+    top: auto;
+    bottom: 2px;
+    right: 2px;
+    translate: none;
+  }
+
+  .sidebar-dock {
+    flex-direction: column;
+  }
+
   .sidebar-account {
-    height: 52px;
+    flex: none;
+    height: 48px;
+  }
+
+  .sidebar-gear {
+    width: auto;
+    height: 40px;
   }
 
   .nav-label {
@@ -8011,6 +8287,49 @@ button.lan-game:hover {
   gap: 16px;
   padding: 16px 20px;
   flex-wrap: wrap;
+}
+
+/* A long form in named parts, the way settings read at GitHub or Stripe:
+   the part's name and a line about it, then its fields; a hairline
+   between parts. Where the card is wide enough the name moves beside
+   its fields, so the eye runs down one edge of names. */
+.form-sections {
+  container: form / inline-size;
+}
+
+.form-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  padding: 20px;
+}
+
+.form-section + .form-section {
+  border-top: 1px solid var(--border);
+}
+
+.form-section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-section-title {
+  font-weight: 650;
+}
+
+.form-section-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+@container form (min-width: 640px) {
+  .form-section {
+    grid-template-columns: 176px minmax(0, 1fr);
+    gap: 24px;
+  }
 }
 
 .server-head-name {

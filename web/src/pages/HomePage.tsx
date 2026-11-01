@@ -5,7 +5,6 @@ import type { Instance, Screenshot, ServerEntry, WorldList } from "../api/types"
 import { Icon } from "../components/Icon";
 import { BrandMark, Celestial, Clouds, Landscape, PX, Stars } from "../components/Pixel";
 import { ServerCard } from "../components/Server";
-import { WorldCard } from "../components/WorldCard";
 import { ShotTile, dayLabel } from "../overlays/Screenshots";
 import { shotTime, useScreenshots } from "../lib/screenshots";
 import { useServerList } from "../lib/servers";
@@ -14,18 +13,19 @@ import { BIOMES, biomeStyle, useBiome, useCover } from "../lib/biome";
 import { PlayerFace } from "../components/PlayerFace";
 import { SceneCover } from "../components/SceneCover";
 import { updateName, formatBytes, formatPlayTime, formatRelative, formatSpeed, formatToday, greeting, isNight, loaderLabel, skyPhase, progressRatio, stageLabel } from "../lib/format";
-import { item, normal, stagger } from "../lib/motion";
+import { glide, item, normal, stagger } from "../lib/motion";
 import { MOD_KEY } from "../lib/platform";
 import { useWorlds } from "../lib/worlds";
 import { usePatchNotes, wikiUrl } from "../lib/news";
 import { useWorldStats, type WorldStats } from "../lib/worldStats";
-import { instanceState, useActiveAccount, useActiveInstance, useAutoMemory, usePick, useStore, type InstanceState, type LastError, type ModInsights } from "../store";
+import { instanceState, overlayOpen, useActiveAccount, useActiveInstance, useAutoMemory, usePick, useStore, type InstanceState, type LastError, type ModInsights } from "../store";
 import { t } from "../lib/i18n";
 import { LEVELS, useP2p } from "../lib/p2p";
 
 /** Home is a title screen: the current world fills the top of the sheet,
-    cut open down to the stone; its facts sit below the cut, then a short
-    look at its servers and screenshots, then the other worlds. */
+    cut open down to the stone, with the other worlds on a hotbar along the
+    stone; its facts sit below the cut, then a short look at its servers
+    and screenshots. */
 export function HomePage() {
   const instances = useStore((s) => s.instances);
   const active = useActiveInstance();
@@ -46,7 +46,7 @@ export function HomePage() {
             {shots && shots.length > 0 && <RecentShots instance={active} shots={shots} half={pair} />}
           </div>
         )}
-        {instances.length > 1 ? <QuickSwitch activeId={active?.id ?? null} /> : active && <NewWorlds />}
+        {instances.length === 1 && active && <NewWorlds />}
         {active && <News />}
       </motion.div>
     </div>
@@ -391,7 +391,101 @@ function Stage({ instance, worlds }: { instance: Instance; worlds: WorldList | n
         )}
         <AnimatePresence>{room && <StageRoom key="room" />}</AnimatePresence>
       </div>
+      <Hotbar activeId={instance.id} />
     </section>
+  );
+}
+
+/** Up to nine worlds for the hotbar: starred ones first, each group in the
+    worlds' own order so a slot keeps its number; the current world always
+    has a place, taking the last one when it would fall off the end. */
+function hotbarSlots(instances: Instance[], activeId: string) {
+  const ordered = [...instances.filter((i) => i.favorite), ...instances.filter((i) => !i.favorite)];
+  const slots = ordered.slice(0, 9);
+  if (!slots.some((i) => i.id === activeId)) {
+    const active = instances.find((i) => i.id === activeId);
+    if (active) slots[slots.length - 1] = active;
+  }
+  return slots;
+}
+
+/** The worlds along the stone, as the game keeps its items: the current
+    one framed, a click or its number key travels there. Running worlds
+    glow in their corner; one installing shows a bar along its foot. */
+function Hotbar({ activeId }: { activeId: string }) {
+  const s = usePick((s) => ({
+    instances: s.instances,
+    runningIds: s.runningIds,
+    install: s.install,
+    setPage: s.setPage,
+    setActiveInstance: s.setActiveInstance,
+  }));
+  const slots = hotbarSlots(s.instances, activeId);
+  const rest = s.instances.length - slots.length;
+  const travel = (id: string) => {
+    if (id !== activeId) s.setActiveInstance(id);
+    document.querySelector(".content")?.scrollTo({ top: 0, behavior: reducedMotion() ? "auto" : "smooth" });
+  };
+  const travelTo = useRef(travel);
+  travelTo.current = travel;
+  const ids = slots.map((i) => i.id).join(" ");
+  // Number keys pick a slot, as in the game, unless something is typed into.
+  useEffect(() => {
+    const list = ids.split(" ");
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || e.isComposing || e.repeat) return;
+      const n = Number(e.key);
+      if (!Number.isInteger(n) || n < 1 || n > list.length) return;
+      if (e.target instanceof Element && e.target.closest("input, textarea, select, [contenteditable]")) return;
+      if (overlayOpen(useStore.getState())) return;
+      e.preventDefault();
+      travelTo.current(list[n - 1]);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [ids]);
+  if (s.instances.length < 2) return null;
+  // Arrows move along the bar, like a toolbar.
+  const onKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    const buttons = [...e.currentTarget.querySelectorAll<HTMLButtonElement>("button")];
+    const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    buttons[(at + (e.key === "ArrowRight" ? 1 : buttons.length - 1)) % buttons.length]?.focus();
+    e.preventDefault();
+  };
+  return (
+    <nav className="hotbar" aria-label={t("世界", "Worlds")} onKeyDown={onKeyDown}>
+      {slots.map((world, i) => {
+        const on = world.id === activeId;
+        const install = s.install?.instanceId === world.id ? s.install : null;
+        const ratio = install ? progressRatio(install.done, install.total, install.bytes, install.totalBytes) : null;
+        return (
+          <button
+            key={world.id}
+            type="button"
+            className="hotbar-slot"
+            aria-current={on ? "true" : undefined}
+            title={`${world.name} · ${i + 1}`}
+            onClick={() => travel(world.id)}
+          >
+            {on && <motion.span layoutId="hotbar-frame" className="hotbar-frame" transition={glide} />}
+            <Identicon seed={world.id} size={36} hero />
+            <span className="hotbar-key">{i + 1}</span>
+            {s.runningIds.includes(world.id) && <span className="hotbar-live" />}
+            {install && (
+              <span className="hotbar-bar">
+                <span style={{ width: `${Math.round((ratio ?? 0) * 100)}%` }} />
+              </span>
+            )}
+          </button>
+        );
+      })}
+      {rest > 0 && (
+        <button type="button" className="hotbar-slot hotbar-more" title={t("全部世界", "All worlds")} onClick={() => s.setPage("instances")}>
+          +{rest}
+        </button>
+      )}
+    </nav>
   );
 }
 
@@ -475,7 +569,7 @@ function Facts({ instance, worlds }: { instance: Instance; worlds: WorldList | n
       <button type="button" className="fact" onClick={() => s.openManage(instance.id, "data")}>
         <span className="fact-label">{t("存档", "Saves")}</span>
         <div className="row items-baseline gap-6">
-          <span className="fact-number">{worlds ? worlds.worlds.length : "··"}</span>
+          <Roll className="fact-number" value={worlds ? worlds.worlds.length : "··"} />
           <span className="fact-unit">{t("个", "")}</span>
         </div>
         <span className="fact-sub truncate">
@@ -486,7 +580,7 @@ function Facts({ instance, worlds }: { instance: Instance; worlds: WorldList | n
       <button type="button" className="fact" onClick={() => s.openManage(instance.id)}>
         <span className="fact-label">{t("内存", "Memory")}</span>
         <div className="row items-baseline gap-6">
-          <span className="fact-number">{memory >= 1024 && memory % 1024 === 0 ? memory / 1024 : memory}</span>
+          <Roll className="fact-number" value={memory >= 1024 && memory % 1024 === 0 ? memory / 1024 : memory} />
           <span className="fact-unit">{memory >= 1024 && memory % 1024 === 0 ? "GB" : "MB"}</span>
           <span className="fact-blocks" aria-hidden>
             {Array.from({ length: Math.min(16, Math.max(1, Math.round(memory / 1024))) }, (_, i) => (
@@ -511,6 +605,21 @@ function Facts({ instance, worlds }: { instance: Instance; worlds: WorldList | n
   );
 }
 
+/** A number that rolls up into place when it changes, as on a counter:
+    travelling to another world turns its facts over. */
+function Roll({ value, className }: { value: string | number; className: string }) {
+  // The first value is simply there; later ones roll in.
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+  }, []);
+  return (
+    <motion.span key={value} className={`roll ${className}`} initial={mounted.current ? { opacity: 0, y: 8 } : false} animate={{ opacity: 1, y: 0, transition: normal }}>
+      {value}
+    </motion.span>
+  );
+}
+
 /** A modded world's mods: how many, and what can be done about them now. */
 function ModsFact({ instance, stats, insights }: { instance: Instance; stats: WorldStats | null; insights: ModInsights }) {
   const openManage = useStore((s) => s.openManage);
@@ -521,7 +630,7 @@ function ModsFact({ instance, stats, insights }: { instance: Instance; stats: Wo
     <button type="button" className="fact" onClick={() => openManage(instance.id, "mods")}>
       <span className="fact-label">{t("模组", "Mods")}</span>
       <div className="row items-baseline gap-6">
-        <span className="fact-number">{stats?.mods ?? "··"}</span>
+        <Roll className="fact-number" value={stats?.mods ?? "··"} />
         <span className="fact-unit">{t("个", "")}</span>
       </div>
       <span className={`fact-sub truncate${updates > 0 ? " fact-sub-go" : ""}`}>
@@ -584,48 +693,6 @@ function RecentShots({ instance, shots, half }: { instance: Instance; shots: Scr
         {shots.slice(0, half ? 4 : 5).map((shot, i) => (
           <ShotTile key={shot.name} id={instance.id} shot={shot} index={i} label={dayLabel(shotTime(shot))} onOpen={() => s.openModal({ kind: "shot", id: instance.id, name: shot.name })} />
         ))}
-      </div>
-    </motion.section>
-  );
-}
-
-function QuickSwitch({ activeId }: { activeId: string | null }) {
-  const s = usePick((s) => ({
-    instances: s.instances,
-    install: s.install,
-    installQueue: s.installQueue,
-    running: s.running,
-    runningIds: s.runningIds,
-    launchPending: s.launchPending,
-    setPage: s.setPage,
-    setActiveInstance: s.setActiveInstance,
-  }));
-  const others = s.instances
-    .filter((i) => i.id !== activeId)
-    .sort((a, b) => (b.lastLaunchedAt ?? 0) - (a.lastLaunchedAt ?? 0))
-    .slice(0, 3);
-  // Travel there: make the world current and scroll up to watch it arrive.
-  const travel = (id: string) => {
-    s.setActiveInstance(id);
-    document.querySelector(".content")?.scrollTo({ top: 0, behavior: reducedMotion() ? "auto" : "smooth" });
-  };
-  return (
-    <motion.section variants={item} style={{ marginTop: 30 }}>
-      <SectionTitle
-        trailing={
-          <button type="button" className="link" onClick={() => s.setPage("instances")}>
-            {t("全部 ", "All ")}{s.instances.length}{t(" 个 →", " →")}
-          </button>
-        }
-      >
-        {t("前往其他世界", "Other worlds")}
-      </SectionTitle>
-      <div className="worlds">
-        <AnimatePresence initial={false}>
-          {others.map((instance) => (
-            <WorldCard key={instance.id} instance={instance} state={instanceState(instance, s)} onSelect={() => travel(instance.id)} />
-          ))}
-        </AnimatePresence>
       </div>
     </motion.section>
   );

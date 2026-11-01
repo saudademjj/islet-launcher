@@ -1,5 +1,5 @@
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { backend } from "./api/backend";
 import type { Theme } from "./api/types";
@@ -11,6 +11,7 @@ import { Tooltips } from "./components/Tooltips";
 import { ContextMenuHost } from "./components/ContextMenu";
 import { Toasts } from "./components/overlay";
 import { Sidebar, StatusBar, WindowBar } from "./layout/Shell";
+import { pageIn } from "./lib/motion";
 import { isMac } from "./lib/platform";
 import { SaveDialog } from "./overlays/SaveDialog";
 import { ConfigDialog } from "./overlays/ConfigDialog";
@@ -45,7 +46,15 @@ export function App() {
   const windows = useStore((s) => s.appInfo.platform === "windows");
   useTheme(theme);
   useShortcuts();
+  useKeyHints();
+  useScrollEdge();
   useP2pPolling();
+  // Which way the new page lies from the last one, in sidebar order.
+  const last = useRef(page);
+  const direction = PAGE_ORDER.indexOf(page) - PAGE_ORDER.indexOf(last.current);
+  useEffect(() => {
+    last.current = page;
+  }, [page]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("reduce-motion", reduceMotion);
@@ -63,13 +72,7 @@ export function App() {
         <Sidebar />
         <main className="main">
           <div className="page-frame">
-            <motion.div
-              key={page}
-              className="page-anim"
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.18, ease: [0.2, 0.8, 0.2, 1] }}
-            >
+            <motion.div key={page} className="page-anim" {...pageIn(direction)}>
               {page === "home" && <HomePage />}
               {page === "instances" && <InstancesPage />}
               {page === "multiplayer" && <MultiplayerPage />}
@@ -147,6 +150,9 @@ function useTheme(preference: Theme) {
   }, [preference]);
 }
 
+/** The pages top to bottom, as the sidebar lists them. */
+const PAGE_ORDER: Page[] = ["home", "instances", "multiplayer", "server", "accounts", "settings"];
+
 const PAGE_KEYS: Record<string, Page> = { "1": "home", "2": "instances", "3": "multiplayer", "4": "server", "5": "accounts", "6": "settings", ",": "settings" };
 
 function useShortcuts() {
@@ -181,5 +187,46 @@ function useShortcuts() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, []);
+}
+
+/** Holding ⌘ (Ctrl elsewhere) a moment shows every shortcut in the
+    sidebar; letting go, or pressing a key with it, hides them again. */
+function useKeyHints() {
+  useEffect(() => {
+    const modifier = isMac ? "Meta" : "Control";
+    const root = document.documentElement;
+    let timer = 0;
+    const hide = () => {
+      window.clearTimeout(timer);
+      delete root.dataset.keys;
+    };
+    const down = (e: KeyboardEvent) => {
+      if (e.key !== modifier) return hide();
+      if (!e.repeat) timer = window.setTimeout(() => (root.dataset.keys = ""), 400);
+    };
+    const up = (e: KeyboardEvent) => e.key === modifier && hide();
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", hide);
+    return () => {
+      hide();
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", hide);
+    };
+  }, []);
+}
+
+/** A page scrolled away from its top draws a line under its toolbar, so
+    the edge where content goes under shows only when something is there. */
+function useScrollEdge() {
+  useEffect(() => {
+    const onScroll = (e: Event) => {
+      const el = e.target;
+      if (el instanceof HTMLElement && el.classList.contains("content")) el.closest(".page-anim")?.toggleAttribute("data-scrolled", el.scrollTop > 0);
+    };
+    document.addEventListener("scroll", onScroll, true);
+    return () => document.removeEventListener("scroll", onScroll, true);
   }, []);
 }

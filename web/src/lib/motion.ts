@@ -11,6 +11,15 @@ export const slow = { duration: 0.3, ease: EASE_OUT };
 /** Sliding highlights (nav, tabs, segmented controls). */
 export const glide = { type: "spring", stiffness: 520, damping: 42, mass: 0.9 } as const;
 
+/** Pages lie along the sidebar's axis: one further down rises from below,
+    one further up drops in from above (a shared Y axis, as in Material's
+    navigation transitions). Enter only, so a switch never waits on the
+    page it leaves. */
+export const pageIn = (direction: number) => ({
+  initial: { opacity: 0, y: 12 * Math.sign(direction || 1) },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.24, ease: EASE_OUT } },
+});
+
 export const fadeRise = {
   initial: { opacity: 0, y: 6 },
   animate: { opacity: 1, y: 0, transition: normal },

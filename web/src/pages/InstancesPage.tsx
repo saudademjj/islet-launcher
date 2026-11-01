@@ -4,7 +4,8 @@ import { useState } from "react";
 import type { Instance } from "../api/types";
 import { Icon } from "../components/Icon";
 import { BrandMark } from "../components/Pixel";
-import { WorldCard } from "../components/WorldCard";
+import { useContextMenu } from "../components/ContextMenu";
+import { WorldCard, worldMenu } from "../components/WorldCard";
 import { Button, Empty, Input, Kbd, Segmented } from "../components/ui";
 import { item, stagger } from "../lib/motion";
 import { formatPlayTime } from "../lib/format";
@@ -246,7 +247,6 @@ function InstanceCard({ instance, active }: { instance: Instance; active: boolea
     launchPending: s.launchPending,
     setActiveInstance: s.setActiveInstance,
     primaryAction: s.primaryAction,
-    openLogs: s.openLogs,
     openManage: s.openManage,
     stopping: s.stopping.includes(instance.id),
   }));
@@ -254,15 +254,24 @@ function InstanceCard({ instance, active }: { instance: Instance; active: boolea
   const primary =
     state === "running"
       ? s.stopping
-        ? { icon: "stop" as const, label: t("关闭中 · 强制", "Closing · force"), variant: "default" as const }
-        : { icon: "stop" as const, label: t("停止", "Stop"), variant: "danger" as const }
+        ? { icon: "stop" as const, label: t("关闭中 · 强制结束", "Closing · force quit"), tone: " stop" }
+        : { icon: "stop" as const, label: t("停止游戏", "Stop game"), tone: " stop" }
       : state === "ready"
-        ? { icon: "play" as const, label: t("开始", "Play"), variant: active ? ("primary" as const) : ("default" as const) }
+        ? { icon: "play" as const, label: t("开始游戏", "Play"), tone: "" }
         : state === "notInstalled"
-          ? { icon: "download" as const, label: t("安装", "Install"), variant: "default" as const }
+          ? { icon: "download" as const, label: t("安装并开始", "Install and play"), tone: "" }
           : state === "queued"
-            ? { icon: "close" as const, label: t("取消排队", "Leave queue"), variant: "default" as const }
+            ? { icon: "close" as const, label: t("取消排队", "Leave queue"), tone: " quiet" }
             : null;
+  // Starting a world makes it the current one, as its menu does.
+  const go = () => {
+    if (!active && state !== "running") s.setActiveInstance(instance.id);
+    s.primaryAction(instance.id);
+  };
+  const more = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const box = e.currentTarget.getBoundingClientRect();
+    useContextMenu.getState().open(box.left, box.bottom + 4, worldMenu(instance, state, active));
+  };
 
   return (
     <WorldCard
@@ -270,20 +279,23 @@ function InstanceCard({ instance, active }: { instance: Instance; active: boolea
       state={state}
       active={active}
       onSelect={active ? undefined : () => s.setActiveInstance(instance.id)}
+      play={
+        primary ? (
+          <button type="button" className={`world-go${primary.tone}`} aria-label={`${primary.label} ${instance.name}`} title={primary.label} onClick={go}>
+            <Icon name={primary.icon} />
+          </button>
+        ) : (
+          <span className="world-go quiet" title={state === "starting" ? t("启动中", "Starting") : t("安装中", "Installing")}>
+            <span className="spinner" />
+          </span>
+        )
+      }
       actions={
         <>
-          {primary ? (
-            <Button size="sm" variant={primary.variant} icon={primary.icon} onClick={() => s.primaryAction(instance.id)}>
-              {primary.label}
-            </Button>
-          ) : (
-            <Button size="sm" busy>
-              {state === "starting" ? t("启动中", "Starting") : t("安装中", "Installing")}
-            </Button>
-          )}
           <Button
             size="sm"
             variant="ghost"
+            icon="signal"
             title={t("开一个 P2P 房间，让好友加入这个世界", "Open a P2P room for friends to join this world")}
             onClick={() => {
               if (!active) s.setActiveInstance(instance.id);
@@ -303,16 +315,8 @@ function InstanceCard({ instance, active }: { instance: Instance; active: boolea
             title={instance.favorite ? t("取消收藏", "Unstar") : t("收藏", "Star")}
             onClick={() => void s.organize(instance.id, !instance.favorite, instance.group)}
           />
-          <Button
-            size="sm"
-            variant="ghost"
-            icon="tag"
-            aria-label={t("分组", "Group")}
-            title={instance.group ? t(`分组：${instance.group}`, `Group: ${instance.group}`) : t("分组", "Group")}
-            onClick={() => useStore.getState().openModal({ kind: "group", id: instance.id })}
-          />
-          <Button size="sm" variant="ghost" icon="log" aria-label={t("日志", "Log")} title={t("日志", "Log")} onClick={() => void s.openLogs(instance.id)} />
           <Button size="sm" variant="ghost" icon="settings" aria-label={t("管理", "Manage")} title={t("管理", "Manage")} onClick={() => s.openManage(instance.id)} />
+          <Button size="sm" variant="ghost" icon="more" aria-label={t("更多", "More")} title={t("更多：存档、分组、日志、目录…", "More: saves, group, log, folder…")} onClick={more} />
         </>
       }
     />

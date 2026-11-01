@@ -20,9 +20,17 @@ const NAV: { page: Page; label: string; icon: IconName; key: string }[] = [
   { page: "instances", label: t("世界", "Worlds"), icon: "block", key: "2" },
   { page: "multiplayer", label: t("联机", "Multiplayer"), icon: "signal", key: "3" },
   { page: "server", label: t("开服", "Server"), icon: "rack", key: "4" },
-  { page: "accounts", label: t("账号", "Accounts"), icon: "player", key: "5" },
-  { page: "settings", label: t("设置", "Settings"), icon: "gear", key: "6" },
 ];
+
+/** The current page's mark: one block that slides between whichever
+    destination is current, in the list or at the foot. */
+function NavHighlight() {
+  return (
+    <motion.span layoutId="nav-highlight" className="nav-highlight" transition={glide}>
+      <span className="nav-bar" />
+    </motion.span>
+  );
+}
 
 export function Sidebar() {
   const page = useStore((s) => s.page);
@@ -58,11 +66,7 @@ export function Sidebar() {
           const active = item.page === page;
           return (
             <button key={item.page} type="button" className="nav-item" title={`${item.label} ${MOD_KEY}${item.key}`} aria-current={active ? "page" : undefined} onClick={() => setPage(item.page)}>
-              {active && (
-                <motion.span layoutId="nav-highlight" className="nav-highlight" transition={glide}>
-                  <span className="nav-bar" />
-                </motion.span>
-              )}
+              {active && <NavHighlight />}
               <Icon name={item.icon} />
               <span className="nav-label">{item.label}</span>
               {badge(item.page)}
@@ -77,20 +81,43 @@ export function Sidebar() {
 
       <div className="sidebar-foot">
         <AnimatePresence initial={false}>{page !== "home" && <CurrentWorld key="now" />}</AnimatePresence>
-        <button type="button" className="sidebar-account" title={account ? account.username : t("添加账号", "Add an account")} onClick={() => setPage("accounts")}>
-        {account ? (
-          <PlayerFace account={account} size={32} />
-        ) : (
-          <span className="identicon hero" style={{ width: 34, height: 34, borderRadius: "var(--radius-lg)" }}>
-            <Icon name="plus" />
-          </span>
-        )}
-        <div className="col sidebar-account-text fill gap-2">
-          <span className="sidebar-account-name truncate">{account ? account.username : t("还没有账号", "No account yet")}</span>
-          <span className="sidebar-account-kind">{account ? (account.provider === "microsoft" ? t("微软账号", "Microsoft account") : t("离线账号", "Offline account")) : t("点击添加账号", "Click to add one")}</span>
+        {/* What is about you rather than the game, at the foot as in most
+            desktop apps: who plays, and how the launcher is set up. */}
+        <div className="sidebar-dock">
+          <button
+            type="button"
+            className="sidebar-account"
+            aria-current={page === "accounts" ? "page" : undefined}
+            title={`${account ? account.username : t("添加账号", "Add an account")} · ${t("账号", "Accounts")} ${MOD_KEY}5`}
+            onClick={() => setPage("accounts")}
+          >
+            {page === "accounts" && <NavHighlight />}
+            {account ? (
+              <PlayerFace account={account} size={32} />
+            ) : (
+              <span className="identicon hero sidebar-account-add">
+                <Icon name="plus" />
+              </span>
+            )}
+            <div className="col sidebar-account-text fill gap-2">
+              <span className="sidebar-account-name truncate">{account ? account.username : t("还没有账号", "No account yet")}</span>
+              <span className="sidebar-account-kind">{account ? (account.provider === "microsoft" ? t("微软账号", "Microsoft account") : account.provider === "yggdrasil" ? t("外置账号", "Third-party account") : t("离线账号", "Offline account")) : t("点击添加账号", "Click to add one")}</span>
+            </div>
+            <Kbd>{MOD_KEY}5</Kbd>
+          </button>
+          <button
+            type="button"
+            className="sidebar-gear"
+            aria-current={page === "settings" ? "page" : undefined}
+            aria-label={t("设置", "Settings")}
+            title={`${t("设置", "Settings")} ${MOD_KEY}6`}
+            onClick={() => setPage("settings")}
+          >
+            {page === "settings" && <NavHighlight />}
+            <Icon name="settings" />
+            <Kbd>{MOD_KEY}6</Kbd>
+          </button>
         </div>
-        <Icon name="chevronRight" />
-      </button>
       </div>
     </aside>
   );

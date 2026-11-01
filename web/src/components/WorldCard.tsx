@@ -5,63 +5,73 @@ import type { Instance } from "../api/types";
 import { formatPlayTime, formatRelative, loaderLabel } from "../lib/format";
 import { useWorldStats } from "../lib/worldStats";
 import { useStore, type InstanceState } from "../store";
-import { useContextMenu } from "./ContextMenu";
+import { useContextMenu, type MenuItem } from "./ContextMenu";
 import { biomeStyle, useBiome, useCover } from "../lib/biome";
 import { SceneCover } from "./SceneCover";
 import { Landscape, PX } from "./Pixel";
 import { Identicon, InstanceStatus } from "./ui";
 import { t } from "../lib/i18n";
 
-/** An instance as a small world: its landscape on top, facts below. */
+/** Everything a world can do, for its right-click menu and its ⋯ button. */
+export function worldMenu(instance: Instance, state: InstanceState, active?: boolean): (MenuItem | "-")[] {
+  const store = useStore.getState();
+  const busy = state === "running" || state === "starting" || state === "installing";
+  return [
+    {
+      label: state === "running" ? t("停止游戏", "Stop game") : state === "queued" ? t("取消排队", "Leave queue") : state === "notInstalled" ? t("安装并开始", "Install and play") : t("开始游戏", "Play"),
+      icon: state === "running" ? "stop" : state === "queued" ? "close" : "play",
+      disabled: state === "starting" || state === "installing",
+      run: () => {
+        store.setActiveInstance(instance.id);
+        store.primaryAction(instance.id);
+      },
+    },
+    { label: t("设为当前世界", "Make current"), icon: "home", disabled: active, run: () => store.setActiveInstance(instance.id) },
+    "-",
+    { label: t("管理", "Manage"), icon: "settings", run: () => store.openManage(instance.id) },
+    { label: t("存档", "Saves"), icon: "box", run: () => store.openManage(instance.id, "data") },
+    { label: instance.group ? t(`分组：${instance.group}`, `Group: ${instance.group}`) : t("分组…", "Group…"), icon: "tag", run: () => store.openModal({ kind: "group", id: instance.id }) },
+    { label: t("打开游戏目录", "Open game folder"), icon: "folder", run: () => void store.open({ kind: "gameDir", id: instance.id }) },
+    { label: t("查看日志", "Show log"), icon: "log", run: () => void store.openLogs(instance.id) },
+    {
+      label: t("创建桌面快捷方式", "Create desktop shortcut"),
+      icon: "external",
+      run: () =>
+        void store.run<string>("create_shortcut", { id: instance.id }).then((path) => {
+          if (path) store.toast(t("已在桌面创建快捷方式，双击直接进入这个世界", "Shortcut created on the Desktop; double-click it to jump into this world"), "success");
+        }),
+    },
+    "-",
+    { label: t("复制世界", "Duplicate world"), icon: "copy", disabled: busy || !instance.installed, run: () => void store.fileOperation(instance.id, { kind: "duplicate" }) },
+    { label: t("移到回收站", "Move to recycle bin"), icon: "trash", danger: true, disabled: busy, run: () => store.openModal({ kind: "deleteInstance", instance }) },
+  ];
+}
+
+/** An instance as a small world: its landscape on top, facts below. `play`
+    rides on the landscape's corner, shown when the card is pointed at,
+    focused or current, and always while the world is busy. */
 export function WorldCard({
   instance,
   state,
   active,
   onSelect,
+  play,
   actions,
 }: {
   instance: Instance;
   state: InstanceState;
   active?: boolean;
   onSelect?: () => void;
+  play?: ReactNode;
   actions?: ReactNode;
 }) {
   const biome = useBiome(instance.id);
   const cover = useCover(instance.id);
   const stats = useWorldStats(instance);
-  const busy = state === "running" || state === "starting" || state === "installing";
-  // Everything a world can do, one right-click away.
+  const busy = state === "running" || state === "starting" || state === "installing" || state === "queued";
   const onContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    const store = useStore.getState();
-    useContextMenu.getState().open(e.clientX, e.clientY, [
-      {
-        label: state === "running" ? t("停止游戏", "Stop game") : state === "queued" ? t("取消排队", "Leave queue") : state === "notInstalled" ? t("安装并开始", "Install and play") : t("开始游戏", "Play"),
-        icon: state === "running" ? "stop" : state === "queued" ? "close" : "play",
-        disabled: state === "starting" || state === "installing",
-        run: () => {
-          store.setActiveInstance(instance.id);
-          store.primaryAction(instance.id);
-        },
-      },
-      { label: t("设为当前世界", "Make current"), icon: "home", disabled: active, run: () => store.setActiveInstance(instance.id) },
-      "-",
-      { label: t("管理", "Manage"), icon: "settings", run: () => store.openManage(instance.id) },
-      { label: t("存档", "Saves"), icon: "box", run: () => store.openManage(instance.id, "data") },
-      { label: t("打开游戏目录", "Open game folder"), icon: "folder", run: () => void store.open({ kind: "gameDir", id: instance.id }) },
-      { label: t("查看日志", "Show log"), icon: "log", run: () => void store.openLogs(instance.id) },
-      {
-        label: t("创建桌面快捷方式", "Create desktop shortcut"),
-        icon: "external",
-        run: () =>
-          void store.run<string>("create_shortcut", { id: instance.id }).then((path) => {
-            if (path) store.toast(t("已在桌面创建快捷方式，双击直接进入这个世界", "Shortcut created on the Desktop; double-click it to jump into this world"), "success");
-          }),
-      },
-      "-",
-      { label: t("复制世界", "Duplicate world"), icon: "copy", disabled: busy || !instance.installed, run: () => void store.fileOperation(instance.id, { kind: "duplicate" }) },
-      { label: t("移到回收站", "Move to recycle bin"), icon: "trash", danger: true, disabled: busy, run: () => store.openModal({ kind: "deleteInstance", instance }) },
-    ]);
+    useContextMenu.getState().open(e.clientX, e.clientY, worldMenu(instance, state, active));
   };
   return (
     <motion.div
@@ -79,6 +89,11 @@ export function WorldCard({
         <SceneCover id={instance.id} />
         <span className="world-biome">{cover ? t("截图", "Screenshots") : biome.name}</span>
         {active && <span className="world-badge">{t("当前", "Current")}</span>}
+        {play && (
+          <div className={`world-play${busy ? " live" : ""}`} onClick={(e) => e.stopPropagation()}>
+            {play}
+          </div>
+        )}
       </div>
       <div className="world-body">
         <span className="world-avatar">
