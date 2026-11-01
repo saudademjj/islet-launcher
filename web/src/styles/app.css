@@ -8388,3 +8388,257 @@ button.lan-game:hover {
     position: static;
   }
 }
+
+/* ---------- intro: the island builds itself, then breaks into squares ---------- */
+
+.intro {
+  position: fixed;
+  inset: 0;
+  z-index: 84;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--frame);
+  user-select: none;
+}
+.intro.leave {
+  background: transparent;
+  pointer-events: none;
+}
+.intro-cells {
+  position: absolute;
+  inset: 0;
+  display: grid;
+}
+.intro-cells i {
+  background: var(--frame);
+}
+.intro.leave .intro-cells i {
+  animation: intro-shrink 240ms steps(3, end) var(--d) both;
+}
+
+.intro-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-12);
+  /* Room above the island for the sun and the tree. */
+  padding-top: calc(var(--b) * 2);
+}
+.intro-sky {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.intro:not(.wait) .intro-sky {
+  animation: intro-drift 2400ms steps(12, end) both;
+}
+.intro.wait .intro-stage,
+.intro.wait .intro-sky {
+  visibility: hidden;
+}
+.intro.leave .intro-sky {
+  visibility: hidden;
+}
+.intro.leave .intro-stage {
+  animation: intro-stage-out 180ms steps(3, end) both;
+}
+
+.intro-scene {
+  position: relative;
+}
+.intro-scene > div {
+  position: absolute;
+}
+.intro:not(.wait) .intro-scene {
+  /* The last block lands with a thud. */
+  animation: intro-thud 140ms steps(2, end) var(--d) both;
+}
+.intro:not(.wait) .intro-block {
+  animation: intro-drop 300ms cubic-bezier(0.55, 0, 1, 0.45) var(--d) both;
+}
+.intro-dust {
+  position: absolute;
+  bottom: 0;
+  width: var(--u);
+  height: var(--u);
+  background: var(--t-dirt-light);
+  opacity: 0;
+}
+.intro-block.grass .intro-dust {
+  background: var(--t-grass-light);
+}
+.intro-dust.left {
+  left: calc(var(--u) * -1);
+  --dx: -4;
+  --dy: -3;
+}
+.intro-dust.right {
+  right: calc(var(--u) * -1);
+  --dx: 4;
+  --dy: -3;
+}
+.intro-dust.high {
+  right: calc(var(--u) * -1);
+  --dx: 2;
+  --dy: -6;
+}
+.intro:not(.wait) .intro-dust {
+  animation: intro-dust 360ms steps(4, end) calc(var(--d) + 300ms) both;
+}
+.intro:not(.wait) .intro-tree {
+  animation: intro-grow 400ms steps(5, end) var(--d) both;
+}
+.intro:not(.wait) .intro-flower {
+  animation: intro-grow 160ms steps(2, end) var(--d) both;
+}
+.intro:not(.wait) .intro-sun {
+  animation: intro-rise 560ms steps(7, end) var(--d) both;
+}
+.intro-ray {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--u) * 2);
+  height: calc(var(--u) * 2);
+  margin: calc(var(--u) * -1);
+  background: var(--sun-light);
+  opacity: 0;
+}
+.intro:not(.wait) .intro-ray {
+  animation: intro-ray 480ms steps(5, end) var(--d) both;
+}
+
+.intro-word {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+}
+.intro-han {
+  display: flex;
+  gap: var(--space-2);
+  font-family: var(--font-pixel);
+  font-size: 48px;
+  line-height: 48px;
+  color: var(--on-dark);
+}
+.intro-latin {
+  display: flex;
+  margin-right: -0.5em;
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  line-height: 12px;
+  letter-spacing: 0.5em;
+  color: var(--on-dark-muted);
+}
+.intro-bar {
+  width: 100%;
+  height: var(--u);
+  background: var(--accent);
+  transform-origin: left;
+}
+.intro:not(.wait) .intro-han span {
+  animation: intro-grow 240ms steps(4, end) var(--d) both;
+}
+.intro:not(.wait) .intro-bar {
+  animation: intro-bar 400ms steps(8, end) var(--d) both;
+}
+.intro:not(.wait) .intro-latin span {
+  animation: intro-appear 1ms steps(1, end) var(--d) both;
+}
+
+@keyframes intro-drop {
+  from {
+    transform: translateY(calc(var(--b) * -2.5));
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes intro-drift {
+  to {
+    transform: translateX(-36px);
+  }
+}
+@keyframes intro-thud {
+  from {
+    transform: translateY(var(--u));
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes intro-dust {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translate(calc(var(--dx) * var(--u)), calc(var(--dy) * var(--u)));
+  }
+}
+@keyframes intro-grow {
+  from {
+    clip-path: inset(100% 0 0 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+@keyframes intro-rise {
+  from {
+    transform: translateY(var(--b));
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes intro-ray {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translate(var(--x), var(--y));
+  }
+}
+@keyframes intro-bar {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes intro-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes intro-stage-out {
+  to {
+    opacity: 0;
+    transform: translateY(calc(var(--u) * -2));
+  }
+}
+@keyframes intro-shrink {
+  to {
+    transform: scale(0);
+  }
+}

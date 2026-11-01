@@ -136,11 +136,12 @@ const MOON = paintGrid(
 );
 
 /** 16 pixels square at PX: 48 CSS pixels. */
-export function Celestial({ night }: { night: boolean }) {
-  return <PixelSvg art={night ? MOON : SUN} unit={PX} />;
+export function Celestial({ night, unit = PX }: { night: boolean; unit?: number }) {
+  return <PixelSvg art={night ? MOON : SUN} unit={unit} />;
 }
 
-const BRAND = paintGrid(
+/** The grass block, 8×8: the launcher's mark and the intro's building block. */
+export const BRAND = paintGrid(
   ["ghgggghg", "gggGgggg", "GdgGdGgd", "dddGdddd", "dDdddeDd", "ddedDddd", "dDdddddD", "dddeddDd"],
   { g: "g", h: "g3", G: "g2", d: "d", D: "d2", e: "d3" },
 );

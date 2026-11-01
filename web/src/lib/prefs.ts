@@ -3,24 +3,36 @@ import { create } from "zustand";
 // Small per-viewer display preferences. They only change how the launcher
 // looks on this machine, so they live in this WebView's storage.
 const DEV_KEY = "mc-launcher.dev-info";
+const INTRO_KEY = "mc-launcher.intro";
 
-function read(key: string): boolean {
+/** A stored switch; `fallback` until it has been turned either way. */
+function read(key: string, fallback = false): boolean {
   try {
-    return localStorage.getItem(key) === "1";
+    const value = localStorage.getItem(key);
+    return value === null ? fallback : value === "1";
   } catch {
-    return false;
+    return fallback;
   }
 }
 
-export const usePrefs = create<{ devInfo: boolean; setDevInfo(on: boolean): void }>((set) => ({
+function write(key: string, on: boolean) {
+  try {
+    localStorage.setItem(key, on ? "1" : "0");
+  } catch {
+    // Storage can be unavailable; the choice still applies until restart.
+  }
+}
+
+export const usePrefs = create<{ devInfo: boolean; intro: boolean; setDevInfo(on: boolean): void; setIntro(on: boolean): void }>((set) => ({
   devInfo: read(DEV_KEY),
+  intro: read(INTRO_KEY, true),
   setDevInfo(on) {
-    try {
-      localStorage.setItem(DEV_KEY, on ? "1" : "0");
-    } catch {
-      // Storage can be unavailable; the choice still applies until restart.
-    }
+    write(DEV_KEY, on);
     set({ devInfo: on });
+  },
+  setIntro(on) {
+    write(INTRO_KEY, on);
+    set({ intro: on });
   },
 }));
 

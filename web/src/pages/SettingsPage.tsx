@@ -544,6 +544,13 @@ export function SettingsPage() {
             </div>
             <div className="setting-row">
               <div className="col">
+                <span className="setting-name">{t("启动动画", "Intro animation")}</span>
+                <span className="field-hint">{t("开启「减少动效」时不播放", "Skipped while Reduce motion is on")}</span>
+              </div>
+              <Switch label={t("启动动画", "Intro animation")} checked={prefs.intro} onChange={prefs.setIntro} />
+            </div>
+            <div className="setting-row">
+              <div className="col">
                 <span className="setting-name">{t("状态栏显示技术信息", "Technical details in the status bar")}</span>
                 <span className="field-hint">{t("下载源、并发数、Java、内存和平台；关闭时只在悬停版本号时显示", "Download source, parallel downloads, Java, memory and platform; when off, they show on hovering the version")}</span>
               </div>

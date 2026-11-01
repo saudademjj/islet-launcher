@@ -5,8 +5,9 @@ import { backend } from "./api/backend";
 import type { Theme } from "./api/types";
 import { TunnelDialog } from "./overlays/TunnelDialog";
 import { GroupDialog } from "./overlays/GroupDialog";
-import { migrateFavorites } from "./lib/prefs";
+import { migrateFavorites, usePrefs } from "./lib/prefs";
 import { FileDrop } from "./components/FileDrop";
+import { Intro } from "./components/Intro";
 import { Tooltips } from "./components/Tooltips";
 import { ContextMenuHost } from "./components/ContextMenu";
 import { Toasts } from "./components/overlay";
@@ -44,6 +45,7 @@ export function App() {
   const theme = useStore((s) => s.settings.theme);
   const covered = useStore(overlayOpen);
   const windows = useStore((s) => s.appInfo.platform === "windows");
+  const [intro, setIntro] = useState(playIntro);
   useTheme(theme);
   useShortcuts();
   useKeyHints();
@@ -90,6 +92,7 @@ export function App() {
       <Toasts />
       <FileDrop />
       <Tooltips />
+      {intro && <Intro onDone={() => setIntro(false)} />}
       {windows && <WindowBar />}
     </MotionConfig>
   );
@@ -129,6 +132,13 @@ function Overlays() {
       {s.login && <LoginOverlay key="login" />}
     </AnimatePresence>
   );
+}
+
+/** The intro plays at each start, unless it is turned off or motion is
+    reduced here or in the system. */
+function playIntro() {
+  if (import.meta.env.VITE_SELFTEST) return false;
+  return usePrefs.getState().intro && !useStore.getState().reduceMotion && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
 /** Applies the theme before paint and keeps native materials in step. */
