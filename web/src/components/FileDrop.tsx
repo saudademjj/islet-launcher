@@ -89,7 +89,7 @@ export function FileDrop() {
       )}
       {skin && <span className="muted">{owner ? t(`设为「${owner.username}」的皮肤。`, `Set as ${owner.username}'s skin.`) : t("请先添加或选择一个账号。", "Add or choose an account first.")}</span>}
       {pack && <span className="muted">{t("导入为独立的新世界，原有世界不受影响。", "Imports as a separate new world; your other worlds stay as they are.")}</span>}
-      {!jars && !skin && !pack && <span className="muted">{t("一次拖入一批模组，或者一个整合包 / PNG 皮肤。", "Drop a batch of mods, or one modpack / PNG skin at a time.")}</span>}
+      {!jars && !skin && !pack && <span className="muted">{t("一次只能添加一批模组，或一个整合包 / PNG 皮肤。", "Only one batch of mods, or one modpack / PNG skin, at a time.")}</span>}
     </div>
   </Modal>;
 }

@@ -48,7 +48,7 @@ export function BiomePicker({ seed }: { seed: string }) {
       </div>
       {shots && shots.length > 0 && (
         <>
-          <span className="field-hint">{t("或者用你在这个世界里的截图做封面", "Or use one of your screenshots from this world as the cover")}</span>
+          <span className="field-label">{t("截图", "Screenshots")}</span>
           <div className="biomes">
             {shots.slice(0, 8).map((shot) => (
               <button

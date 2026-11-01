@@ -21,7 +21,7 @@ export function RecycleBin() {
   return (
     <Modal
       title={t("回收站", "Recycle bin")}
-      subtitle={t("移出的世界、模组、资源包、存档和截图都完整保存在这里；只有清空才会真正删除", "Removed worlds, mods, resource packs, saves and screenshots are kept whole here; only emptying deletes them")}
+      subtitle={t("只有清空才会真正删除", "Only emptying deletes for good")}
       onClose={s.closeModal}
       footer={
         <>
@@ -161,7 +161,6 @@ export function AddOffline() {
           seed="offline-account"
           eyebrow={t("添加离线账号", "Add offline account")}
           title={value || t("新玩家", "New player")}
-          meta={t("不需要密码 · 名字就是你在游戏里的称呼", "No password · the name is what others see in game")}
           aside={<PlayerFace name={value || "player"} size={48} />}
           onClose={s.closeModal}
         />
@@ -393,7 +392,7 @@ export function LoginOverlay() {
       ) : (
         <div className="col gap-16">
           <p className="muted" style={{ margin: 0 }}>
-            {device ? t("打开微软登录页，输入下面的代码，然后按提示登录。", "Open Microsoft's sign-in page, enter the code below and follow the steps.") : t("已在默认浏览器中打开微软登录页。如果没有自动打开，可以手动打开或复制链接。", "Microsoft's sign-in page opened in your default browser. If it didn't, open or copy the link yourself.")}
+            {device ? t("在微软登录页输入下面的代码。", "Enter the code below on Microsoft's sign-in page.") : t("已在默认浏览器中打开微软登录页。", "Microsoft's sign-in page opened in your default browser.")}
           </p>
           {device && auth.userCode && (
             <motion.div className="device-code" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}>
@@ -554,7 +553,7 @@ export function LogsPanel() {
         </label>
       </div>
       {s.logs.length === 0 ? (
-        <div className="console console-empty">{t("暂无日志。启动游戏后，输出会实时显示在这里。", "No log yet. Start the game and its output shows here live.")}</div>
+        <div className="console console-empty">{t("暂无日志", "No log yet")}</div>
       ) : view.rows.length === 0 ? (
         <div className="console console-empty">{t("没有符合条件的行。", "No lines match.")}</div>
       ) : (

@@ -573,7 +573,7 @@ function Facts({ instance, worlds }: { instance: Instance; worlds: WorldList | n
           <span className="fact-unit">{t("个", "")}</span>
         </div>
         <span className="fact-sub truncate">
-          {!worlds ? t("正在读取…", "Loading…") : worlds.worlds[0] ? t(`最近的存档：${worlds.worlds[0].folder}`, `Latest: ${worlds.worlds[0].folder}`) : instance.installed ? t("还没有存档，进游戏创建一个", "No saves yet; create one in game") : t("安装后在游戏里创建", "Create one in game after installing")}
+          {!worlds ? t("正在读取…", "Loading…") : worlds.worlds[0] ? t(`最近的存档：${worlds.worlds[0].folder}`, `Latest: ${worlds.worlds[0].folder}`) : t("还没有存档", "No saves yet")}
         </span>
         <Icon name="chevronRight" className="fact-go" />
       </button>
@@ -635,13 +635,13 @@ function ModsFact({ instance, stats, insights }: { instance: Instance; stats: Wo
       </div>
       <span className={`fact-sub truncate${updates > 0 ? " fact-sub-go" : ""}`}>
         {!instance.installed
-          ? t("安装后可添加模组", "Add mods after installing")
+          ? t("未安装", "Not installed")
           : !stats
             ? t("正在读取…", "Loading…")
             : updates > 0
               ? t(`${updates} 个可更新`, `${updates} can be updated`)
               : stats.mods === 0
-                ? t(`去下载适配 ${loaderLabel(instance.loader)} 的模组`, `Find ${loaderLabel(instance.loader)} mods`)
+                ? t("还没有模组", "No mods yet")
                 : off > 0
                   ? t(`${off} 个已停用`, `${off} disabled`)
                   : t("全部已启用", "All enabled")}
@@ -750,7 +750,7 @@ function NewWorlds() {
           </span>
           <span className="col fill gap-4">
             <span className="start-title">{t("新建世界", "New world")}</span>
-            <span className="start-text">{t("任选 Minecraft 版本，可加 Fabric、Quilt、Forge 或 NeoForge", "Any Minecraft version, with Fabric, Quilt, Forge or NeoForge if you like")}</span>
+            <span className="start-text">{t("原版、Fabric、Quilt、Forge、NeoForge", "Vanilla, Fabric, Quilt, Forge, NeoForge")}</span>
           </span>
           <Kbd>{MOD_KEY}N</Kbd>
         </button>
@@ -821,13 +821,13 @@ function Welcome({ hasInstances }: { hasInstances: boolean }) {
   const steps = [
     {
       title: t("起个名字", "Pick a name"),
-      text: t("先用离线账号开始；以后可以在「账号」页登录微软正版", "Start with an offline account; sign in with Microsoft later on the Accounts page"),
+      text: null,
       done: account !== null,
       action: <QuickOffline onMore={() => s.setPage("accounts")} />,
     },
     {
       title: t("创建世界", "Create a world"),
-      text: t("选择 Minecraft 版本，或导入 Modrinth 整合包", "Choose a Minecraft version, or import a modpack"),
+      text: null,
       done: hasInstances,
       action: (
         <Button size="sm" variant="primary" icon="plus" onClick={s.openCreate}>
@@ -863,7 +863,7 @@ function Welcome({ hasInstances }: { hasInstances: boolean }) {
             <motion.div key={step.title} className={`step${step.done ? " done" : ""}`} variants={item}>
               <div className="step-index mono">{step.done ? <Icon name="check" /> : i + 1}</div>
               <div className="step-title">{step.title}</div>
-              <div className="step-text">{step.text}</div>
+              {step.text && <div className="step-text">{step.text}</div>}
               {!step.done && step.action}
             </motion.div>
           ))}

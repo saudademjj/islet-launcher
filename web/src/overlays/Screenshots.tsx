@@ -103,7 +103,7 @@ export function ScreenshotsTab({ instance }: { instance: Instance }) {
           }
           title={t("还没有截图", "No screenshots yet")}
         >
-          {t("进入游戏后按 F2，截下的画面会按日期出现在这里。", "Press F2 in game; your shots appear here by date.")}
+          {t("游戏里按 F2 截图", "Press F2 in game")}
         </Empty>
       ) : (
         months.map((month) => (

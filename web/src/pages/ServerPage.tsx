@@ -139,7 +139,7 @@ export function ServerPage() {
 
   return (
     <>
-      <Toolbar title={t("开服", "Server")} meta={t("选好服务端和模组或插件，一键导出或部署到云服务器", "Pick a server, its mods or plugins, then export or deploy it in one go")}>
+      <Toolbar title={t("开服", "Server")} meta={s.projects.length > 0 ? t(`${s.projects.length} 台服务器`, `${s.projects.length} servers`) : undefined}>
         <Button variant="primary" icon="plus" disabled={showCreate} onClick={create}>
           {t("新建服务器", "New server")}
         </Button>
@@ -205,8 +205,8 @@ function CreateServer({ first, onCancel, onCreated }: { first: boolean; onCancel
         {first && (
           <span className="field-hint">
             {t(
-              "选一种服务端和游戏版本，再添加想要的模组或插件。完成后导出成文件夹，或者填上云服务器的 SSH 一键部署；内存、JVM 参数和视距会按那台机器的配置自动设好。",
-              "Choose a kind of server and a game version, then add the mods or plugins you want. Export it as a folder or deploy it over SSH; memory, JVM flags and view distance fit the machine it runs on.",
+              "内存、JVM 参数和视距按运行它的机器自动设置。",
+              "Memory, JVM flags and view distance fit the machine it runs on.",
             )}
           </span>
         )}
@@ -256,14 +256,14 @@ const toForm = (p: Instance): Form => {
 
 const same = (a: Form, b: Form) => (Object.keys(a) as (keyof Form)[]).every((key) => a[key] === b[key]);
 
-/** One labelled part of a long form: its name and a line about it beside
-    its fields, or above them where the card is narrow. */
-function FormSection({ title, text, children }: { title: string; text: string; children: ReactNode }) {
+/** One labelled part of a long form: its name, and a technical note when
+    there is one, beside its fields, or above them where the card is narrow. */
+function FormSection({ title, text, children }: { title: string; text?: string; children: ReactNode }) {
   return (
     <div className="form-section">
       <div className="form-section-head">
         <span className="form-section-title">{title}</span>
-        <span className="field-hint">{text}</span>
+        {text && <span className="field-hint">{text}</span>}
       </div>
       <div className="form-section-fields">{children}</div>
     </div>
@@ -386,8 +386,8 @@ function ProjectView({ project, bar }: { project: Instance; bar: HTMLDivElement 
             ) : (
               <span className="field-hint">
                 {plugins
-                  ? t("还没有插件。点「下载插件」从 Modrinth 搜，比如 EssentialsX、LuckPerms；也可以把 .jar 拖进管理窗口。", "No plugins yet. Get them from Modrinth, like EssentialsX or LuckPerms, or drop .jar files into the manage window.")
-                  : t("还没有模组。点「下载模组」只会列出能在服务器上运行的模组；只在客户端用的会在导出时去掉。", "No mods yet. Get mods lists only ones that run on a server; client-only ones are left out when exporting.")}
+                  ? t("还没有插件；本地 .jar 可以拖进管理窗口", "No plugins yet; local .jar files can be dropped into the manage window")
+                  : t("还没有模组；下载列表只含服务端能运行的模组，仅客户端的会在导出时去掉", "No mods yet; downloads list only mods that run on a server, and client-only ones are left out when exporting")}
               </span>
             )}
           </div>
@@ -396,16 +396,16 @@ function ProjectView({ project, bar }: { project: Instance; bar: HTMLDivElement 
       {project.loader === "vanilla" && <span className="field-hint">{t("原版服务端不加载模组和插件；想装插件，把类型换成 Paper。", "A vanilla server runs no mods or plugins; switch to Paper for plugins.")}</span>}
 
       <section className="card form-sections">
-        <CardHeader icon="sliders" title={t("服务器设置", "Server settings")} text={t("导出和部署都按保存后的设置来", "Exports and deploys use what's saved")} />
-        <FormSection title={t("基本", "Basics")} text={t("好友在多人游戏列表里看到的样子", "What friends see in the multiplayer list")}>
+        <CardHeader icon="sliders" title={t("服务器设置", "Server settings")} />
+        <FormSection title={t("基本", "Basics")}>
           <Field label={t("名称", "Name")} tone={form.name.trim() ? undefined : "bad"}>
             <Input value={form.name} maxLength={64} invalid={!form.name.trim()} onChange={(e) => set("name", e.target.value)} />
           </Field>
-          <Field label={t("服务器介绍（MOTD）", "Message of the day")} hint={t("显示在多人游戏列表里；不填就用名称", "Shown in the multiplayer list; the name when left empty")}>
+          <Field label={t("服务器介绍（MOTD）", "Message of the day")} hint={t("不填就用名称", "The name when left empty")}>
             <Input value={form.motd} maxLength={120} placeholder={form.name} onChange={(e) => set("motd", e.target.value.replace(/[\r\n]/g, ""))} />
           </Field>
         </FormSection>
-        <FormSection title={t("服务端", "Server")} text={t("跑哪种服务端、哪个游戏版本", "Which server software, on which game version")}>
+        <FormSection title={t("服务端", "Server")}>
           <Field label={t("服务端类型", "Kind of server")} tone={kindChanged ? "bad" : undefined} hint={kindChanged ? t(`换类型后，已添加的${what}可能用不了，保存后去「管理」里检查`, `Changing the kind may leave the ${what.toLowerCase()} you added unusable; check them under Manage after saving`) : undefined}>
             <KindPicker value={form.loader} onChange={(loader) => set("loader", loader)} />
           </Field>
@@ -446,7 +446,7 @@ function ProjectView({ project, bar }: { project: Instance; bar: HTMLDivElement 
             <Switch label="PVP" checked={form.pvp} onChange={(v) => set("pvp", v)} />
           </div>
         </FormSection>
-        <FormSection title={t("进入", "Access")} text={t("谁能进来，从哪个端口进", "Who can join, and on which port")}>
+        <FormSection title={t("进入", "Access")}>
           <div className="row gap-16 items-start wrap">
             <Field label={t("最多玩家", "Max players")} tone={maxPlayers >= 1 && maxPlayers <= 1000 ? undefined : "bad"}>
               <Input mono inputMode="numeric" value={form.maxPlayers} style={{ width: 100 }} invalid={!(maxPlayers >= 1 && maxPlayers <= 1000)} onChange={(e) => set("maxPlayers", e.target.value.replace(/\D/g, "").slice(0, 4))} />
@@ -458,14 +458,14 @@ function ProjectView({ project, bar }: { project: Instance; bar: HTMLDivElement 
           <div className="setting-row">
             <div className="col">
               <span className="setting-name">{t("白名单", "Whitelist")}</span>
-              <span className="field-hint">{t("只让名单上的人进；开服后用 whitelist add 名字 添加", "Only listed players can join; add them with whitelist add <name> once it runs")}</span>
+              <span className="field-hint">{t("开服后用 whitelist add <名字> 添加", "Add players with whitelist add <name> once it runs")}</span>
             </div>
             <Switch label={t("白名单", "Whitelist")} checked={form.whitelist} onChange={(v) => set("whitelist", v)} />
           </div>
           <div className="setting-row">
             <div className="col">
               <span className="setting-name">{t("正版验证", "Online mode")}</span>
-              <span className="field-hint">{t("只让微软正版账号进入；关掉后离线账号也能进，但谁都能冒用别人的名字", "Only Microsoft accounts can join; turned off, offline accounts can too, but anyone can use any name")}</span>
+              <span className="field-hint">{t("关闭后离线账号也能进，但名字可被冒用", "Off, offline accounts can join too, and names can be faked")}</span>
             </div>
             <Switch label={t("正版验证", "Online mode")} checked={form.onlineMode} onChange={(v) => set("onlineMode", v)} />
           </div>

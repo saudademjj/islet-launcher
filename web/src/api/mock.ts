@@ -840,7 +840,7 @@ const commands: Record<string, (args: any) => unknown> = {
       toggleMod: "模组状态已更新。",
       setMods: operation.enabled ? `已启用 ${operation.names?.length} 个模组。` : `已禁用 ${operation.names?.length} 个模组。`,
       recycleMods: `${operation.names?.length} 个模组已移到回收站。`,
-      importPack: "整合包已导入，点击安装并启动即可准备游戏。",
+      importPack: "整合包已导入，首次开始游戏时安装。",
       recycle: `「${operation.name}」已移到回收站。`,
       addPacks: "已添加 1 个资源包。",
       addDatapacks: "已添加 1 个数据包，下次进入存档时生效。",

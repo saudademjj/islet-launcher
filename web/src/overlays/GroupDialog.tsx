@@ -54,7 +54,7 @@ export function GroupDialog({ id }: { id: string }) {
             ))}
           </div>
         )}
-        <Field label={t("分组名", "Group name")} hint={t("输入新名字即可新建；留空表示不分组。", "Type a new name to start a group; leave empty for none.")}>
+        <Field label={t("分组名", "Group name")} hint={t("留空表示不分组", "Leave empty for none")}>
           <Input value={group} maxLength={24} placeholder={t("例如 生存、整合包、测试", "e.g. Survival, Modpacks, Testing")} onChange={(e) => setGroup(e.target.value)} onKeyDown={(e) => e.key === "Enter" && name !== (instance.group ?? "") && void save()} />
         </Field>
       </div>

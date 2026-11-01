@@ -106,7 +106,7 @@ export function ExportServer({ id }: { id: string }) {
             <div className="setting-row">
               <div className="col">
                 <span className="setting-name">{t("正版验证", "Online mode")}</span>
-                <span className="field-hint">{t("只让微软正版账号进入；关掉后离线账号也能进，但谁都能冒用别人的名字", "Only Microsoft accounts can join; turned off, offline accounts can too, but anyone can use any name")}</span>
+                <span className="field-hint">{t("关闭后离线账号也能进，但名字可被冒用", "Off, offline accounts can join too, and names can be faked")}</span>
               </div>
               <Switch label={t("正版验证", "Online mode")} checked={onlineMode} onChange={setOnlineMode} />
             </div>

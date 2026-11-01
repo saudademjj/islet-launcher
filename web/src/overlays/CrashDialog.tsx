@@ -158,7 +158,7 @@ export function CrashDialog({
     >
       {analysis.diagnoses.length === 0 ? (
         <Notice tone="warn" title={t("没能识别原因", "Couldn't tell the cause")}>
-          {t("这次启动的日志里没有匹配到已知的崩溃特征。可以查看完整日志，或把诊断报告附在问题反馈中。", "Nothing in this launch's log matches a known crash. Look at the full log, or attach the report when asking for help.")}
+          {t("这次启动的日志里没有匹配到已知的崩溃特征。", "Nothing in this launch's log matches a known crash.")}
         </Notice>
       ) : (
         <div className="crash-list">

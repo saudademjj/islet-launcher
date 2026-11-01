@@ -130,7 +130,7 @@ export function AddYggdrasil() {
         {/* Submitting with Enter. */}
         <button type="submit" hidden />
         {profiles && (
-          <Field label={t("选择角色", "Choose a character")} hint={t("这个账号有多个角色，选一个用来进入游戏", "This account has several characters; choose one to play as")}>
+          <Field label={t("选择角色", "Choose a character")}>
             <div className="list">
               {profiles.map((profile) => (
                 <div key={profile.id} className="list-row">

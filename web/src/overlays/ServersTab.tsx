@@ -115,9 +115,7 @@ export function ServersTab({ instance, busy }: { instance: Instance; busy: boole
                 {t("添加服务器", "Add server")}
               </Button>
             }
-          >
-            {t("填上朋友或社区服务器的地址，就能在这里看到在线人数和延迟，并一键加入。", "Add a friend's or community server to see players and ping here and join in one click.")}
-          </Empty>
+          />
         )
       ) : (
         <div className="server-list">

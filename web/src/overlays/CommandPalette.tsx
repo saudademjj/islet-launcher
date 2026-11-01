@@ -446,7 +446,7 @@ function useItems(query: string): { items: Item[]; quick: Item[] } {
         primary: { label: t("切换", "Switch"), run: () => update({ theme }, t(`已切换到${label}主题`, `Switched to the ${label} theme`)) },
       });
     }
-    list.push({ id: "setting:login", kind: "setting", label: t("微软登录 Client ID", "Microsoft sign-in Client ID"), sub: t("使用你自己的 Azure 应用接入正版登录", "Use your own Azure app for Microsoft sign-in"), keywords: "microsoft azure login client 微软 登录 正版", icon: glyph("shield"), primary: { label: t("在设置中修改", "Change in Settings"), run: () => store.openSettings("login") } });
+    list.push({ id: "setting:login", kind: "setting", label: t("微软登录 Client ID", "Microsoft sign-in Client ID"), keywords: "microsoft azure login client 微软 登录 正版", icon: glyph("shield"), primary: { label: t("在设置中修改", "Change in Settings"), run: () => store.openSettings("login") } });
 
     // Actions.
     const action = (id: string, label: string, icon: IconName, run: () => void, extra: Partial<Item> = {}): Item => ({ id: `action:${id}`, kind: "action", label, icon: glyph(icon), primary: { label: t("执行", "Run"), run }, ...extra });
@@ -482,8 +482,8 @@ function useItems(query: string): { items: Item[]; quick: Item[] } {
       const code = room.code;
       list.push(action("room-copy", t("复制房间码", "Copy room code"), "copy", () => void store.copy(code, t("房间码", "Room code")), { sub: code, keywords: "p2p room code copy 联机 房间码 复制 好友" }));
     } else if (!room?.active) {
-      list.push(action("room-host", t("开房间", "Host a room"), "globe", () => useP2p.getState().focus("host"), { sub: t("把对局域网开放的世界分享给好友", "Share a world opened to LAN with friends"), keywords: "p2p host room lan 联机 开房间 房主 局域网 好友" }));
-      list.push(action("room-join", t("加入房间", "Join a room"), "link", () => useP2p.getState().focus("join"), { sub: t("输入好友发来的房间码", "Enter the code a friend sent"), keywords: "p2p join room code 联机 加入房间 房间码 好友" }));
+      list.push(action("room-host", t("开房间", "Host a room"), "globe", () => useP2p.getState().focus("host"), { keywords: "p2p host room lan 联机 开房间 房主 局域网 好友" }));
+      list.push(action("room-join", t("加入房间", "Join a room"), "link", () => useP2p.getState().focus("join"), { keywords: "p2p join room code 联机 加入房间 房间码 好友" }));
     }
     list.push(action("data-dir", t("打开数据目录", "Open data folder"), "folder", () => void store.open({ kind: "dataDir" }), { keywords: "data folder 数据 目录" }));
 

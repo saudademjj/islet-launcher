@@ -281,12 +281,12 @@ export function RemoteServer({ id }: { id: string }) {
               <span className="field-hint">
                 {instance.server
                   ? t(
-                      "租一台 Linux 云服务器（2 核 4G 起），把它的 IP、用户名和密码填在这里。启动器会把服务端和模组、插件传上去，装好 Java，按服务器的内存调好参数并启动；之后在这里开关、备份和更新。不经过任何第三方中转。",
-                      "Rent a Linux cloud server (2 cores and 4 GB or more) and fill in its IP, user and password. The launcher uploads the server with its mods or plugins, installs Java, tunes it to the host's memory and starts it; start, stop, back up and update it from here later. Nothing sits in between.",
+                      "需要 Linux 云服务器（2 核 4G 起）。会上传服务端和模组、插件，安装 Java，按内存调好参数后启动；直连，不经第三方中转。",
+                      "Needs a Linux cloud server (2 cores and 4 GB or more). Uploads the server with its mods or plugins, installs Java, tunes it to the memory and starts it; direct, with nothing in between.",
                     )
                   : t(
-                      "租一台 Linux 云服务器（2 核 4G 起），把它的 IP、用户名和密码填在这里。启动器会把这个世界的服务端、模组和存档传上去，装好 Java 并启动；之后在这里开关、备份和更新。不经过任何第三方中转。",
-                      "Rent a Linux cloud server (2 cores and 4 GB or more) and fill in its IP, user and password. The launcher uploads this world's server, mods and save, installs Java and starts it; start, stop, back up and update it from here later. Nothing sits in between.",
+                      "需要 Linux 云服务器（2 核 4G 起）。会上传这个世界的服务端、模组和存档，安装 Java 后启动；直连，不经第三方中转。",
+                      "Needs a Linux cloud server (2 cores and 4 GB or more). Uploads this world's server, mods and save, installs Java and starts it; direct, with nothing in between.",
                     )}
               </span>
               {!supported && <span className="field-hint bad">{t("这个加载器没有可以一键生成的服务端；原版、Fabric、Quilt、Forge 和 NeoForge 可以。", "This loader has no server Islet can set up; vanilla, Fabric, Quilt, Forge and NeoForge do.")}</span>}
@@ -579,7 +579,7 @@ function ServerSettings({ form, set }: { form: Form; set: (patch: Partial<Form>)
       <div className="setting-row">
         <div className="col">
           <span className="setting-name">{t("正版验证", "Online mode")}</span>
-          <span className="field-hint">{t("只让微软正版账号进入；关掉后离线账号也能进，但谁都能冒用别人的名字", "Only Microsoft accounts can join; turned off, offline accounts can too, but anyone can use any name")}</span>
+          <span className="field-hint">{t("关闭后离线账号也能进，但名字可被冒用", "Off, offline accounts can join too, and names can be faked")}</span>
         </div>
         <Switch label={t("正版验证", "Online mode")} checked={form.onlineMode} onChange={(onlineMode) => set({ onlineMode })} />
       </div>

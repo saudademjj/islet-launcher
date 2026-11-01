@@ -77,7 +77,7 @@ export function InstancesPage() {
 
   return (
     <>
-      <Toolbar title={t("世界", "Worlds")} meta={t(`${s.instances.length} 个世界 · 点击卡片设为当前世界`, `${s.instances.length} worlds · click a card to make it current`)}>
+      <Toolbar title={t("世界", "Worlds")} meta={t(`${s.instances.length} 个世界`, `${s.instances.length} worlds`)}>
         <Button variant="ghost" icon="trash" onClick={() => void s.openRecycle()}>
           {t("回收站", "Recycle bin")}
         </Button>
@@ -194,7 +194,6 @@ export function InstancesPage() {
                       <Icon name="plus" />
                     </span>
                     <span className="world-new-title">{t("新建世界", "New world")}</span>
-                    <span className="faint">{t("选择版本和加载器", "Choose version and loader")}</span>
                   </motion.button>
                 )}
               </motion.div>

@@ -50,7 +50,7 @@ export function AccountsPage() {
   const offline = {
     icon: "user" as IconName,
     title: t("离线账号", "Offline account"),
-    text: t("只需一个名字，适合单人游戏和局域网", "Just a name; good for singleplayer and LAN"),
+    text: t("单人游戏和局域网", "Singleplayer and LAN"),
     primary: !ready,
     pending: false,
     disabled: false,

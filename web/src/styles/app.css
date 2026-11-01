@@ -7922,6 +7922,7 @@ html.reduce-motion .skin-stage.spinning {
 
 .room-card-foot > .btn {
   flex: none;
+  margin-left: auto;
 }
 
 .room-card-text {

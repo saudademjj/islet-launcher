@@ -96,7 +96,7 @@ export function CreateInstance() {
       const id = useStore.getState().settings.activeInstanceId;
       if (id) useBiomeChoices.getState().choose(id, biome.id);
       useStore.setState({ modal: null, page: "home" });
-      useStore.getState().toast(t(`已创建「${name.trim() || selected.id}」，点击开始游戏即可安装`, `Created "${name.trim() || selected.id}"; press Play to install it`), "success");
+      useStore.getState().toast(t(`已创建「${name.trim() || selected.id}」，首次开始游戏时安装`, `Created "${name.trim() || selected.id}"; it installs the first time you play`), "success");
     }
   };
 
@@ -113,16 +113,12 @@ export function CreateInstance() {
           eyebrow={t(`新建世界 · 封面：${biome.name}`, `New world · cover: ${biome.name}`)}
           title={name.trim() || t("未命名", "Untitled")}
           meta={
-            selected ? (
+            selected && (
               <>
                 <span className="mono">{selected.id}</span>
                 <span className="dot" />
                 {loaderLabel(loader)}
-                <span className="dot" />
-                {t("创建后点「开始游戏」会自动下载所需文件", "Press Play after creating and the files it needs download")}
               </>
-            ) : (
-              t("从右侧列表选择一个版本", "Pick a version on the right")
             )
           }
           aside={<Identicon key={seed} seed={seed} size={52} hero build />}

@@ -101,7 +101,7 @@ export function Sidebar() {
             )}
             <div className="col sidebar-account-text fill gap-2">
               <span className="sidebar-account-name truncate">{account ? account.username : t("还没有账号", "No account yet")}</span>
-              <span className="sidebar-account-kind">{account ? (account.provider === "microsoft" ? t("微软账号", "Microsoft account") : account.provider === "yggdrasil" ? t("外置账号", "Third-party account") : t("离线账号", "Offline account")) : t("点击添加账号", "Click to add one")}</span>
+              {account && <span className="sidebar-account-kind">{account.provider === "microsoft" ? t("微软账号", "Microsoft account") : account.provider === "yggdrasil" ? t("外置账号", "Third-party account") : t("离线账号", "Offline account")}</span>}
             </div>
             <Kbd>{MOD_KEY}5</Kbd>
           </button>

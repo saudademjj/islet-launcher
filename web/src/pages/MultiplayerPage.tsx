@@ -144,8 +144,8 @@ function Start({ downloadSize }: { downloadSize: number | null }) {
           <h2 className="room-title">{t("和好友一起玩，不用公网 IP", "Play with friends, no public IP needed")}</h2>
           <p className="room-text">
             {t(
-              "房主把世界「对局域网开放」，好友输入房间码就能加入。能直连时走直连，不能时由共享节点中转，全程加密。",
-              "The host opens a world to LAN; friends join with the room code. Connections go direct when they can and through shared nodes when they can't, encrypted either way.",
+              "能直连时直连，否则经共享节点中转；全程加密。",
+              "Direct when possible, otherwise relayed through shared nodes; encrypted end to end.",
             )}
           </p>
           <Bridge level="none" left={<PlayerFace account={account} size={32} />} right={<span className="bridge-ghost">?</span>} />
@@ -238,7 +238,7 @@ function HostCard({ name }: { name: string }) {
   const valid = /^\d{1,5}$/.test(port) && Number(port) > 0 && Number(port) < 65536;
   return (
     <section className="card room-card">
-      <CardHeader icon="home" title={t("开房间", "Host a room")} text={t("在游戏里按 Esc →「对局域网开放」，再回来选中它。", "In the game, press Esc → Open to LAN, then pick it here.")} />
+      <CardHeader icon="home" title={t("开房间", "Host a room")} text={t("在游戏里按 Esc →「对局域网开放」", "In the game: Esc → Open to LAN")} />
       <div className="room-card-body">
         <div className="lan-list">
           {scanning && !games ? (
@@ -275,7 +275,6 @@ function HostCard({ name }: { name: string }) {
         </div>
       </div>
       <div className="room-card-foot">
-        <span className="room-card-text">{t("创建后会得到一个房间码，发给好友。", "You get a room code to send to friends.")}</span>
         <Button variant="primary" icon="play" busy={busy} disabled={!valid} onClick={() => void host(Number(port), name)}>
           {t("创建房间", "Create room")}
         </Button>
@@ -294,7 +293,7 @@ function JoinCard({ name }: { name: string }) {
   const go = () => ready && !busy && void join(code, name);
   return (
     <section className="card room-card">
-      <CardHeader icon="link" title={t("加入房间", "Join a room")} text={t("向房主要房间码，粘贴到这里。HMCL、PCL CE 等启动器开的房间也能加入。", "Ask the host for the room code and paste it here. Rooms opened in HMCL, PCL CE and similar launchers work too.")} />
+      <CardHeader icon="link" title={t("加入房间", "Join a room")} text={t("兼容 HMCL、PCL CE 等启动器开的房间", "Works with rooms from HMCL, PCL CE and similar launchers")} />
       <div className="room-card-body">
         <Input
           ref={codeRef}
@@ -458,7 +457,7 @@ function RoomView({ status, onNodes }: { status: P2pStatus; onNodes: () => void 
                 <span className="check-mark" aria-hidden />
               </li>
             ))}
-            {others.length === 0 && <li className="players-empty">{host ? t("把房间码发给好友，他们加入后会出现在这里。", "Send friends the room code; they appear here once they join.") : t("正在寻找房主…", "Looking for the host…")}</li>}
+            {others.length === 0 && <li className="players-empty">{host ? t("还没有人加入", "No one has joined yet") : t("正在寻找房主…", "Looking for the host…")}</li>}
           </ul>
           {status.world && (
             <div className="room-world">

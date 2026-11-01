@@ -82,11 +82,8 @@ export function TunnelDialog({ id }: { id: string }) {
     </Button>
   );
   return (
-    <Modal title={t("联机隧道", "Multiplayer tunnel")} subtitle={t("通过你自己的 SSH 主机，把局域网游戏开放给朋友", "Share a LAN game with friends through your own SSH host")} onClose={close} footer={footer}>
+    <Modal title={t("联机隧道", "Multiplayer tunnel")} onClose={close} footer={footer}>
       <div className="col gap-16">
-        <span className="muted" style={{ fontSize: "var(--text-sm)" }}>
-          {t("先在游戏里选择「对局域网开放」，把游戏显示的端口填在下面。系统 SSH 需要已配好这台主机的密钥和 known_hosts。", "First choose \"Open to LAN\" in the game and enter the port it shows below. System SSH must already have a key and known_hosts entry for this host.")}
-        </span>
         <div className="row" style={{ alignItems: "flex-start" }}>
           <div style={{ flex: 2 }}>
             <Field label={t("SSH 主机", "SSH host")}>
@@ -100,7 +97,7 @@ export function TunnelDialog({ id }: { id: string }) {
           </div>
         </div>
         <div className="row" style={{ alignItems: "flex-start" }}>
-          <Field label={t("游戏局域网端口", "LAN game port")} tone={local && !port(local) ? "bad" : undefined}>
+          <Field label={t("游戏局域网端口", "LAN game port")} hint={t("「对局域网开放」后游戏显示", "Shown after Open to LAN")} tone={local && !port(local) ? "bad" : undefined}>
             <Input value={local} inputMode="numeric" onChange={(e) => setLocal(e.target.value)} disabled={running} />
           </Field>
           <Field label={t("公网端口", "Public port")} tone={remote && !port(remote) ? "bad" : undefined}>
@@ -117,7 +114,7 @@ export function TunnelDialog({ id }: { id: string }) {
           </Notice>
         ) : (
           <span className="faint" style={{ fontSize: "var(--text-xs)" }}>
-            {t("SSH 服务端需要 GatewayPorts clientspecified 并放行公网端口。关掉这个窗口隧道仍会运行，退出启动器时自动停止。", "The SSH server needs GatewayPorts clientspecified and an open public port. The tunnel keeps running when this window closes and stops when the launcher quits.")}
+            {t("系统 SSH 需要已配好这台主机的密钥和 known_hosts，服务端需要 GatewayPorts clientspecified 并放行公网端口。关掉这个窗口隧道仍会运行，退出启动器时自动停止。", "System SSH needs a key and known_hosts entry for this host, and the server needs GatewayPorts clientspecified and an open public port. The tunnel keeps running when this window closes and stops when the launcher quits.")}
           </span>
         )}
         {error && (

@@ -141,7 +141,7 @@ export function OptionsTab({ instance, busy }: { instance: Instance; busy: boole
           <Row label={t("游戏语言", "Game language")} hint={t("1.11 以前的版本会自动换成旧格式", "Versions before 1.11 get the old format automatically")}>
             <Segmented value={form.lang} options={languages} disabled={busy} onChange={(lang) => set({ lang })} />
           </Row>
-          <Row label={t("界面缩放", "GUI scale")} hint={t("按钮和文字的大小；自动会按窗口大小选择", "Size of buttons and text; Auto picks by window size")}>
+          <Row label={t("界面缩放", "GUI scale")} hint={t("自动：按窗口大小选择", "Auto: picked by window size")}>
             <Segmented
               value={String(form.guiScale)}
               disabled={busy}

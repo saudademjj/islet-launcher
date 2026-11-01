@@ -207,7 +207,7 @@ export function SaveDialog({ id, folder }: { id: string; folder: string }) {
               {backups && backups.length > 0 && <span className="mono faint">{backups.length}{t(" 个", " more")}</span>}
             </div>
             {backups == null ? null : backups.length === 0 ? (
-              <div className="saves-empty muted">{t("还没有备份。点上面的「备份」把这个存档打包保存一份；打开「设置 → 游戏退出后自动备份存档」后，每次玩完会自动备份。", "No backups yet. Use Back up above to keep a copy of this save, or turn on Settings → Back up saves after playing.")}</div>
+              <div className="saves-empty muted">{t("还没有备份；可在「设置 → 游戏退出后自动备份存档」开启自动备份", "No backups yet; turn on Settings → Back up saves after playing for automatic ones")}</div>
             ) : (
               <div className="list">
                 {backups.map((backup) => (

@@ -464,7 +464,7 @@ impl AppServices {
                     }
                     FileOperation::ImportPack(path) => {
                         this.import_pack(&path)?;
-                        Ok(crate::core::i18n::pick("整合包已导入，点击安装并启动即可准备游戏。", "Modpack imported; press Install and play to get it ready.").into())
+                        Ok(crate::core::i18n::pick("整合包已导入，首次开始游戏时安装。", "Modpack imported; it installs the first time you play.").into())
                     }
                     FileOperation::InstallModpack(version) => {
                         let key = this.settings.get().curseforge_key;
@@ -475,7 +475,7 @@ impl AppServices {
                         if let Err(error) = crate::core::modpacks::record_source(&this.paths, &imported?, &source) {
                             tracing::warn!(%error, "couldn't record the modpack source");
                         }
-                        Ok(crate::core::i18n::pick("整合包已下载并导入，点击安装并启动即可准备游戏。", "Modpack downloaded and imported; press Install and play to get it ready.").into())
+                        Ok(crate::core::i18n::pick("整合包已下载并导入，首次开始游戏时安装。", "Modpack downloaded and imported; it installs the first time you play.").into())
                     }
                     FileOperation::ExportPack { destination, options } => {
                         let instance = this.instances.get(&id)?;

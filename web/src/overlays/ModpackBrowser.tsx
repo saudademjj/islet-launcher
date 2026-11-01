@@ -216,7 +216,7 @@ export function ModpackBrowser() {
               {!chosen ? (
                 <motion.div key="hint" className="browse-versions browse-placeholder" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: normal }} exit={{ opacity: 0 }}>
                   <Icon name="pack" size={32} />
-                  <span>{t("选择左侧任意整合包，这里会列出它的版本。安装会创建一个新世界。", "Pick any modpack on the left to see its versions. Installing creates a new world.")}</span>
+                  <span>{t("未选择整合包", "No modpack selected")}</span>
                 </motion.div>
               ) : (
                 <motion.div key={chosen.project_id} className="browse-versions card" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0, transition: normal }} exit={{ opacity: 0 }}>
@@ -258,7 +258,7 @@ export function ModpackBrowser() {
                       ))
                     )}
                     <span className="faint" style={{ fontSize: "var(--text-xs)", padding: "6px 10px" }}>
-                      {t("下载后导入为一个新世界，原有世界不受影响。整合包文件只含清单和配置，模组在安装时另外下载，进度里会显示总大小。", "Downloads and imports as a new world; your other worlds stay as they are. The pack file holds the list and configs; mods download during the install, which shows the total size.")}
+                      {t("导入为一个新世界，原有世界不受影响。整合包文件只含清单和配置，模组在安装时另外下载。", "Imports as a new world; your other worlds stay as they are. The pack file holds only the list and configs; mods download during the install.")}
                     </span>
                   </div>
                 </motion.div>

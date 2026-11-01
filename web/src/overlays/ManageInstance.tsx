@@ -326,7 +326,7 @@ function GeneralTab({ instance, busy }: { instance: Instance; busy: boolean }) {
           </div>
         </Field>
         {s.accounts.length > 1 && (
-          <Field label={t("游玩账号", "Play as")} hint={t("这个世界固定用哪个账号进入；跟随时用账号页正在使用的账号", "The account this world always uses; \"follow\" uses the one selected on the Accounts page")}>
+          <Field label={t("游玩账号", "Play as")} hint={t("跟随：用账号页正在使用的账号", "Follow: the one selected on the Accounts page")}>
             <div>
               <Segmented
                 value={accountId}
@@ -844,8 +844,8 @@ function ModsTab({ instance, busy, browse }: { instance: Instance; busy: boolean
           }
         >
           {plugins
-            ? t("从 Modrinth 下载 Paper、Spigot 和 Bukkit 插件，需要的前置插件会一起装上；也可以点「添加 .jar」导入本地文件。", "Download Paper, Spigot and Bukkit plugins from Modrinth, with the plugins they need; you can also add local files with \"Add .jar\".")
-            : t("从 Modrinth 下载时，必需的前置模组会自动一起安装；也可以点「添加 .jar」导入本地文件。", "Required dependencies install along with mods from Modrinth; you can also add local files with \"Add .jar\".")}
+            ? t("从 Modrinth 下载时，前置插件会一起装上", "Plugins they need install along with them from Modrinth")
+            : t("从 Modrinth 下载时，前置模组会一起装上", "Mods they need install along with them from Modrinth")}
         </Empty>
       ) : shown.length === 0 ? (
         <div className="saves-empty muted">{plugins ? t("没有符合条件的插件。", "No plugins match.") : t("没有符合条件的模组。", "No mods match.")}</div>
@@ -1102,7 +1102,7 @@ function PacksTab({ instance, browse }: { instance: Instance; browse: (kind: Con
       glyph: "pack" as const,
       title: t("资源包", "Resource packs"),
       list: s.packs?.resourcepacks,
-      hint: t("已启用的排在前面，上面的覆盖下面的；可以在这里启用、停用和调整顺序，下次进游戏生效。", "Enabled packs come first, upper ones override lower ones. Enable, disable and reorder them here; changes apply next time you play."),
+      hint: t("上面的覆盖下面的；下次进游戏生效", "Upper ones override lower ones; changes apply next time you play"),
       warn: false,
       need: undefined,
     },
@@ -1879,7 +1879,7 @@ function DataTab({ instance, busy }: { instance: Instance; busy: boolean }) {
     {
       icon: "globe",
       title: t("部署到云服务器", "Deploy to a cloud server"),
-      text: t("把这个世界连同存档和模组传到你租的 Linux 云服务器上一直运行；在这里开关、备份、看控制台，改了模组一键同步", "Uploads this world with its save and mods to a Linux cloud server you rent and keeps it running; start, stop, back up and use the console from here, and sync mods in one click"),
+      text: t("连同存档和模组传到 Linux 云服务器上长期运行", "Runs this world with its save and mods on a Linux cloud server"),
       action: (
         <Button size="sm" onClick={() => s.openModal({ kind: "remote", id: instance.id })}>
           {t("打开…", "Open…")}
@@ -1914,7 +1914,7 @@ function DataTab({ instance, busy }: { instance: Instance; busy: boolean }) {
       ),
     });
   }
-  const rows: { icon: Parameters<typeof Icon>[0]["name"]; title: string; text: string; action: React.ReactNode }[] = [
+  const rows: { icon: Parameters<typeof Icon>[0]["name"]; title: string; text?: string; action: React.ReactNode }[] = [
     ...packRows,
     {
       icon: "archive",
@@ -1951,7 +1951,7 @@ function DataTab({ instance, busy }: { instance: Instance; busy: boolean }) {
     {
       icon: "copy",
       title: t("复制世界", "Duplicate world"),
-      text: t("连同存档、模组和设置复制一份新世界", "Copies saves, mods and settings into a new world"),
+      text: t("包括存档、模组和设置", "Saves, mods and settings included"),
       action: (
         <Button size="sm" disabled={busy} onClick={() => void s.fileOperation(instance.id, { kind: "duplicate" })}>
           {t("复制", "Duplicate")}
@@ -1971,7 +1971,6 @@ function DataTab({ instance, busy }: { instance: Instance; busy: boolean }) {
     {
       icon: "folder",
       title: t("游戏目录", "Game folder"),
-      text: t("存档、截图、资源包和配置文件都在这里", "Saves, screenshots, resource packs and config files live here"),
       action: (
         <Button size="sm" onClick={() => void s.open({ kind: "gameDir", id: instance.id })}>
           {t("打开", "Open")}
@@ -1999,9 +1998,11 @@ function DataTab({ instance, busy }: { instance: Instance; busy: boolean }) {
             <Icon name={row.icon} className="faint" />
             <div className="col fill gap-2">
               <span style={{ fontWeight: 600 }}>{row.title}</span>
-              <span className="muted" style={{ fontSize: "var(--text-xs)" }}>
-                {row.text}
-              </span>
+              {row.text && (
+                <span className="muted" style={{ fontSize: "var(--text-xs)" }}>
+                  {row.text}
+                </span>
+              )}
             </div>
             <div className="row">{row.action}</div>
           </div>
@@ -2071,7 +2072,7 @@ function Worlds({ instance }: { instance: Instance }) {
       ) : worlds.length === 0 ? (
         <div className="saves-empty muted">
           <BrandMark size={28} />
-          {t("还没有存档。进入游戏创建一个世界后，它会出现在这里。", "No saves yet. Create one in game and it appears here.")}
+          {t("还没有存档", "No saves yet")}
         </div>
       ) : (
         <div className="world-tiles">

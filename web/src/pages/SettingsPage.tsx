@@ -308,7 +308,7 @@ export function SettingsPage() {
               </Button>
             </div>
           )}
-          <Section id="game" icon="cpu" title={t("游戏", "Game")} text={t("新世界默认使用的内存、Java 和启动行为", "Memory, Java and launch behavior for worlds")}>
+          <Section id="game" icon="cpu" title={t("游戏", "Game")}>
             <Field
               label={t("默认游戏内存", "Default game memory")}
               hint={
@@ -402,7 +402,7 @@ export function SettingsPage() {
             <div className="setting-row">
               <div className="col">
                 <span className="setting-name">{t("游戏启动后隐藏启动器", "Hide the launcher while playing")}</span>
-                <span className="field-hint">{t("游戏窗口出现后才收起，可从托盘、任务栏或程序坞恢复；游戏退出后自动回来", "Steps aside once the game's window is up. Restore it from the tray, taskbar or Dock; it returns when the game exits")}</span>
+                <span className="field-hint">{t("游戏窗口出现后才收起，游戏退出后自动回来", "Steps aside once the game's window is up and returns when the game exits")}</span>
               </div>
               <Switch
                 label={t("游戏启动后隐藏启动器", "Hide the launcher while playing")}
@@ -413,7 +413,7 @@ export function SettingsPage() {
             <div className="setting-row">
               <div className="col">
                 <span className="setting-name">{t("关闭窗口后驻留托盘", "Keep running in the tray when closed")}</span>
-                <span className="field-hint">{t("关闭按钮只收起窗口，游戏和下载继续；点击托盘图标恢复，从托盘菜单退出启动器", "Closing only hides the window; games and downloads continue. Click the tray icon to restore it, or use its menu to quit")}</span>
+                <span className="field-hint">{t("关闭按钮只收起窗口，游戏和下载继续；从托盘菜单退出", "Closing only hides the window; games and downloads continue. Quit from the tray menu")}</span>
               </div>
               <Switch label={t("关闭窗口后驻留托盘", "Keep running in the tray when closed")} checked={s.settings.closeToTray !== false}
                 onChange={(closeToTray) => void s.mutate("update_settings", { settings: { ...s.settings, closeToTray } }, closeToTray ? t("关闭窗口后会留在托盘", "Closing keeps the launcher in the tray") : t("关闭窗口时会退出；任务进行中会先询问", "Closing exits the launcher, with confirmation while work is in progress"))} />
@@ -436,7 +436,7 @@ export function SettingsPage() {
             <GlobalLaunchOptions value={form.launch} onChange={(launch) => set({ launch })} changed={fieldChanged(form, saved, "launch")} />
           </Section>
 
-          <Section id="download" icon="download" title={t("下载", "Download")} text={t("下载源、并发数和数据存放位置", "Download source, parallel downloads and where data lives")}>
+          <Section id="download" icon="download" title={t("下载", "Download")}>
             <Field label={t("下载源", "Download source")} hint={t("镜像在国内更快，失败时自动改用官方源；文件都会用官方校验值核对", "The mirror is faster in mainland China and falls back to the official source; every file is checked against official hashes")}>
               <div>
                 <Segmented
@@ -451,7 +451,7 @@ export function SettingsPage() {
             </Field>
             <Field
               label={t("同时下载数", "Parallel downloads")}
-              hint={concurrencyOk ? t("默认 32；游戏资源多是小文件，并发越高越快。网络或镜像不稳定时可以调低", "Default 32; game assets are mostly small files, so more is faster. Lower it if the network or mirror is unstable") : t("需要在 1–64 之间", "Must be between 1 and 64")}
+              hint={concurrencyOk ? t("默认 32；网络或镜像不稳定时调低", "Default 32; lower it if the network or mirror is unstable") : t("需要在 1–64 之间", "Must be between 1 and 64")}
               tone={concurrencyOk ? undefined : "bad"}
             >
               <div className="row">
@@ -491,7 +491,7 @@ export function SettingsPage() {
             </Field>
             <Field
               label="CurseForge API Key"
-              hint={t("填写后可以在 CurseForge 搜索和安装模组、资源包、光影，并导入 CurseForge 整合包。只保存在本机。", "Lets you search and install mods, resource packs and shaders from CurseForge, and import CurseForge modpacks. Stored on this computer only.")}
+              hint={t("用于搜索、安装和导入 CurseForge 内容；只保存在本机", "For searching, installing and importing CurseForge content; stored on this computer only")}
               action={
                 <button type="button" className="link" onClick={() => void s.openUrl("https://console.curseforge.com/")}>
                   {t("申请 API Key", "Get an API key")}
@@ -515,7 +515,7 @@ export function SettingsPage() {
 
           <StorageSection />
 
-          <Section id="look" icon="palette" title={t("外观", "Appearance")} text={t("主题和动效，立即生效", "Theme and motion, applied at once")}>
+          <Section id="look" icon="palette" title={t("外观", "Appearance")}>
             <LanguageRow />
             <div className="themes">
               {THEMES.map((theme) => (
@@ -538,7 +538,7 @@ export function SettingsPage() {
             <div className="setting-row">
               <div className="col">
                 <span className="setting-name">{t("减少动效", "Reduce motion")}</span>
-                <span className="field-hint">{t("关闭过渡和滑动动画；系统开启「减少动态效果」时也会自动减少", "Turns off transitions and sliding animations; also follows the system's Reduce Motion")}</span>
+                <span className="field-hint">{t("系统开启「减少动态效果」时也会自动减少", "Also follows the system's Reduce Motion")}</span>
               </div>
               <Switch label={t("减少动效", "Reduce motion")} checked={s.reduceMotion} onChange={s.setReduceMotion} />
             </div>
@@ -568,7 +568,6 @@ export function SettingsPage() {
                 <div className="setting-row">
                   <div className="col">
                     <span className="setting-name">{t("可以直接登录", "Ready to sign in")}</span>
-                    <span className="field-hint">{t("在账号页添加微软账号即可，不需要任何配置", "Add a Microsoft account on the Accounts page; nothing to set up")}</span>
                   </div>
                   <Button size="sm" icon="user" onClick={() => useStore.getState().setPage("accounts")}>
                     {t("去登录", "Sign in")}
@@ -821,7 +820,7 @@ function LanguageRow() {
       <div className="col">
         {/* Both names, so it can be found in either language. */}
         <span className="setting-name">{t("语言 · Language", "Language · 语言")}</span>
-        <span className="field-hint">{t("界面和提示信息的语言；切换后启动器会刷新一次", "For the interface and messages; the launcher refreshes once after switching")}</span>
+        <span className="field-hint">{t("切换后启动器会刷新一次", "The launcher refreshes once after switching")}</span>
       </div>
       <Segmented
         value={s.settings.language}
@@ -960,7 +959,7 @@ function StorageSection() {
     : [];
   const total = usage ? usage.worlds + usage.assets + usage.libraries + usage.versions + usage.recycle + usage.backups + usage.thumbnails + usage.logs + usage.java.reduce((sum, j) => sum + j.bytes, 0) : 0;
   return (
-    <Section id="storage" icon="disk" title={t("存储", "Storage")} text={t("启动器占用的空间；这里清理的都能在需要时重新下载或生成", "Space the launcher uses; anything cleaned here is downloaded or rebuilt when needed")}>
+    <Section id="storage" icon="disk" title={t("存储", "Storage")} text={t("清理的内容需要时会重新下载或生成", "Anything cleaned here is downloaded or rebuilt when needed")}>
       {!usage ? (
         <div className="row">
           <span className="muted" style={{ flex: 1 }}>
