@@ -1011,6 +1011,8 @@ export const useStore = create<State & Actions>()((set, get) => ({
           void get().launchInstance(id, undefined, undefined, true);
         },
       };
+    if (code === "owner_required")
+      return { label: t("登录微软账号", "Sign in with Microsoft"), run: () => get().setPage("accounts") };
     if (code !== "auth_expired") return null;
     return {
       label: t("重新登录", "Sign in again"),
@@ -1515,6 +1517,16 @@ export function useAutoMemory(instance: Instance | null): number | null {
     };
   }, [id, mods]);
   return mb && mb.id === id ? mb.value : fallback;
+}
+
+/** Offline accounts open once a Microsoft account that owns the game has
+    signed in; the core checks the same. */
+export function hasOwner(accounts: Account[]): boolean {
+  return accounts.some((a) => a.provider === "microsoft" && a.ownership === true);
+}
+
+export function useHasOwner(): boolean {
+  return useStore((s) => hasOwner(s.accounts));
 }
 
 export function useActiveAccount(): Account | null {

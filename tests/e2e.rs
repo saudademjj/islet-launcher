@@ -11,6 +11,7 @@ use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
 use async_channel::Receiver;
+use islet::core::accounts::{Account, AccountProvider};
 use islet::core::paths::AppPaths;
 use islet::core::server_pack::ServerOptions;
 use islet::core::settings::{DownloadSource, Settings};
@@ -59,6 +60,23 @@ impl Waiter {
 }
 
 /// A mod's newest file for the version and loader, from Modrinth.
+/// A Microsoft account that owns the game, as a sign-in would save it.
+fn owner() -> Account {
+    Account {
+        id: "microsoft:00000000-0000-0000-0000-0000000000e2".into(),
+        provider: AccountProvider::Microsoft,
+        username: "Islet_Owner".into(),
+        uuid: "00000000-0000-0000-0000-0000000000e2".into(),
+        xuid: None,
+        ownership: Some(true),
+        skin_url: None,
+        skin_slim: false,
+        created_at: 0,
+        server: None,
+        server_name: None,
+    }
+}
+
 fn modrinth_file(runtime: &tokio::runtime::Runtime, slug: &str, loader: &str, into: &Path) {
     let url = format!("https://api.modrinth.com/v2/project/{slug}/version?loaders=[\"{loader}\"]&game_versions=[\"{VERSION}\"]");
     let (name, bytes) = runtime.block_on(async {
@@ -116,6 +134,8 @@ fn install_play_and_host() {
     let waiter = Waiter { runtime: tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap(), events };
 
     // The game: install, start offline, wait for it to render, stop it.
+    // Offline accounts need an owning Microsoft account in the list first.
+    services.accounts.upsert(owner()).unwrap();
     let (account, _) = services.add_offline_account("Islet_E2E").unwrap();
     services.set_active_account(Some(account.id)).unwrap();
     let vanilla = services.create_instance("E2E", VERSION, "release").unwrap();

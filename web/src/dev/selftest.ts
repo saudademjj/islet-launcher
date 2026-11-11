@@ -85,6 +85,13 @@ export async function run() {
   });
 
   await step("add_offline_account / remove_account", async () => {
+    // Offline accounts need an owning Microsoft account; without one the
+    // core refuses, which is what to check then.
+    if (!initial.accounts.some((a) => a.provider === "microsoft" && a.ownership === true)) {
+      const refused = await call<Snapshot>("add_offline_account", { username: "SelfTest" }).then(() => null, (error: { code?: string }) => error.code);
+      expect(refused === "owner_required", `expected owner_required, got ${refused}`);
+      return "refused without an owner";
+    }
     const added = await call<Snapshot>("add_offline_account", { username: "SelfTest" });
     const account = added.accounts.find((a) => a.username === "SelfTest");
     expect(account, "account not added");

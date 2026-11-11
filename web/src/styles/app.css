@@ -6641,46 +6641,16 @@ html.reduce-motion .blocks.grow span {
   color: var(--muted);
 }
 
-/* ---------- first run: the name field in step one ---------- */
+/* ---------- first run: signing in, step one ---------- */
 
-.quick-offline {
+.first-sign-in {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 8px;
-  width: 100%;
 }
 
-.quick-offline-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 4px 4px 6px;
-  border-radius: var(--radius-lg);
-  background: var(--hero-edge);
-}
-
-.quick-offline-input {
-  flex: 1;
-  min-width: 0;
-  height: 28px;
-  border: 0;
-  background: transparent;
-  color: var(--on-dark);
-  font: inherit;
-  outline: none;
-}
-
-.quick-offline-input::placeholder {
-  color: var(--on-dark-faint);
-}
-
-.quick-offline-hint {
-  font-size: var(--text-xs);
-  color: var(--on-dark-warn);
-}
-
-.quick-offline-more {
-  align-self: flex-start;
+.first-sign-in-more {
   font-size: var(--text-xs);
   color: var(--on-dark-accent);
 }

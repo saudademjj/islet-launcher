@@ -10,7 +10,6 @@ import { shotTime, useScreenshots } from "../lib/screenshots";
 import { useServerList } from "../lib/servers";
 import { BlockProgress, Button, Identicon, Kbd, Notice, ProgressBar, SectionTitle } from "../components/ui";
 import { BIOMES, biomeStyle, useBiome, useCover } from "../lib/biome";
-import { PlayerFace } from "../components/PlayerFace";
 import { SceneCover } from "../components/SceneCover";
 import { updateName, formatBytes, formatPlayTime, formatRelative, formatSpeed, formatToday, greeting, isNight, loaderLabel, skyPhase, progressRatio, stageLabel } from "../lib/format";
 import { glide, item, normal, stagger } from "../lib/motion";
@@ -769,47 +768,19 @@ function NewWorlds() {
   );
 }
 
-/** The first step done in place: type a name, press Enter, and an offline
-    account exists. Microsoft sign-in stays one click away. */
-function QuickOffline({ onMore }: { onMore: () => void }) {
-  const mutate = useStore((s) => s.mutate);
-  const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
-  const value = name.trim();
-  const valid = value.length > 0 && value.length <= 16 && !/\s/.test(value);
-  // The same advice as the add-account dialog: other names work offline, but
-  // servers and some mods may refuse them.
-  const strict = /^[A-Za-z0-9_]{3,16}$/.test(value);
-  const create = async () => {
-    if (!valid || busy) return;
-    setBusy(true);
-    await mutate("add_offline_account", { username: value }, t(`欢迎，${value}`, `Welcome, ${value}`));
-    setBusy(false);
-  };
+/** The first step: a Microsoft account that owns the game. Offline
+    accounts open after it, on the Accounts page. */
+function FirstSignIn({ onMore }: { onMore: () => void }) {
+  const s = usePick((s) => ({ ready: s.loginConfigured, busy: s.authBusy || s.auth !== null, startLogin: s.startLogin, openSettings: s.openSettings }));
   return (
-    <form
-      className="quick-offline"
-      onSubmit={(e) => {
-        e.preventDefault();
-        void create();
-      }}
-    >
-      <span className="quick-offline-row">
-        <PlayerFace name={value || "player"} size={32} />
-        <input className="quick-offline-input" value={name} maxLength={16} placeholder={t("玩家名，例如 Steve", "Player name, e.g. Steve")} onChange={(e) => setName(e.target.value)} spellCheck={false} />
-        <Button size="sm" variant="primary" type="submit" disabled={!valid} busy={busy}>
-          {t("开始", "Start")}
-        </Button>
-      </span>
-      {valid && !strict && (
-        <span className="quick-offline-hint">
-          {t("可以使用，但部分服务器和模组只接受 3–16 位字母、数字或下划线", "Usable, but some servers and mods accept only 3–16 letters, digits or underscores")}
-        </span>
-      )}
-      <button type="button" className="link quick-offline-more" onClick={onMore}>
-        {t("用微软账号登录 →", "Sign in with Microsoft →")}
+    <span className="first-sign-in">
+      <Button size="sm" variant="primary" icon="shield" busy={s.busy} onClick={() => (s.ready ? void s.startLogin("browser") : s.openSettings("login"))}>
+        {s.ready ? t("用微软账号登录", "Sign in with Microsoft") : t("配置微软登录", "Set up Microsoft sign-in")}
+      </Button>
+      <button type="button" className="link first-sign-in-more" onClick={onMore}>
+        {t("其他登录方式 →", "Other ways to sign in →")}
       </button>
-    </form>
+    </span>
   );
 }
 
@@ -820,10 +791,10 @@ function Welcome({ hasInstances }: { hasInstances: boolean }) {
   const account = useActiveAccount();
   const steps = [
     {
-      title: t("起个名字", "Pick a name"),
-      text: null,
+      title: t("登录微软账号", "Sign in with Microsoft"),
+      text: t("离线账号在验证过拥有 Java 版后才能添加", "Offline accounts open after a sign-in that owns Java Edition"),
       done: account !== null,
-      action: <QuickOffline onMore={() => s.setPage("accounts")} />,
+      action: <FirstSignIn onMore={() => s.setPage("accounts")} />,
     },
     {
       title: t("创建世界", "Create a world"),

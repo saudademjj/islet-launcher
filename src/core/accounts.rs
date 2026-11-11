@@ -38,6 +38,23 @@ pub struct Account {
     pub server_name: Option<String>,
 }
 
+impl Account {
+    pub fn owns_game(&self) -> bool {
+        self.provider == AccountProvider::Microsoft && self.ownership == Some(true)
+    }
+}
+
+/// Offline accounts need a Microsoft account that owns the game first.
+pub fn owner_required() -> AppError {
+    AppError::new(
+        "owner_required",
+        crate::core::i18n::pick(
+            "离线账号需要先登录一个拥有 Minecraft Java 版的微软账号。",
+            "Offline accounts need a Microsoft account that owns Minecraft: Java Edition signed in first.",
+        ),
+    )
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct AccountFile {
@@ -74,6 +91,14 @@ impl AccountStore {
             .and_then(|guard| guard.iter().find(|account| account.id == id).cloned())
     }
 
+    /// Whether a Microsoft account that owns Java Edition has signed in.
+    /// Offline accounts open only after that, so the launcher doesn't play
+    /// the game for people who don't own it. Microsoft accounts are saved
+    /// only once their Minecraft profile loads, so any one here owns it.
+    pub fn has_owner(&self) -> bool {
+        self.accounts.read().map(|guard| guard.iter().any(Account::owns_game)).unwrap_or(false)
+    }
+
     pub fn upsert(&self, account: Account) -> AppResult<Account> {
         let mut guard = self
             .accounts
@@ -107,5 +132,41 @@ impl AccountStore {
         };
         let encoded = serde_json::to_vec_pretty(&file)?;
         atomic_write(&self.path, &encoded)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn account(id: &str, provider: AccountProvider, ownership: Option<bool>) -> Account {
+        Account {
+            id: id.into(),
+            provider,
+            username: "Steve".into(),
+            uuid: "00000000-0000-0000-0000-000000000001".into(),
+            xuid: None,
+            ownership,
+            skin_url: None,
+            skin_slim: false,
+            created_at: 0,
+            server: None,
+            server_name: None,
+        }
+    }
+
+    #[test]
+    fn only_a_microsoft_account_that_owns_the_game_counts() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = AccountStore::load(dir.path().join("accounts.json")).unwrap();
+        assert!(!store.has_owner());
+        store.upsert(account("offline:a", AccountProvider::Offline, None)).unwrap();
+        store.upsert(account("yggdrasil:b", AccountProvider::Yggdrasil, None)).unwrap();
+        store.upsert(account("microsoft:c", AccountProvider::Microsoft, Some(false))).unwrap();
+        assert!(!store.has_owner());
+        store.upsert(account("microsoft:d", AccountProvider::Microsoft, Some(true))).unwrap();
+        assert!(store.has_owner());
+        store.remove("microsoft:d").unwrap();
+        assert!(!store.has_owner());
     }
 }

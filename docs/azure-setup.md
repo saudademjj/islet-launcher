@@ -31,7 +31,7 @@ Mojang 只允许审核通过的 Azure 应用调用 Minecraft 登录接口（`log
 
 1. 打开 [aka.ms/mce-reviewappid](https://aka.ms/mce-reviewappid)，填写申请表：Client ID、Tenant ID（应用概览页的 Directory (tenant) ID）、启动器名称和网站、用途说明。
 2. 审核通常需要几天到几周，结果会发到申请邮箱。
-3. 通过前登录会在「换取 Minecraft 令牌」这一步失败；离线账号和外置登录不受影响。
+3. 通过前登录会在「换取 Minecraft 令牌」这一步失败；外置登录不受影响；离线账号要等有拥有 Java 版的微软账号登录后才能添加。
 
 被拒绝时邮件不一定说明原因，可能的原因有：
 
@@ -56,7 +56,7 @@ Mojang 只允许审核通过的 Azure 应用调用 Minecraft 登录接口（`log
 | `该微软账号未拥有 Minecraft Java 版` | 账号没有 Java 版拥有记录 | 换用拥有 Java 版的账号；离线账号不能用于正版在线服务器 |
 | `该微软账号还没有 Xbox 档案` | 微软账号未创建 Xbox 档案 | 先在 xbox.com 登录并创建档案 |
 | `儿童账号需要加入 Microsoft 家庭组` | 账号是儿童账号 | 由家庭组织者加入家庭组后再登录 |
-| 浏览器授权成功，但最后提示无法登录 Minecraft | Azure 应用还没有通过 Mojang AppID 审核 | 按上文申请审核；通过前只能用离线账号或外置登录 |
+| 浏览器授权成功，但最后提示无法登录 Minecraft | Azure 应用还没有通过 Mojang AppID 审核 | 按上文申请审核；通过前只能用外置登录 |
 | 浏览器登录完成后启动器没有反应 | 回环回调被拦截/超时 | 重新登录并改用设备代码登录 |
 
 ## 安全说明

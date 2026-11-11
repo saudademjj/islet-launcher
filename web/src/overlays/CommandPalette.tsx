@@ -20,7 +20,7 @@ import { shotTime, shotUrl, useShots } from "../lib/screenshots";
 import { aliasesOf, matchItem, queryWords } from "../lib/search";
 import { usePing, useServers } from "../lib/servers";
 import { dayLabel } from "./Screenshots";
-import { instanceState, usePick, useStore } from "../store";
+import { hasOwner, instanceState, usePick, useStore } from "../store";
 import { isEnglish, t } from "../lib/i18n";
 
 // ---------------------------------------------------------------------------
@@ -475,7 +475,7 @@ function useItems(query: string): { items: Item[]; quick: Item[] } {
       list.push(action("game-dir", t("打开游戏目录", "Open game folder"), "folder", () => void store.open({ kind: "gameDir", id: active.id }), { sub: active.name, keywords: "folder directory 目录 文件夹" }));
     }
     list.push(action("recycle", t("回收站", "Recycle bin"), "trash", () => void store.openRecycle(), { keywords: "recycle trash restore 回收站 恢复" }));
-    list.push(action("offline", t("添加离线账号", "Add offline account"), "user", () => store.openModal({ kind: "addOffline" }), { keywords: "account offline 账号 离线" }));
+    if (hasOwner(store.accounts)) list.push(action("offline", t("添加离线账号", "Add offline account"), "user", () => store.openModal({ kind: "addOffline" }), { keywords: "account offline 账号 离线" }));
     // Rooms: open the multiplayer page on the card that does it.
     const room = useP2p.getState().status;
     if (room?.active && room.code) {

@@ -9,7 +9,7 @@ import { Button, Chip, Notice, SectionTitle, Status } from "../components/ui";
 import { formatDate } from "../lib/format";
 import { item, stagger } from "../lib/motion";
 import { Toolbar } from "../layout/Shell";
-import { useActiveAccount, usePick, useStore } from "../store";
+import { useActiveAccount, useHasOwner, usePick, useStore } from "../store";
 import { t } from "../lib/i18n";
 
 export function AccountsPage() {
@@ -24,17 +24,16 @@ export function AccountsPage() {
     openSettings: s.openSettings,
   }));
   const active = useActiveAccount();
+  const owner = useHasOwner();
 
-  // The emphasised option is always one that works now: Microsoft sign-in
-  // once a Client ID is set, the offline account until then.
   const ready = s.loginConfigured;
   const microsoft = [
     {
       icon: "shield" as IconName,
       title: t("微软账号", "Microsoft account"),
       text: ready ? t("正版账号，可以进入开启验证的服务器", "A paid account that can join servers which verify accounts") : t("需要先在设置里填写 Client ID", "Needs a Client ID in Settings first"),
-      primary: ready,
-      pending: !ready,
+      primary: true,
+      tag: ready ? undefined : t("需配置", "Setup needed"),
       disabled: s.authBusy,
       onClick: () => (ready ? void s.startLogin("browser") : s.openSettings("login")),
     },
@@ -42,7 +41,7 @@ export function AccountsPage() {
       icon: "monitor" as IconName,
       title: t("设备代码登录", "Device code"),
       text: ready ? t("在手机或另一台电脑上完成微软登录", "Finish Microsoft sign-in on a phone or another computer") : t("同样需要先配置微软登录", "Also needs Microsoft sign-in set up first"),
-      pending: !ready,
+      tag: ready ? undefined : t("需配置", "Setup needed"),
       disabled: s.authBusy,
       onClick: () => (ready ? void s.startLogin("device") : s.openSettings("login")),
     },
@@ -50,24 +49,19 @@ export function AccountsPage() {
   const offline = {
     icon: "user" as IconName,
     title: t("离线账号", "Offline account"),
-    text: t("单人游戏和局域网", "Singleplayer and LAN"),
-    primary: !ready,
-    pending: false,
-    disabled: false,
+    text: owner ? t("单人游戏和局域网", "Singleplayer and LAN") : t("先登录一个拥有 Java 版的微软账号", "Sign in a Microsoft account that owns Java Edition first"),
+    tag: owner ? undefined : t("需正版", "Needs ownership"),
+    disabled: !owner,
     onClick: () => s.openModal({ kind: "addOffline" }),
   };
   const thirdParty = {
     icon: "globe" as IconName,
     title: t("外置登录", "Third-party sign-in"),
     text: t("LittleSkin 等皮肤站、统一通行证账号，用它们的皮肤和服务器验证", "Skin sites like LittleSkin, or 统一通行证, with their skins and server verification"),
-    primary: false,
-    pending: false,
     disabled: false,
     onClick: () => s.openModal({ kind: "addYggdrasil" }),
   };
-  const options: { icon: IconName; title: string; text: string; primary?: boolean; pending?: boolean; disabled?: boolean; onClick: () => void }[] = ready
-    ? [...microsoft, offline, thirdParty]
-    : [offline, ...microsoft, thirdParty];
+  const options: { icon: IconName; title: string; text: string; primary?: boolean; tag?: string; disabled?: boolean; onClick: () => void }[] = [...microsoft, offline, thirdParty];
 
   return (
     <>
@@ -88,7 +82,7 @@ export function AccountsPage() {
                       </Button>
                     }
                   >
-                    {t("这个版本没有内置微软登录。离线账号可以正常玩单人和局域网；有自己的 Azure 应用的话，可以在设置里填它的 Client ID。", "This build has no Microsoft sign-in built in. Offline accounts play singleplayer and LAN as usual; if you have your own Azure app, enter its Client ID in Settings.")}
+                    {t("这个版本没有内置微软登录。离线账号要先登录一个拥有 Java 版的微软账号；有自己的 Azure 应用的话，可以在设置里填它的 Client ID。", "This build has no Microsoft sign-in built in. Offline accounts need a Microsoft account that owns Java Edition first; if you have your own Azure app, enter its Client ID in Settings.")}
                   </Notice>
                 </motion.div>
               )}
@@ -113,13 +107,13 @@ export function AccountsPage() {
                 <SectionTitle>{s.accounts.length ? t("添加账号", "Add account") : t("添加第一个账号", "Add your first account")}</SectionTitle>
                 <div className="options">
                   {options.map((o) => (
-                    <button key={o.title} type="button" className={`option${o.primary ? " primary" : ""}${o.pending ? " pending" : ""}`} disabled={o.disabled} onClick={o.onClick}>
+                    <button key={o.title} type="button" className={`option${o.primary ? " primary" : ""}${o.tag ? " pending" : ""}`} disabled={o.disabled} onClick={o.onClick}>
                       <span className="option-icon">
                         <Icon name={o.icon} />
                       </span>
                       <span className="option-title">
                         {o.title}
-                        {o.pending && <span className="option-tag">{t("需配置", "Setup needed")}</span>}
+                        {o.tag && <span className="option-tag">{o.tag}</span>}
                       </span>
                       <span className="option-text">{o.text}</span>
                       <Icon name="chevronRight" className="option-go" />
@@ -127,7 +121,7 @@ export function AccountsPage() {
                   ))}
                 </div>
                 <p className="fine-print">
-                  {t("微软账号在微软官方页面登录，启动器不接触密码；登录后会校验是否拥有 Java 版，刷新令牌保存在系统凭据存储中。", "Microsoft accounts sign in on Microsoft's own page and the launcher never sees the password; ownership of Java Edition is checked, and the refresh token goes to the system keychain.")}
+                  {t("微软账号在微软官方页面登录，启动器不接触密码；登录后会校验是否拥有 Java 版，刷新令牌保存在系统凭据存储中。离线账号要求列表里有拥有 Java 版的微软账号，删掉后离线账号无法启动。", "Microsoft accounts sign in on Microsoft's own page and the launcher never sees the password; ownership of Java Edition is checked, and the refresh token goes to the system keychain. Offline accounts need a Microsoft account that owns Java Edition in this list, and stop launching once it's removed.")}
                 </p>
               </section>
             </motion.aside>
@@ -146,6 +140,7 @@ function providerLabel(account: Account): string {
 
 function AccountCard({ account, active }: { account: Account; active: boolean }) {
   const s = usePick((s) => ({ mutate: s.mutate, openModal: s.openModal, copy: s.copy }));
+  const owner = useHasOwner();
   return (
     <motion.div
       layout="position"
@@ -161,6 +156,7 @@ function AccountCard({ account, active }: { account: Account; active: boolean })
           <span className="account-name">{account.username}</span>
           <Chip>{providerLabel(account)}</Chip>
           {account.ownership === false && <Status tone="warn">{t("未拥有 Java 版", "Doesn't own Java Edition")}</Status>}
+          {account.provider === "offline" && !owner && <Status tone="warn">{t("需先登录微软账号", "Needs a Microsoft sign-in")}</Status>}
         </div>
         {/* The UUID is for whitelists and support, a click away rather than on show. */}
         <span className="account-meta">

@@ -100,7 +100,7 @@ Each world keeps its own version, loader, mods and saves, and gets a pixel lands
 Get them from the **[latest release](https://github.com/saudademjj/islet-launcher/releases/latest)**. The packages aren't code-signed yet, so Windows and macOS will check with you before the first launch; the [install guide](docs/INSTALL.en.md) shows what to click.
 
 > [!NOTE]
-> Microsoft sign-in switches on once Mojang approves Islet's app ID, which is under review. Until then, play with an offline or authlib-injector account.
+> Microsoft sign-in switches on once Mojang approves Islet's app ID, which is under review. Until then, play with an authlib-injector account. Offline accounts open once a Microsoft account that owns Java Edition has signed in.
 
 ## Everything else
 
@@ -112,7 +112,7 @@ Get them from the **[latest release](https://github.com/saudademjj/islet-launche
 - **Saves and maps**: automatic backups after you play, plus manual backup, restore, import and export; maps from CurseForge; jump straight into a save on 1.20+
 - **Mod configs**: edit the files in `config/` inside the launcher, with the previous version kept on every save
 - **Servers**: the game's own list, with live ping and one-click join
-- **Accounts**: offline with local skins, authlib-injector servers such as LittleSkin, 统一通行证 (Nide8), and Microsoft
+- **Accounts**: offline with local skins (after a Microsoft account that owns the game signs in), authlib-injector servers such as LittleSkin, 统一通行证 (Nide8), and Microsoft
 - **Moving in**: bring worlds over from the official launcher, HMCL, PCL, Prism and MultiMC
 - **Shortcuts**: ⌘K / Ctrl+K command palette, drag-and-drop installs, desktop shortcuts, Discord status
 - **Private**: no telemetry, and sign-in tokens stay in your system keychain

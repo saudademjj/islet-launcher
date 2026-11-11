@@ -656,6 +656,9 @@ impl AppServices {
 
     pub fn add_offline_account(&self, username: &str) -> AppResult<(Account, Settings)> {
         self.ensure_storage_idle()?;
+        if !self.accounts.has_owner() {
+            return Err(crate::core::accounts::owner_required());
+        }
         let account = offline::create_account(username)?;
         self.accounts.upsert(account.clone())?;
         let settings = self.settings.update(|settings| {
@@ -2081,6 +2084,11 @@ impl AppServices {
         target: LaunchTarget<'_>,
         offline: bool,
     ) -> AppResult<()> {
+        // Offline accounts saved before the rule, or kept after the
+        // Microsoft one was removed, wait for one to sign in again.
+        if account.provider == AccountProvider::Offline && !self.accounts.has_owner() {
+            return Err(crate::core::accounts::owner_required());
+        }
         let session = if offline {
             offline::session(account)
         } else {

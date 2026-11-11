@@ -295,7 +295,7 @@ let gameOptions: GameOptions = { exists: true, lang: "zh_cn", renderDistance: 12
 const listeners = new Set<(event: LauncherEvent) => void>();
 const emit = (event: LauncherEvent) => listeners.forEach((l) => l(event));
 const later = (ms: number, f: () => void) => window.setTimeout(f, ms);
-const fail = (message: string) => Promise.reject({ code: "demo", message, detail: null });
+const fail = (message: string, code = "demo") => Promise.reject({ code, message, detail: null });
 
 // Worlds running now, each with its log timer.
 const running = new Map<string, number>();
@@ -421,6 +421,7 @@ const commands: Record<string, (args: any) => unknown> = {
   login_configured: () => settings.clientId !== "",
   update_settings: ({ settings: next }) => (Object.assign(settings, next), snapshot()),
   add_offline_account: ({ username }) => {
+    if (!accounts.some((a) => a.provider === "microsoft" && a.ownership === true)) return fail("离线账号需要先登录一个拥有 Minecraft Java 版的微软账号。", "owner_required");
     if (!/^\S{1,16}$/.test(username)) return fail("用户名不能超过 16 个字符，也不能包含空格");
     const id = `offline:${username.toLowerCase()}`;
     accounts = [...accounts.filter((a) => a.id !== id), account(id, "offline", username, crypto.randomUUID())];
@@ -906,6 +907,11 @@ const commands: Record<string, (args: any) => unknown> = {
     later(900, () => {
       // `localStorage.mockSignIn = "auth_offline"` (or "auth_expired") in the
       // console tries the sign-in failures out.
+      const player = accounts.find((a) => a.id === (instances.find((i) => i.id === id)?.accountId ?? settings.activeAccountId));
+      if (player?.provider === "offline" && !accounts.some((a) => a.provider === "microsoft" && a.ownership === true)) {
+        emit({ type: "launchError", data: { instanceId: id, error: { code: "owner_required", message: "离线账号需要先登录一个拥有 Minecraft Java 版的微软账号。", detail: null } } });
+        return;
+      }
       const failure = offline ? null : localStorage.getItem("mockSignIn");
       if (failure) {
         const message = failure === "auth_expired" ? "登录已过期，请重新登录。" : "连不上登录服务器。可以先以离线身份玩单人游戏，存档和进度都在；联机服务器要等网络恢复。";
