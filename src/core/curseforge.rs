@@ -400,13 +400,12 @@ pub fn fingerprint(data: &[u8]) -> u32 {
     const M: u32 = 0x5bd1_e995;
     let bytes: Vec<u8> = data.iter().copied().filter(|b| !matches!(b, 9 | 10 | 13 | 32)).collect();
     let mut hash = 1 ^ bytes.len() as u32;
-    let mut chunks = bytes.chunks_exact(4);
-    for chunk in &mut chunks {
-        let mut k = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]).wrapping_mul(M);
+    let (chunks, rest) = bytes.as_chunks::<4>();
+    for chunk in chunks {
+        let mut k = u32::from_le_bytes(*chunk).wrapping_mul(M);
         k ^= k >> 24;
         hash = hash.wrapping_mul(M) ^ k.wrapping_mul(M);
     }
-    let rest = chunks.remainder();
     if !rest.is_empty() {
         for (i, byte) in rest.iter().enumerate() {
             hash ^= (*byte as u32) << (8 * i);

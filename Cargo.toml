@@ -39,7 +39,6 @@ md5 = "0.8"
 rsa = "0.9"
 sha1_compat = { package = "sha1", version = "0.10", features = ["oid"] }
 uuid = { version = "1", features = ["v4"] }
-unicode-segmentation = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 # Screenshot thumbnails; already in the tree through Tauri.
 png = "0.18"
