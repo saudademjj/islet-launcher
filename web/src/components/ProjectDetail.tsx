@@ -4,6 +4,7 @@ import { call, toError } from "../api/backend";
 import type { ContentKind, ModProject, ProjectDetails } from "../api/types";
 import { formatCount, formatRelative } from "../lib/format";
 import { t } from "../lib/i18n";
+import { renderSanitizedHtml, safeHttpsUrl } from "../lib/sanitize";
 import { usePick } from "../store";
 import { Icon, type IconName } from "./Icon";
 import { ModIcon } from "./ModIcon";
@@ -19,20 +20,8 @@ const LINK_LABEL: Record<string, string> = {
 
 /** Markdown or HTML from the project, rendered and then sanitized. The two
  *  libraries load only when a description is first opened. */
-async function render(details: ProjectDetails): Promise<string> {
-  const [{ marked }, { default: DOMPurify }] = await Promise.all([import("marked"), import("dompurify")]);
-  const html = details.format === "markdown" ? (marked.parse(details.body, { async: false, gfm: true }) as string) : details.body;
-  DOMPurify.removeAllHooks();
-  DOMPurify.addHook("afterSanitizeAttributes", (node) => {
-    if (node.tagName === "IMG") {
-      node.setAttribute("loading", "lazy");
-      node.setAttribute("referrerpolicy", "no-referrer");
-    }
-  });
-  return DOMPurify.sanitize(html, {
-    FORBID_TAGS: ["style", "form", "input", "button", "textarea", "select", "iframe", "video", "audio"],
-    FORBID_ATTR: ["style", "class", "id", "target"],
-  });
+function render(details: ProjectDetails): Promise<string> {
+  return renderSanitizedHtml(details.body, details.format === "markdown" ? "markdown" : "html");
 }
 
 /** A search result opened up: description, gallery and links, with the
@@ -71,12 +60,23 @@ export function ProjectDetail({ project, kind, glyph, busy, onInstall, onBack, p
   }, [newest?.id, project.project_id]);
   // Links in a description open in the browser, never inside the launcher.
   const follow = (event: React.MouseEvent) => {
-    const anchor = (event.target as HTMLElement).closest("a");
+    if (!(event.target instanceof Element)) return;
+    const anchor = event.target.closest("a");
     if (!anchor) return;
     event.preventDefault();
-    const href = anchor.getAttribute("href") ?? "";
-    if (/^https:\/\//i.test(href)) void s.openUrl(href);
+    if (event.type === "auxclick" && event.button !== 1) return;
+    const href = safeHttpsUrl(anchor.getAttribute("href"));
+    if (href) void s.openUrl(href);
   };
+
+  const safeLinks = details ? details.links.flatMap(([kindOfLink, url]) => {
+    const safe = safeHttpsUrl(url);
+    return safe ? [[kindOfLink, safe] as const] : [];
+  }) : [];
+  const safeGallery = details ? details.gallery.flatMap((image) => {
+    const safe = safeHttpsUrl(image.url);
+    return safe ? [{ ...image, url: safe }] : [];
+  }) : [];
 
   return (
     <div className="project-detail">
@@ -99,20 +99,20 @@ export function ProjectDetail({ project, kind, glyph, busy, onInstall, onBack, p
           </Button>
         )}
       </div>
-      {notes && <details><summary>{t("更新日志", "Changelog")}</summary><div className="project-body selectable" onClick={follow} dangerouslySetInnerHTML={{ __html: notes }} /></details>}
+      {notes && <details><summary>{t("更新日志", "Changelog")}</summary><div className="project-body selectable" onClick={follow} onAuxClick={follow} dangerouslySetInnerHTML={{ __html: notes }} /></details>}
       <p className="muted project-summary">{project.description}</p>
-      {details && details.links.length > 0 && (
+      {safeLinks.length > 0 && (
         <div className="project-links">
-          {details.links.map(([kindOfLink, url]) => (
+          {safeLinks.map(([kindOfLink, url]) => (
             <Button key={kindOfLink} size="sm" variant="ghost" icon="external" onClick={() => void s.openUrl(url)}>
               {LINK_LABEL[kindOfLink] ?? kindOfLink}
             </Button>
           ))}
         </div>
       )}
-      {details && details.gallery.length > 0 && (
+      {safeGallery.length > 0 && (
         <div className="project-gallery" aria-label={t("截图", "Gallery")}>
-          {details.gallery.map((image) => (
+          {safeGallery.map((image) => (
             <button key={image.url} type="button" className="project-shot" title={image.title ?? undefined} onClick={() => void s.openUrl(image.url)}>
               <img src={image.url} alt={image.title ?? ""} loading="lazy" referrerPolicy="no-referrer" />
             </button>
@@ -129,7 +129,7 @@ export function ProjectDetail({ project, kind, glyph, busy, onInstall, onBack, p
           {t(" 正在加载介绍…", " Loading the description…")}
         </div>
       ) : html.trim() ? (
-        <div className="project-body selectable" onClick={follow} dangerouslySetInnerHTML={{ __html: html }} />
+        <div className="project-body selectable" onClick={follow} onAuxClick={follow} dangerouslySetInnerHTML={{ __html: html }} />
       ) : (
         <div className="faint" style={{ padding: "12px 0" }}>
           {kind === "mod" ? t("这个模组没有写介绍。", "This mod has no description.") : t("这个项目没有写介绍。", "This project has no description.")}

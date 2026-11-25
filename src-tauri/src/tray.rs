@@ -142,7 +142,8 @@ pub(crate) fn watch_background_work(app: &AppHandle) {
             tokio::time::sleep(Duration::from_secs(1)).await;
             let services = app.state::<LauncherState>().services();
             let idle = services.activity() == Activity::Idle
-                && !app.state::<crate::p2p::P2p>().is_preparing();
+                && !app.state::<crate::p2p::P2p>().has_activity()
+                && !app.state::<crate::tunnel::Tunnels>().has_activity();
             if exit.ready(crate::quit_is_scheduled(), idle, Instant::now()) {
                 if !crate::has_unsaved_changes() {
                     crate::quit(&app);
@@ -300,12 +301,11 @@ fn dispatch(app: &AppHandle, id: &str) {
             hide_main_window(app, true);
         }
         "tray-play" => {
-            if services.activity() == Activity::Idle && !crate::quit_is_scheduled() {
-                if let Some(instance_id) = services.settings.get().active_instance_id {
+            if services.activity() == Activity::Idle && !crate::quit_is_scheduled()
+                && let Some(instance_id) = services.settings.get().active_instance_id {
                     crate::events::show_main_window(app, true);
                     services.send(UiEvent::LaunchRequest { instance_id });
                 }
-            }
         }
         "tray-stop" => {
             if !services.running_instance_ids().is_empty()

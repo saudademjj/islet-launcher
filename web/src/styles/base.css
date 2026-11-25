@@ -1,0 +1,452 @@
+/* ---------- base ---------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+html {
+  background: var(--frame);
+}
+
+body {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--frame);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+  overflow: hidden;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: default;
+}
+
+h1 {
+  margin: 0;
+}
+
+::selection {
+  background: var(--selection);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.94em;
+  letter-spacing: -0.01em;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.faint {
+  color: var(--faint);
+}
+
+.selectable {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+.truncate {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* Spacing between children, only in steps of the spacing scale. */
+.gap-2 { gap: 2px; }
+.gap-4 { gap: 4px; }
+.gap-6 { gap: 6px; }
+.gap-8 { gap: 8px; }
+.gap-12 { gap: 12px; }
+.gap-16 { gap: 16px; }
+.gap-20 { gap: 20px; }
+.gap-24 { gap: 24px; }
+
+.fill {
+  flex: 1;
+  min-width: 0;
+}
+
+.min-0 {
+  min-width: 0;
+}
+
+.wrap {
+  flex-wrap: wrap;
+}
+
+.items-start {
+  align-items: flex-start;
+}
+
+.items-baseline {
+  align-items: baseline;
+}
+
+.justify-end {
+  justify-content: flex-end;
+}
+
+.dot {
+  width: 4px;
+  height: 4px;
+  flex: none;
+  background: var(--border-strong);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: var(--radius-lg);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---------- pixel art ---------- */
+
+.pixel {
+  display: block;
+  flex: none;
+}
+
+.px-g {
+  fill: var(--t-grass);
+}
+.px-g2 {
+  fill: var(--t-grass-dark);
+}
+.px-g3 {
+  fill: var(--t-grass-light);
+}
+.px-d {
+  fill: var(--t-dirt);
+}
+.px-d2 {
+  fill: var(--t-dirt-dark);
+}
+.px-d3 {
+  fill: var(--t-dirt-light);
+}
+.px-w {
+  fill: var(--t-wood);
+}
+.px-l {
+  fill: var(--t-leaf);
+}
+.px-l2 {
+  fill: var(--t-leaf-dark);
+}
+.px-f {
+  fill: var(--t-flower);
+}
+.px-c {
+  fill: var(--hero-cloud);
+}
+.px-k {
+  fill: var(--t-stone);
+}
+.px-k2 {
+  fill: var(--t-stone-dark);
+}
+.px-v {
+  fill: var(--t-cave);
+}
+.px-o1 {
+  fill: var(--t-coal);
+}
+.px-o2 {
+  fill: var(--t-iron);
+}
+.px-o3 {
+  fill: var(--t-gem);
+}
+
+/* The notice signpost: wood in both themes, its mark in the tone. */
+.sign-edge,
+.sign-post-shade {
+  fill: var(--sign-edge);
+}
+.sign-light {
+  fill: var(--sign-light);
+}
+.sign-face {
+  fill: var(--sign-face);
+}
+.sign-shade {
+  fill: var(--sign-shade);
+}
+.sign-post {
+  fill: var(--t-wood);
+}
+.sign-mark {
+  fill: var(--sign-ink);
+}
+.sign.danger .sign-mark {
+  fill: var(--sign-danger);
+}
+.sign.warn .sign-mark {
+  fill: var(--sign-warn);
+}
+.sign.ok .sign-mark {
+  fill: var(--sign-ok);
+}
+
+/* ---------- block progress and memory blocks ---------- */
+
+.blocks {
+  display: grid;
+  grid-template-columns: repeat(32, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.blocks span {
+  height: 10px;
+  background: var(--hero-edge);
+  transition: background var(--dur) var(--ease-out);
+}
+
+.blocks span.on {
+  background: var(--accent);
+}
+
+.blocks span.lead {
+  background: var(--on-dark-accent);
+}
+
+.fact-blocks {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  max-width: 110px;
+  margin-left: 12px;
+  align-self: center;
+}
+
+.fact-blocks i {
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+}
+
+/* ---------- small motions ---------- */
+
+.nav-item .icon {
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.nav-item:hover .icon {
+  transform: translateX(1px);
+}
+
+/* ---------- layered landscape ----------
+   Layers rise once on mount, far to near; hovering a scene pans them at
+   different speeds, like a camera moving past. */
+
+.landscape {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 0;
+  z-index: -1;
+}
+
+.land {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  line-height: 0;
+  animation: land-rise 560ms var(--ease-out) both;
+}
+
+.land.near {
+  animation-delay: 70ms;
+}
+
+.land.ground {
+  animation-delay: 140ms;
+}
+
+@keyframes land-rise {
+  from {
+    transform: translateY(26px);
+    opacity: 0;
+  }
+}
+
+.land .pixel {
+  transition: transform 1.4s var(--ease-out);
+}
+
+.hero:hover .land.far .pixel,
+.world:hover .land.far .pixel,
+.profile:hover .land.far .pixel {
+  transform: translateX(-6px);
+}
+
+.hero:hover .land.near .pixel {
+  transform: translateX(-12px);
+}
+
+.hero:hover .land.ground .pixel,
+.world:hover .land.ground .pixel,
+.profile:hover .land.ground .pixel {
+  transform: translateX(-20px);
+}
+
+/* ---------- install finished: the blocks grow grass ---------- */
+
+.blocks.grow span {
+  animation: block-grow 420ms steps(3, end) both;
+}
+
+@keyframes block-grow {
+  0% {
+    background: var(--t-dirt);
+  }
+  50% {
+    background: var(--t-grass-dark);
+  }
+  100% {
+    background: var(--accent);
+  }
+}
+
+.install-done {
+  color: var(--on-dark-accent);
+}
+
+html.reduce-motion .blocks.grow span {
+  animation: none;
+  background: var(--accent);
+}
+
+/* ---------- loading placeholders ----------
+   Rows of the shape that is coming, so the list does not jump when the
+   answer arrives; a page being replaced stays, dimmed. */
+
+.skeleton {
+  display: block;
+  height: 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  animation: skeleton 1.2s steps(2, jump-none) infinite alternate;
+}
+
+.skeleton-icon {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: var(--radius-lg);
+}
+
+@keyframes skeleton {
+  to {
+    background: var(--border);
+  }
+}
+
+.browse-skeleton {
+  min-height: 62px;
+  border-bottom: 1px solid var(--border);
+}
+
+.browse-results.stale .browse-hit {
+  opacity: 0.55;
+  transition: opacity var(--dur) var(--ease-out);
+}
+
+/* "More" in a long filter group: dashed, so it reads as a control. */
+.filter-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-style: dashed;
+}
+
+/* ---------- removing things ----------
+   The trash button on a row only shows when the row is pointed at or
+   focused, so lists stay calm; it moves files to the recycle bin. */
+
+.row-remove {
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.mod-row:hover .row-remove,
+.pack-tile:hover .row-remove,
+.row-remove:focus-visible {
+  opacity: 1;
+}
+
+.row-remove:hover:not(:disabled) {
+  color: var(--danger-text);
+}
+
+/* Section labels with buttons: the buttons sit on the label's line. */
+.section-label .btn {
+  align-self: center;
+  letter-spacing: 0;
+}
+
+.world-tile.clickable {
+  cursor: pointer;
+}
+
+.world-tile.clickable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

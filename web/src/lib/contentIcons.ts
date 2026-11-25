@@ -11,20 +11,22 @@ import type { LocalMod, PackInsight, PackLists } from "../api/types";
 
 /** Icons from inside the mod jars, by file name; re-read when the list changes. */
 export function useModIcons(id: string, mods: LocalMod[]): Record<string, string> {
-  const [icons, setIcons] = useState<{ key: string; value: Record<string, string> } | null>(null);
+  const [icons, setIcons] = useState<{ id: string; key: string; value: Record<string, string> } | null>(null);
   const key = `${id}:${mods.map((m) => `${m.name}/${m.bytes}`).join("|")}`;
   useEffect(() => {
     if (mods.length === 0) return;
     let live = true;
     call<Record<string, string>>("mod_icons", { id })
-      .then((value) => live && setIcons({ key, value }))
-      .catch(() => live && setIcons({ key, value: {} }));
+      .then((value) => live && setIcons({ id, key, value }))
+      .catch(() => live && setIcons({ id, key, value: {} }));
     return () => {
       live = false;
     };
-  }, [key]);
-  // Keep the previous icons while a changed list is read again.
-  return icons?.value ?? {};
+  }, [id, key, mods.length]);
+  // Keep this instance's previous icons while a changed list is read again;
+  // never show stale icons after switching worlds or removing the last mod.
+  if (mods.length === 0 || icons?.id !== id) return {};
+  return icons.value;
 }
 
 const usePackStore = create<{

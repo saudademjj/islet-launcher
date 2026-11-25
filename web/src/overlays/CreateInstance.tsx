@@ -81,7 +81,7 @@ export function CreateInstance() {
   }, [s.versions, filter, query]);
 
   const create = async () => {
-    if (!selected) return;
+    if (creating || !selected || !loaderValid) return;
     setCreating(true);
     const ok = await s.mutate("create_instance", {
       name: name.trim(),
@@ -144,7 +144,7 @@ export function CreateInstance() {
         <>
           <span className="faint create-note">
             {s.fromCache && t("版本列表来自本地缓存 · ", "Cached version list · ")}
-            {t("封面只是启动器里的背景，不决定游戏地形；存档在开始游戏后到游戏里新建", "The cover is only the launcher's backdrop, not the game's terrain; make a save in the game after pressing Play")}
+            {t("封面仅用于启动器展示", "Cover is only used inside the launcher")}
           </span>
           <Button variant="ghost" onClick={s.closeModal}>
             {t("取消", "Cancel")}

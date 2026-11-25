@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
 
 import { t } from "../lib/i18n";
+import { cssBackgroundUrl } from "../lib/sanitize";
 import { secure, useSkin } from "./PlayerFace";
 
 // The whole player in 3D, built from CSS boxes whose faces are cut from the
@@ -77,7 +78,7 @@ function BoxView({ box, url, sheet, px }: { box: Box; url: string; sheet: [numbe
           height: fh * px,
           marginLeft: (-fw * px) / 2,
           marginTop: (-fh * px) / 2,
-          backgroundImage: `url("${url}")`,
+          backgroundImage: cssBackgroundUrl(url),
           backgroundSize: `${sheet[0] * px}px ${sheet[1] * px}px`,
           backgroundPosition: `${-fu * px}px ${-fv * px}px`,
           transform: `${face.turn} translateZ(${out * px}px) scale(${sx}, ${sy})`,
@@ -95,6 +96,7 @@ function useCape(url: string | null | undefined): string | null {
     setCape(null);
     if (!url) return;
     const src = secure(url);
+    if (!src) return;
     const image = new Image();
     image.onload = () => image.naturalWidth === image.naturalHeight * 2 && setCape(src);
     image.src = src;

@@ -1,0 +1,1295 @@
+/* ---------- accounts ---------- */
+
+.account-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+}
+
+.account-card.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.account-name {
+  font-size: var(--text-md);
+  font-weight: 750;
+}
+
+.options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-height: 158px;
+  padding: 20px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: 0 3px 0 var(--border-strong);
+  text-align: left;
+  transition: transform 80ms var(--ease-out), box-shadow 80ms var(--ease-out), background var(--dur-fast);
+}
+
+.option:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.option:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 var(--border-strong);
+}
+
+.option:disabled {
+  opacity: 0.5;
+}
+
+/* The way that works now: a green edge on the same paper. Dark cards are
+   kept for things from the game (servers, the screenshot viewer). */
+.option.primary {
+  border-color: var(--accent-edge);
+  box-shadow: 0 3px 0 var(--accent-edge);
+}
+
+.option.primary:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.option-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 12px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.option.primary .option-icon {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.option-title {
+  font-size: var(--text-md);
+  font-weight: 750;
+}
+
+.option-text {
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+
+.option-go {
+  position: absolute;
+  top: 20px;
+  right: 18px;
+  color: var(--faint);
+}
+
+.option.primary .option-go {
+  color: var(--accent-text);
+}
+
+/* In an aside the ways to choose stack as rows: tile, words, arrow. */
+.page-aside .options {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.page-aside .option {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 16px;
+  column-gap: 12px;
+  row-gap: 2px;
+  align-items: center;
+  min-height: 0;
+  padding: 16px;
+}
+
+.page-aside .option-icon {
+  grid-row: span 2;
+  margin: 0;
+}
+
+.page-aside .option-text {
+  grid-column: 2;
+  font-size: var(--text-xs);
+}
+
+.page-aside .option-go {
+  position: static;
+  grid-column: 3;
+  grid-row: 1 / span 2;
+}
+
+/* ---------- settings ---------- */
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.setting-name {
+  font-weight: 650;
+}
+
+.help-steps {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: 1.9;
+}
+
+.presets {
+  display: inline-flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-3);
+}
+
+.preset {
+  height: 26px;
+  min-width: 42px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  transition: color var(--dur-fast), background var(--dur-fast);
+}
+
+.preset:hover {
+  color: var(--text);
+}
+
+.preset[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+  box-shadow: 0 1px 0 var(--border-strong);
+}
+
+.themes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 176px));
+  gap: 16px;
+}
+
+.theme {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.theme-preview {
+  position: relative;
+  display: block;
+  height: 96px;
+  border-radius: var(--radius-xl);
+  border: 2px solid var(--border);
+  overflow: hidden;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+
+.theme:hover .theme-preview {
+  border-color: var(--border-strong);
+}
+
+.theme[aria-pressed="true"] .theme-preview {
+  border-color: var(--accent);
+}
+
+.theme-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.theme[aria-pressed="true"] .theme-label {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.theme[aria-pressed="true"] .theme-label .icon {
+  color: var(--accent-text);
+}
+
+.tp {
+  display: flex;
+  height: 100%;
+  background: var(--tp-side);
+}
+
+.tp-side {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 22%;
+  flex: none;
+  padding: 16px 6px 0;
+}
+
+.tp-nav {
+  height: 5px;
+  border-radius: 1px;
+  background: var(--tp-line);
+  opacity: 0.35;
+}
+
+.tp-nav.on {
+  background: var(--tp-grass);
+  opacity: 1;
+}
+
+.tp-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--tp-bg);
+  border-radius: var(--radius) 0 0 var(--radius);
+  overflow: hidden;
+}
+
+/* Full-bleed stage, as on the home page. */
+.tp-hero {
+  position: relative;
+  height: 58px;
+  background: var(--tp-hero);
+}
+
+.tp-title {
+  position: absolute;
+  left: 8px;
+  top: 10px;
+  width: 38%;
+  height: 7px;
+  border-radius: 1px;
+  background: var(--tp-cream);
+}
+
+.tp-button {
+  position: absolute;
+  left: 8px;
+  top: 22px;
+  width: 26px;
+  height: 8px;
+  border-radius: 1px;
+  background: var(--tp-grass);
+}
+
+.tp-ground {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tp-ground i {
+  display: block;
+}
+
+.tp-ground .g {
+  height: 3px;
+  background: var(--tp-grass);
+}
+
+.tp-ground .d {
+  height: 5px;
+  background: var(--tp-dirt);
+}
+
+.tp-ground .s {
+  height: 7px;
+  background: var(--tp-stone);
+}
+
+.tp-facts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 0 6px;
+}
+
+.tp-facts i {
+  height: 14px;
+  border-radius: 1px;
+  background: var(--tp-card);
+}
+
+.theme-preview-half {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  right: 0;
+  overflow: hidden;
+}
+
+.theme-preview-half .tp {
+  width: 200%;
+  margin-left: -100%;
+}
+
+/* ---------- settings index ---------- */
+
+.settings-layout {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.settings-index {
+  position: sticky;
+  top: 4px;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.index-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 36px;
+  padding: 0 12px 0 16px;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--muted);
+  font-weight: 550;
+  text-align: left;
+  transition: color var(--dur-fast);
+}
+
+.index-item:hover {
+  color: var(--text);
+}
+
+.index-item[aria-current="true"] {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.index-item[aria-current="true"] .icon {
+  color: var(--accent-text);
+}
+
+.index-item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.index-count {
+  margin-left: auto;
+  font-family: var(--font-pixel);
+  font-size: var(--px-font);
+  font-weight: 400;
+  color: var(--accent-text);
+  -webkit-font-smoothing: none;
+}
+
+/* settings search: matches stay and are marked, the rest step aside */
+.settings-search {
+  width: 220px;
+}
+
+.settings-searching .search-miss {
+  display: none;
+}
+
+.settings-searching .search-hit {
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 8px var(--accent-soft);
+}
+
+.settings-none {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 4px;
+  color: var(--muted);
+}
+
+.index-highlight {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: var(--radius-lg);
+  background: var(--surface-3);
+}
+
+.index-highlight::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: var(--accent);
+}
+
+.settings-section {
+  scroll-margin-top: 12px;
+}
+
+@media (max-width: 1080px) {
+  .settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .settings-index {
+    display: none;
+  }
+}
+
+/* ---------- accounts: player card ---------- */
+
+.profile {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 24px;
+  padding: 24px 32px 80px;
+  border-radius: var(--radius-xl);
+  background: var(--hero);
+  color: var(--on-dark);
+  overflow: hidden;
+}
+
+.profile-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--on-dark-faint);
+}
+
+.profile-name {
+  font-size: var(--text-xl);
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.profile-kind {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 12px;
+  border-radius: var(--radius-xl);
+  background: var(--hero-2);
+  font-size: var(--text-xs);
+  font-weight: 650;
+}
+
+.account-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: var(--text-xs);
+  color: var(--faint);
+}
+
+.account-uuid {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xs);
+}
+
+/* ---------- settings: unsaved bar and Java rows ---------- */
+
+.save-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 18px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(560px, calc(100% - 64px));
+  margin: 0 auto;
+  padding: 12px 12px 12px 16px;
+  border-radius: var(--radius-xl);
+  background: var(--frame);
+  color: var(--on-dark);
+  box-shadow: 0 4px 0 var(--hero-edge);
+}
+
+.save-bar-mark {
+  width: 8px;
+  height: 8px;
+  background: var(--on-dark-warn);
+  flex: none;
+}
+
+.save-bar-text {
+  font-weight: 650;
+}
+
+.save-bar .kbd {
+  color: var(--on-dark-faint);
+}
+
+/* Leave room above the bar so the last section can scroll clear of it. */
+.settings-layout {
+  padding-bottom: 96px;
+}
+
+.java-major {
+  flex: none;
+  width: 64px;
+  font-family: var(--font-pixel);
+  font-size: var(--px-font);
+  -webkit-font-smoothing: none;
+  color: var(--text);
+}
+
+.java-name {
+  font-weight: 650;
+}
+
+/* ---------- accounts: an option that needs setup first ---------- */
+
+.option.pending {
+  border-style: dashed;
+}
+
+.option.pending .option-icon {
+  background: var(--surface-3);
+  color: var(--faint);
+}
+
+.option-tag {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-family: var(--font-pixel);
+  font-size: var(--px-font);
+  font-weight: 400;
+  -webkit-font-smoothing: none;
+  vertical-align: 1px;
+}
+
+/* ---------- storage ---------- */
+
+.storage-total {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+/* One bar, one solid block per kind of file, in the grass family. */
+.storage-bar {
+  display: flex;
+  gap: 3px;
+  height: 12px;
+}
+
+.storage-bar span {
+  min-width: 3px;
+  background: var(--accent);
+}
+
+.storage-bar span:nth-child(2) {
+  background: var(--accent-edge);
+}
+
+.storage-bar span:nth-child(3) {
+  background: var(--t-leaf);
+}
+
+.storage-bar span:nth-child(4) {
+  background: var(--t-dirt-light);
+}
+
+.storage-bar span:nth-child(n + 5) {
+  background: var(--border-strong);
+}
+
+.storage-row {
+  gap: 16px;
+}
+
+/* ---------- multiplayer: P2P rooms ----------
+   A forest panel on its own land: this computer and the other side joined
+   by a bridge of blocks that is whole, patchy, gapped or broken with the
+   connection. Below it the checks and the people in the room, on paper. */
+
+.room-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin-bottom: 16px;
+  border-radius: var(--radius-xl);
+  background: var(--hero);
+  color: var(--on-dark);
+}
+
+.room-hero-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px 32px 84px;
+}
+
+.room-eyebrow {
+  color: var(--on-dark-faint);
+}
+
+.room-title {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.room-text {
+  margin: 0;
+  max-width: 600px;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--on-dark-muted);
+}
+
+/* level → colour, on the forest panel and on paper */
+.lamp,
+.bridge,
+.check,
+.player,
+.nav-dot,
+.room-dot {
+  --lv: var(--on-dark-faint);
+  --lv-paper: var(--muted);
+}
+
+.lamp-good,
+.bridge-good,
+.level-good {
+  --lv: var(--on-dark-accent);
+  --lv-paper: var(--accent-text);
+}
+
+.lamp-fair,
+.lamp-starting,
+.bridge-fair,
+.bridge-starting,
+.level-fair,
+.level-starting {
+  --lv: var(--on-dark-warn);
+  --lv-paper: var(--warn);
+}
+
+.lamp-poor,
+.lamp-down,
+.bridge-poor,
+.bridge-down,
+.level-poor,
+.level-down {
+  --lv: var(--on-dark-danger);
+  --lv-paper: var(--danger-text);
+}
+
+/* the lantern: an iron frame, its light the room's health */
+.lamp {
+  display: block;
+  flex: none;
+}
+
+.lamp-frame {
+  fill: var(--on-dark-faint);
+}
+
+.lamp-light {
+  fill: var(--lv);
+  transition: fill var(--dur) var(--ease-out);
+}
+
+.lamp-shine {
+  fill: var(--on-dark);
+  opacity: 0.55;
+  transition: opacity var(--dur) var(--ease-out);
+}
+
+.lamp-idle .lamp-shine,
+.lamp-down .lamp-shine {
+  opacity: 0;
+}
+
+.lamp-starting .lamp-light {
+  animation: pulse 1.4s var(--ease-out) infinite;
+}
+
+/* The bridge: two players at the ends, twelve blocks between. */
+.bridge {
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  margin: 6px 0 2px;
+}
+
+.bridge-end {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-lg);
+  background: var(--hero-2);
+  box-shadow: 0 3px 0 var(--hero-edge);
+}
+
+.bridge-ghost {
+  font-family: var(--font-pixel);
+  font-size: var(--px-font-2);
+  line-height: 1;
+  color: var(--on-dark-faint);
+  -webkit-font-smoothing: none;
+}
+
+.bridge-span {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  max-width: 420px;
+  gap: 3px;
+  margin: 0 3px 9px;
+}
+
+.bridge-cell {
+  flex: 1;
+  height: 9px;
+  background: var(--t-wood);
+  box-shadow: 0 3px 0 var(--t-dirt-dark);
+  transition: background-color var(--dur) var(--ease-out), opacity var(--dur) var(--ease-out);
+}
+
+.bridge-none .bridge-cell {
+  background: var(--hero-3);
+  box-shadow: none;
+}
+
+.bridge-good .bridge-cell {
+  background: var(--lv);
+  box-shadow: 0 3px 0 var(--accent-edge);
+}
+
+/* fair: every other block only outlined */
+.bridge-fair .bridge-cell:nth-child(even) {
+  background: transparent;
+  box-shadow: inset 0 0 0 3px var(--lv);
+}
+
+/* poor: blocks missing here and there */
+.bridge-poor .bridge-cell:nth-child(3n + 2) {
+  opacity: 0;
+}
+
+/* down: broken in the middle, the two halves hanging */
+.bridge-down .bridge-cell:nth-child(n + 5):nth-child(-n + 8) {
+  opacity: 0;
+}
+
+.bridge-down .bridge-cell:nth-child(4),
+.bridge-down .bridge-cell:nth-child(9) {
+  transform: translateY(6px);
+}
+
+/* starting: laid block by block, again until the link is up */
+.bridge-starting .bridge-cell {
+  animation: bridge-lay 2.4s steps(1, jump-none) infinite;
+}
+
+@keyframes bridge-lay {
+  0% {
+    opacity: 0;
+  }
+  45%,
+  100% {
+    opacity: 1;
+  }
+}
+
+.room-code-row {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-top: 4px;
+}
+
+.room-code {
+  font-family: var(--font-pixel);
+  font-size: var(--px-font-2);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--on-dark);
+  -webkit-font-smoothing: none;
+  overflow-wrap: anywhere;
+}
+
+.room-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 16px;
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.room-hint .icon {
+  flex: none;
+  margin-top: 2px;
+}
+
+/* not in a room: two cards side by side */
+.room-start {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+/* Two ways in, side by side and equal: neither is a step before the
+   other. Each card is header, body and a footer like a dialog's, so
+   the two actions sit on one line whatever the bodies hold. */
+.room-card {
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 3px 0 var(--border-strong);
+}
+
+.room-card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+}
+
+.room-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 calc(var(--radius-xl) - 1px) calc(var(--radius-xl) - 1px);
+  background: var(--surface-2);
+}
+
+.room-card-foot > .room-card-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.room-card-foot > .btn {
+  flex: none;
+  margin-left: auto;
+}
+
+.room-card-text {
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.lan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 36px;
+}
+
+.lan-game {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--text);
+  text-align: left;
+}
+
+button.lan-game:hover {
+  border-color: var(--accent-edge);
+}
+
+.lan-game[aria-pressed="true"] {
+  border-color: var(--accent-edge);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 650;
+}
+
+.lan-game.skeleton {
+  height: 36px;
+  border: 0;
+}
+
+.lan-empty {
+  display: grid;
+  place-items: center;
+  height: 36px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-xs);
+  color: var(--faint);
+}
+
+.lan-empty.waiting,
+.lan-empty.start {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: auto;
+  min-height: 36px;
+  padding: 6px 12px;
+  text-align: center;
+}
+
+.code-input {
+  height: 44px;
+  font-size: var(--text-md);
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+/* in a room: checks and people */
+.room-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+  margin-bottom: 16px;
+}
+
+.checks,
+.players {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+}
+
+.check,
+.player {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 12px 16px;
+}
+
+.check + .check,
+.player + .player,
+.player + .players-empty {
+  border-top: 1px solid var(--border);
+}
+
+.check-mark {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  background: var(--lv-paper);
+}
+
+.check.level-starting .check-mark {
+  animation: pulse 1.4s var(--ease-out) infinite;
+}
+
+.check-label,
+.player-name {
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+
+.check-detail {
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.check.level-poor .check-detail,
+.check.level-down .check-detail {
+  color: var(--danger-text);
+}
+
+.players-empty {
+  padding: 20px 16px;
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--faint);
+}
+
+.room-world {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-3);
+  font-size: var(--text-xs);
+}
+
+.room-advanced {
+  margin-top: 24px;
+  padding: 0 0 4px;
+  border-top: 1px solid var(--border);
+}
+
+.room-advanced > summary {
+  padding: 16px 0;
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+
+.room-advanced > summary .faint {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.room-advanced[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.room-advanced-alt {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.room-advanced-title {
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+
+.room-nodes {
+  height: auto;
+  min-height: 112px;
+  padding: 12px 12px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+/* the room's health beside the nav item and in the status bar */
+.nav-dot,
+.room-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--lv);
+}
+
+.nav-dot.pulse,
+.room-dot.pulse {
+  animation: pulse 1.4s var(--ease-out) infinite;
+}
+
+.nav-item .nav-dot {
+  margin-left: auto;
+}
+
+.nav-item .nav-dot + .kbd {
+  margin-left: 0;
+}
+
+/* The save bar asking before a page switch: same row, other words. */
+.save-bar-question {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---------- server page: projects beside the one being edited ---------- */
+
+.server-layout {
+  display: grid;
+  grid-template-columns: 208px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.server-layout.single {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 860px;
+}
+
+.server-list {
+  position: sticky;
+  top: 0;
+  overflow: hidden;
+}
+
+.server-list .list-row {
+  width: 100%;
+  text-align: left;
+  color: var(--text);
+}
+
+.server-list-name {
+  max-width: 100%;
+  overflow: hidden;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.server-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  flex-wrap: wrap;
+}
+
+/* A long form in named parts, the way settings read at GitHub or Stripe:
+   the part's name and a line about it, then its fields; a hairline
+   between parts. Where the card is wide enough the name moves beside
+   its fields, so the eye runs down one edge of names. */
+.form-sections {
+  container: form / inline-size;
+}
+
+.form-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  padding: 20px;
+}
+
+.form-section + .form-section {
+  border-top: 1px solid var(--border);
+}
+
+.form-section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-section-title {
+  font-weight: 650;
+}
+
+.form-section-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+@container form (min-width: 560px) {
+  .form-section {
+    grid-template-columns: 160px minmax(0, 1fr);
+    gap: 20px;
+  }
+}
+
+.server-head-name {
+  font-size: var(--text-lg);
+  font-weight: 750;
+}
+
+.server-kinds {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.server-kind-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.server-versions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.server-version {
+  min-width: 64px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 2px 0 var(--border);
+  color: var(--text);
+  font-size: var(--text-sm);
+  transition: border-color var(--dur-fast), background var(--dur-fast), box-shadow var(--dur-fast);
+}
+
+.server-version:hover {
+  border-color: var(--border-strong);
+}
+
+.server-version[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 2px 0 var(--accent-edge);
+  font-weight: 700;
+}

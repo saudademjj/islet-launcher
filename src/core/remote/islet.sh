@@ -84,12 +84,13 @@ status() {
 
 set_prop() {
 	touch server.properties
+	clean=$(printf '%s' "$2" | tr -d '\r\n')
 	if grep -q "^$1=" server.properties; then
 		# The value goes into sed's replacement: \ & and | are taken literally.
-		v=$(printf '%s' "$2" | sed 's/[\\&|]/\\&/g')
+		v=$(printf '%s' "$clean" | sed 's/[\\&|]/\\&/g')
 		sed -i "s|^$1=.*|$1=$v|" server.properties
 	else
-		printf '%s=%s\n' "$1" "$2" >> server.properties
+		printf '%s=%s\n' "$1" "$clean" >> server.properties
 	fi
 }
 
@@ -157,11 +158,20 @@ setup() {
 # Starting at boot and a backup every night: cron when there is one, else
 # systemd units when running as root.
 schedule() {
-	tag="# islet:$HERE"
+	legacy="# islet:$HERE"
+	tag="# islet:$HERE#"
 	unit="islet-$(printf %s "$HERE" | cksum | cut -d ' ' -f 1)"
 	if command -v crontab >/dev/null 2>&1; then
 		{
-			crontab -l 2>/dev/null | grep -vF "$tag"
+			# Exact tag match so /islet/survival never removes /islet/survival-2.
+			crontab -l 2>/dev/null | awk -v t1="$legacy" -v t2="$tag" '
+				{
+					l = length($0)
+					if (index($0, t2) > 0) next
+					if (l >= length(t1) && substr($0, l - length(t1) + 1) == t1) next
+					print
+				}
+			'
 			[ "$1" = 1 ] && echo "@reboot sh $HERE/islet.sh start >/dev/null 2>&1 $tag"
 			[ "$2" = 1 ] && echo "17 5 * * * sh $HERE/islet.sh backup >/dev/null 2>&1 $tag"
 		} | crontab - && echo cron > .islet/schedule

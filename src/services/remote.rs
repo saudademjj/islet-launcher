@@ -192,12 +192,16 @@ impl AppServices {
     pub async fn remote_download_backup(&self, id: &str, name: &str, destination: &Path) -> AppResult<()> {
         let name = remote::backup_name(name)?;
         let (target, session) = self.remote_session(id).await?;
-        let partial = destination.with_extension("part");
+        let mut partial_os = destination.as_os_str().to_os_string();
+        partial_os.push(format!(".part-{}", uuid::Uuid::new_v4().simple()));
+        let partial = PathBuf::from(partial_os);
         let output = session.download(&format!("{}&& cat {}", remote::cd(&target.dir), remote::quote(name)), &partial).await;
         session.close().await;
         match output {
             Ok(output) if output.ok() => {
-                std::fs::rename(&partial, destination)?;
+                crate::core::util::replace_file(&partial, destination).inspect_err(|_| {
+                    let _ = std::fs::remove_file(&partial);
+                })?;
                 Ok(())
             }
             other => {
@@ -325,7 +329,7 @@ impl AppServices {
                 }
             }
 
-            report("检查朋友能否连上", "Checking friends can reach it", 0, 0);
+            report("检查好友能否连上", "Checking friends can reach it", 0, 0);
             let address = target.public_address();
             let reachable = runtime.block_on(crate::core::servers::ping(&self.http()?, &address)).is_ok();
             target.deployed_at = Some(crate::core::util::now_millis());
@@ -338,12 +342,12 @@ impl AppServices {
                 crate::tr!("服务器已经在 {address} 运行，带 {} 个{what}。", "The server is running at {address} with {} {what}.", summary.mods)
             };
             if let Some(pack) = &pack {
-                message += &crate::tr!("把「{}」发给朋友，导入后就能进服。", " Send \"{}\" to friends; once imported they can join.", pack.file_name().unwrap_or_default().to_string_lossy());
+                message += &crate::tr!("把「{}」发给好友，导入后就能进服。", " Send \"{}\" to friends; once imported they can join.", pack.file_name().unwrap_or_default().to_string_lossy());
             }
             if !reachable {
                 message += &crate::tr!(
-                    "但从这台电脑连不上 {address}：请在云服务器控制台的安全组（防火墙）里放行 TCP {} 端口。",
-                    " But {address} can't be reached from here: allow TCP port {} in the cloud provider's security group (firewall).",
+                    "但从本机无法连通 {address}：请在云服务器防火墙中放行 TCP {} 端口。",
+                    " But {address} can't be reached from here: allow TCP port {} in the cloud firewall.",
                     target.game_port
                 );
             }

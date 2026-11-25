@@ -77,7 +77,8 @@ pub async fn listening(port: u16) -> bool {
 }
 
 /// Binds 4445 alongside a running game's own listener (it sets address
-/// reuse too) and joins the LAN group.
+/// reuse too) and joins the LAN group on both the default interface and
+/// loopback so local games are still heard offline or behind a VPN.
 fn listener() -> std::io::Result<tokio::net::UdpSocket> {
     use socket2::{Domain, Protocol, Socket, Type};
     let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
@@ -85,7 +86,21 @@ fn listener() -> std::io::Result<tokio::net::UdpSocket> {
     #[cfg(unix)]
     socket.set_reuse_port(true)?;
     socket.bind(&SocketAddr::from((Ipv4Addr::UNSPECIFIED, PORT)).into())?;
-    socket.join_multicast_v4(&GROUP, &Ipv4Addr::UNSPECIFIED)?;
+    let default_join = socket.join_multicast_v4(&GROUP, &Ipv4Addr::UNSPECIFIED);
+    let loopback_join = socket.join_multicast_v4(&GROUP, &Ipv4Addr::LOCALHOST);
+    if default_join.is_err() && loopback_join.is_err() {
+        default_join?;
+    }
+    socket.set_nonblocking(true)?;
+    tokio::net::UdpSocket::from_std(socket.into())
+}
+
+fn loopback_sender() -> std::io::Result<tokio::net::UdpSocket> {
+    use socket2::{Domain, Protocol, Socket, Type};
+    let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
+    socket.bind(&SocketAddr::from((Ipv4Addr::LOCALHOST, 0)).into())?;
+    let _ = socket.set_multicast_loop_v4(true);
+    let _ = socket.set_multicast_if_v4(&Ipv4Addr::LOCALHOST);
     socket.set_nonblocking(true)?;
     tokio::net::UdpSocket::from_std(socket.into())
 }
@@ -93,17 +108,32 @@ fn listener() -> std::io::Result<tokio::net::UdpSocket> {
 /// Announces `port` until the task is dropped. `motd` can change while it
 /// runs (the host's world name arrives with the first status reply).
 pub async fn announce(motd: Arc<Mutex<String>>, port: u16) {
-    let Ok(socket) = tokio::net::UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)).await else {
+    let default_sock = tokio::net::UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)).await.ok();
+    let loopback_sock = loopback_sender().ok();
+    if default_sock.is_none() && loopback_sock.is_none() {
         tracing::warn!("p2p: can't open a socket for LAN announcements");
         return;
-    };
+    }
     let target = SocketAddrV4::new(GROUP, PORT);
     let mut tick = tokio::time::interval(Duration::from_millis(1500));
     loop {
         tick.tick().await;
         let text = announcement(&motd.lock().map(|m| m.clone()).unwrap_or_default(), port);
-        if let Err(error) = socket.send_to(text.as_bytes(), target).await {
-            tracing::debug!("p2p: LAN announcement failed: {error}");
+        let sent_default = match &default_sock {
+            Some(sock) => match sock.send_to(text.as_bytes(), target).await {
+                Ok(_) => true,
+                Err(error) => {
+                    tracing::debug!("p2p: LAN announcement failed: {error}");
+                    false
+                }
+            },
+            None => false,
+        };
+        if !sent_default
+            && let Some(sock) = &loopback_sock
+            && let Err(error) = sock.send_to(text.as_bytes(), target).await
+        {
+            tracing::debug!("p2p: loopback LAN announcement failed: {error}");
         }
     }
 }

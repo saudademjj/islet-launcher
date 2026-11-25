@@ -48,9 +48,45 @@ fn file_stem(name: &str) -> String {
 }
 
 fn desktop() -> Result<PathBuf, ErrorPayload> {
-    let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from);
-    let desktop = home.map(|h| h.join("Desktop")).filter(|d| d.is_dir());
-    desktop.ok_or_else(|| fail(islet::core::i18n::pick("找不到桌面文件夹。", "Couldn't find the Desktop folder."), None))
+    let mut candidates = Vec::new();
+    #[cfg(windows)]
+    {
+        if let Some(home) = std::env::var_os("USERPROFILE").map(PathBuf::from) {
+            candidates.push(home.join("Desktop"));
+            candidates.push(home.join("OneDrive").join("Desktop"));
+        }
+        if let Some(onedrive) = std::env::var_os("OneDrive").map(PathBuf::from) {
+            candidates.push(onedrive.join("Desktop"));
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        if let Some(home) = std::env::var_os("HOME").map(PathBuf::from) {
+            candidates.push(home.join("Desktop"));
+        }
+    }
+    candidates
+        .into_iter()
+        .find(|d| d.is_dir())
+        .ok_or_else(|| fail(islet::core::i18n::pick("找不到桌面文件夹。", "Couldn't find the Desktop folder."), None))
+}
+
+/// Escapes an argument inside double quotes in a freedesktop `.desktop` `Exec=`
+/// line (`\\`, `"`, `$`, `` ` ``, and `%` -> `%%` per the Desktop Entry spec).
+#[cfg(any(test, all(unix, not(target_os = "macos"))))]
+fn escape_desktop_exec(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for ch in value.chars() {
+        match ch {
+            '\\' | '"' | '$' | '`' => {
+                out.push('\\');
+                out.push(ch);
+            }
+            '%' => out.push_str("%%"),
+            _ => out.push(ch),
+        }
+    }
+    out
 }
 
 /// Puts a shortcut for the world on the desktop and returns its path.
@@ -141,7 +177,7 @@ fn write_shortcut(desktop: &Path, stem: &str, exe: &Path, id: &str) -> Result<Pa
     }
     let entry = format!(
         "[Desktop Entry]\nType=Application\nName={stem}\nExec=\"{}\" --launch {id}\nIcon=islet\nTerminal=false\nCategories=Game;\n",
-        exe.to_string_lossy().replace('"', "\\\"")
+        escape_desktop_exec(&exe.to_string_lossy())
     );
     let io = |e: std::io::Error| fail(islet::core::i18n::pick("创建快捷方式失败。", "Couldn't create the shortcut."), Some(e.to_string()));
     std::fs::write(&file, entry).map_err(io)?;
@@ -160,5 +196,6 @@ mod tests {
         assert_eq!(launch_argument(&["mc".into(), "--launch".into(), "../x".into()]), None);
         assert_eq!(launch_argument(&["mc".into()]), None);
         assert_eq!(file_stem("我的/世界:1"), "我的_世界_1");
+        assert_eq!(escape_desktop_exec(r#"/opt/100% $a`b"c\d"#), r#"/opt/100%% \$a\`b\"c\\d"#);
     }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { call, toError } from "../api/backend";
 import { Modal } from "../components/overlay";
 import { Button, Field, Input, Notice } from "../components/ui";
@@ -30,11 +30,30 @@ export function TunnelDialog({ id }: { id: string }) {
   const [status, setStatus] = useState<Status | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [stopping, setStopping] = useState(false);
+  const epochRef = useRef(0);
+  const pollingRef = useRef(false);
   const close = useStore((s) => s.closeModal);
   useEffect(() => {
     let live = true;
-    const refresh = () => call<Status>("tunnel_status", { id }).then((v) => live && setStatus(v), (e) => live && setError(toError(e).message));
-    void refresh();
+    const refresh = () => {
+      if (pollingRef.current) return;
+      pollingRef.current = true;
+      const epoch = epochRef.current;
+      call<Status>("tunnel_status", { id })
+        .then(
+          (v) => {
+            if (live && epochRef.current === epoch) setStatus(v);
+          },
+          (e) => {
+            if (live && epochRef.current === epoch) setError(toError(e).message);
+          },
+        )
+        .finally(() => {
+          pollingRef.current = false;
+        });
+    };
+    refresh();
     const timer = setInterval(refresh, 3000);
     return () => {
       live = false;
@@ -44,32 +63,40 @@ export function TunnelDialog({ id }: { id: string }) {
   const running = !!status?.running;
   const ready = host.trim() && user.trim() && port(local) && port(remote) && port(ssh);
   const start = async () => {
+    if (busy || !ready) return;
+    const epoch = ++epochRef.current;
     setBusy(true);
     setError("");
     try {
-      setStatus(await call<Status>("start_tunnel", { id, host: host.trim(), user: user.trim(), localPort: Number(local), remotePort: Number(remote), sshPort: Number(ssh) }));
+      const next = await call<Status>("start_tunnel", { id, host: host.trim(), user: user.trim(), localPort: Number(local), remotePort: Number(remote), sshPort: Number(ssh) });
+      if (epochRef.current === epoch) setStatus(next);
       try {
         localStorage.setItem(SAVED_KEY, JSON.stringify({ host: host.trim(), user: user.trim(), ssh, remote }));
       } catch {
         /* remembering is a convenience */
       }
     } catch (e) {
-      setError(toError(e).message);
+      if (epochRef.current === epoch) setError(toError(e).message);
     } finally {
       setBusy(false);
     }
   };
   const stop = async () => {
+    if (stopping) return;
+    const epoch = ++epochRef.current;
+    setStopping(true);
     try {
       await call("stop_tunnel", { id });
-      setStatus(null);
+      if (epochRef.current === epoch) setStatus(null);
     } catch (e) {
-      setError(toError(e).message);
+      if (epochRef.current === epoch) setError(toError(e).message);
+    } finally {
+      setStopping(false);
     }
   };
   const footer = running ? (
     <>
-      <Button variant="danger-ghost" onClick={() => void stop()}>
+      <Button variant="danger-ghost" busy={stopping} onClick={() => void stop()}>
         {t("停止隧道", "Stop tunnel")}
       </Button>
       <Button variant="primary" icon="copy" onClick={() => void useStore.getState().copy(status!.address, t("联机地址", "Server address"))}>
@@ -109,12 +136,12 @@ export function TunnelDialog({ id }: { id: string }) {
         </div>
         {running ? (
           <Notice icon="check" title={t("隧道已运行", "Tunnel running")}>
-            {t("让朋友在多人游戏里添加服务器：", "Ask your friend to add this server in Multiplayer: ")}
+            {t("让好友在多人游戏里添加服务器：", "Ask your friend to add this server in Multiplayer: ")}
             <span className="mono selectable">{status!.address}</span>
           </Notice>
         ) : (
           <span className="faint" style={{ fontSize: "var(--text-xs)" }}>
-            {t("系统 SSH 需要已配好这台主机的密钥和 known_hosts，服务端需要 GatewayPorts clientspecified 并放行公网端口。关掉这个窗口隧道仍会运行，退出启动器时自动停止。", "System SSH needs a key and known_hosts entry for this host, and the server needs GatewayPorts clientspecified and an open public port. The tunnel keeps running when this window closes and stops when the launcher quits.")}
+            {t("需提前配好本机 SSH 密钥，并在服务端放行公网端口。关闭窗口隧道继续运行，退出启动器时自动停止。", "Requires a local SSH key and an open public port on the host. Keeps running when closed and stops when the launcher quits.")}
           </span>
         )}
         {error && (

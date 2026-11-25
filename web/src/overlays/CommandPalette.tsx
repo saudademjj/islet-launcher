@@ -245,7 +245,7 @@ function useItems(query: string): { items: Item[]; quick: Item[] } {
           icon: world.icon ? <img className="palette-img pixelated" src={world.icon} alt="" /> : <Icon name="map" />,
           primary: ws.quickPlay
             ? { label: t("进入存档", "Open save"), run: () => (store.setActiveInstance(instance.id), void store.launchInstance(instance.id, world.folder)) }
-            : { label: t("查看存档", "Show saves"), run: () => store.openManage(instance.id, "data") },
+            : { label: t("查看存档", "Show saves"), run: () => store.openManage(instance.id, "saves") },
           secondary: { label: t("在文件夹中显示", "Show in folder"), run: () => void store.open({ kind: "world", id: instance.id, folder: world.folder }) },
           preview: () => (
             <div className="pv">
@@ -259,7 +259,7 @@ function useItems(query: string): { items: Item[]; quick: Item[] } {
                 <dt>{t("上次游玩", "Last played")}</dt>
                 <dd>{world.modifiedMs ? formatRelative(world.modifiedMs) : t("未知", "Unknown")}</dd>
               </dl>
-              <p className="pv-note">{ws.quickPlay ? t("回车直接进入这个存档，跳过标题画面。", "Press Enter to go straight into this save, skipping the title screen.") : t("这个版本不支持直接进入存档（需要 1.20 以上），回车打开存档列表。", "This version can't open saves directly (needs 1.20+); Enter opens the save list.")}</p>
+              <p className="pv-note">{ws.quickPlay ? t("回车直接进入存档", "Press Enter to jump straight into this save") : t("此版本需 1.20+ 才支持直进存档，回车查看存档", "Direct join requires 1.20+; Enter opens Saves")}</p>
             </div>
           ),
         });
@@ -307,12 +307,12 @@ function useItems(query: string): { items: Item[]; quick: Item[] } {
           id: `mod:${mod.name}`,
           kind: "mod",
           label,
-          sub: t(`${mod.enabled ? "模组" : "已停用"} · ${mod.name}`, `${mod.enabled ? "Mod" : "Disabled"} · ${mod.name}`),
+          sub: t(`${mod.enabled ? "模组" : "已禁用"} · ${mod.name}`, `${mod.enabled ? "Mod" : "Disabled"} · ${mod.name}`),
           keywords: `mod 模组 ${slug} ${known?.aliases?.join(" ") ?? ""}`,
           icon: <ModIcon src={modIcons[mod.name]} seed={slug} size={24} glyph="mod" />,
-          value: mod.enabled ? undefined : t("停用", "Turn off"),
+          value: mod.enabled ? undefined : t("已禁用", "Disabled"),
           primary: { label: t("打开模组页", "Open Mods tab"), run: () => store.openManage(active.id, "mods") },
-          secondary: { label: mod.enabled ? t("停用", "Turn off") : t("启用", "Enable"), run: () => void store.fileOperation(active.id, { kind: "toggleMod", name: mod.name }) },
+          secondary: { label: mod.enabled ? t("禁用", "Disable") : t("启用", "Enable"), run: () => void store.fileOperation(active.id, { kind: "toggleMod", name: mod.name }) },
           preview: () => (
             <div className="pv">
               <div className="pv-figure">
@@ -326,7 +326,7 @@ function useItems(query: string): { items: Item[]; quick: Item[] } {
                 <dt>{t("大小", "Size")}</dt>
                 <dd>{formatBytes(mod.bytes)}</dd>
                 <dt>{t("状态", "Status")}</dt>
-                <dd>{mod.enabled ? t("启用", "Enable") : t("已停用", "Disabled")}</dd>
+                <dd>{mod.enabled ? t("已启用", "Enabled") : t("已禁用", "Disabled")}</dd>
               </dl>
             </div>
           ),
@@ -376,7 +376,7 @@ function useItems(query: string): { items: Item[]; quick: Item[] } {
       keywords: `setting 设置 开关 ${keywords}`,
       icon: glyph("settings"),
       value: on ? t("开", "On") : t("关", "Off"),
-      primary: { label: on ? t("关闭", "Close") : t("打开", "Open"), run: flip },
+      primary: { label: on ? t("关闭", "Turn off") : t("开启", "Turn on"), run: flip },
       secondary: { label: t("在设置中查看", "Show in Settings"), run: () => store.openSettings(id === "motion" || id === "dev" ? "look" : "game") },
     });
     const memoryText = settings.memoryAuto
@@ -395,7 +395,7 @@ function useItems(query: string): { items: Item[]; quick: Item[] } {
     list.push({
       id: "setting:concurrency",
       kind: "setting",
-      label: t("下载并发数", "Parallel downloads"),
+      label: t("同时下载数", "Parallel downloads"),
       sub: t("输入「并发 64」可以直接修改", "Type \"threads 64\" to change it"),
       keywords: "download concurrency threads 并发 下载 线程",
       icon: glyph("download"),
@@ -427,7 +427,7 @@ function useItems(query: string): { items: Item[]; quick: Item[] } {
       primary: { label: t("在设置中修改", "Change in Settings"), run: () => store.openSettings("game") },
     });
     list.push(toggle("hide", t("游戏启动后隐藏启动器", "Hide the launcher while playing"), t("游戏退出后自动回来", "It comes back when the game exits"), settings.hideOnLaunch, () => update({ hideOnLaunch: !settings.hideOnLaunch }, settings.hideOnLaunch ? t("启动后不再隐藏", "The launcher stays visible while playing") : t("启动后会隐藏启动器", "The launcher hides while playing")), t("hide 隐藏 最小化", "hide 隐藏 最小化")));
-    list.push(toggle("chinese", t("新世界使用启动器的语言", "New worlds use the launcher's language"), t("第一次启动前把游戏语言设成和启动器一样", "Sets the game language to match the launcher before the first launch"), settings.autoChinese, () => update({ autoChinese: !settings.autoChinese }, settings.autoChinese ? t("新世界不再自动设置语言", "New worlds no longer get a language set") : t("新世界会使用启动器的语言", "New worlds will use the launcher's language")), t("language chinese 中文 语言", "language chinese 中文 语言")));
+    list.push(toggle("chinese", t("新世界使用启动器的语言", "New worlds use the launcher's language"), t("首次启动时自动设为启动器语言", "Matches the launcher language on first start"), settings.autoChinese, () => update({ autoChinese: !settings.autoChinese }, settings.autoChinese ? t("新世界不再自动设置语言", "New worlds no longer get a language set") : t("新世界会使用启动器的语言", "New worlds will use the launcher's language")), t("language chinese 中文 语言", "language chinese 中文 语言")));
     list.push(toggle("motion", t("减少动效", "Reduce motion"), t("关闭过渡和滑动动画", "Turns off transitions and sliding animations"), s.reduceMotion, () => store.setReduceMotion(!s.reduceMotion), t("motion animation 动画 动效", "motion animation 动画 动效")));
     list.push(toggle("dev", t("状态栏显示技术信息", "Technical details in the status bar"), t("下载源、Java、内存和平台", "Download source, Java, memory and platform"), devInfo, () => usePrefs.getState().setDevInfo(!devInfo), t("status bar developer 状态栏 技术", "status bar developer 状态栏 技术")));
     const themes: [Theme, string][] = [
@@ -467,7 +467,8 @@ function useItems(query: string): { items: Item[]; quick: Item[] } {
       }
       list.push(action("get-packs", t("下载资源包", "Download resource packs"), "layers", () => store.openManage(active.id, "browse", "", "resourcepack"), { sub: "Modrinth", keywords: "resource pack texture 资源包 材质 下载" }));
       list.push(action("get-shaders", t("下载光影", "Download shaders"), "sparkle", () => store.openManage(active.id, "browse", "", "shader"), { sub: "Modrinth", keywords: "shader iris optifine 光影 下载" }));
-      list.push(action("saves", t("存档与备份", "Saves & backups"), "box", () => store.openManage(active.id, "data"), { sub: active.name, keywords: "worlds saves backup 存档 备份 恢复" }));
+      list.push(action("saves", t("存档", "Saves"), "box", () => store.openManage(active.id, "saves"), { sub: active.name, keywords: "worlds saves 存档 导入" }));
+      list.push(action("tools", t("工具与备份", "Tools & backups"), "archive", () => store.openManage(active.id, "tools"), { sub: active.name, keywords: "tools backup restore export repair verify 工具 备份 恢复 导出 校验 修复 复制 整合包" }));
       list.push(action("servers", t("服务器列表", "Server list"), "globe", () => store.openManage(active.id, "servers"), { sub: active.name, keywords: "servers multiplayer 服务器 多人 联机 添加" }));
       list.push(action("shots", t("截图墙", "Screenshots"), "image", () => store.openManage(active.id, "shots"), { sub: active.name, keywords: "screenshots gallery 截图 相册 图片 f2" }));
       list.push(action("options", t("游戏选项", "Game options"), "edit", () => store.openManage(active.id, "options"), { sub: t("语言、渲染距离、视场角、帧率", "Language, render distance, FOV, frame rate"), keywords: "options language fov render distance fps 选项 语言 中文 视野 帧率 音量" }));
@@ -521,7 +522,7 @@ function useItems(query: string): { items: Item[]; quick: Item[] } {
         id: "quick:memory",
         kind: "setting",
         label: ok ? t(`把默认内存设为 ${mb % 1024 === 0 ? `${mb / 1024} GB` : `${mb} MB`}`, `Set default memory to ${mb % 1024 === 0 ? `${mb / 1024} GB` : `${mb} MB`}`) : t("内存需要在 512 MB 到 32 GB 之间", "Memory must be between 512 MB and 32 GB"),
-        sub: t("改为手动内存；世界单独设置的内存仍然优先", "Switches to manual memory; a world's own setting still wins"),
+        sub: t("切换为手动内存分配", "Switches to manual memory allocation"),
         icon: glyph("cpu"),
         primary: { label: ok ? t("应用", "Apply") : t("打开设置", "Open Settings"), run: () => (ok ? set({ memoryAuto: false, memoryMb: mb }, t(`默认内存已设为 ${mb} MB`, `Default memory set to ${mb} MB`)) : store.openSettings("game")) },
       });

@@ -8,12 +8,30 @@ on:
 permissions:
   contents: read
 jobs:
+  preflight:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Verify font subset, types, tests and frontend build
+        run: |
+          npm ci
+          npm run check:font
+          npm test
+          npm run build
   windows:
+    needs: preflight
     uses: ./.github/workflows/windows.yml
     secrets: inherit
   linux:
+    needs: preflight
     uses: ./.github/workflows/linux.yml
+    secrets: inherit
   macos:
+    needs: preflight
     strategy:
       fail-fast: false
       matrix:
@@ -33,6 +51,8 @@ jobs:
       - name: Package
         env:
           MC_LAUNCHER_CLIENT_ID: ${{ vars.MC_LAUNCHER_CLIENT_ID }}
+          MC_LAUNCHER_CURSEFORGE_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
+          MC_LAUNCHER_CURSEFORGE_URL: ${{ vars.MC_LAUNCHER_CURSEFORGE_URL }}
           MC_LAUNCHER_UPDATE_URL: ${{ vars.MC_LAUNCHER_UPDATE_URL || format('https://github.com/{0}/releases/latest/download/latest.json', github.repository) }}
           JOBS: 3
         run: |
@@ -59,8 +79,11 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           version="$(awk -F'"' '/^version = / { print $2; exit }' src-tauri/Cargo.toml)"
-          if [ "$TAG" != "v$version" ]; then
-            echo "tag $TAG does not match version $version in src-tauri/Cargo.toml" >&2
+          core_version="$(awk -F'"' '/^version = / { print $2; exit }' Cargo.toml)"
+          pkg_version="$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')"
+          tauri_version="$(python3 -c 'import json; print(json.load(open("src-tauri/tauri.conf.json"))["version"])')"
+          if [ "$TAG" != "v$version" ] || [ "$version" != "$core_version" ] || [ "$version" != "$pkg_version" ] || [ "$version" != "$tauri_version" ]; then
+            echo "version mismatch: tag=$TAG Cargo.toml=$core_version src-tauri=$version package.json=$pkg_version tauri.conf.json=$tauri_version" >&2
             exit 1
           fi
           mkdir release

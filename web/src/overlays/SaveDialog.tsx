@@ -36,7 +36,7 @@ export function SaveDialog({ id, folder }: { id: string; folder: string }) {
   const [backups, setBackups] = useState<SaveBackup[] | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
   const busy = s.fileBusy || s.gameBusy;
-  const back = () => s.openModal({ kind: "manage", id, tab: "data" });
+  const back = () => s.openModal({ kind: "manage", id, tab: "saves" });
 
   useEffect(() => setName(shown), [shown]);
 
@@ -109,7 +109,7 @@ export function SaveDialog({ id, folder }: { id: string; folder: string }) {
               {t("改名", "Rename")}
             </Button>
           </form>
-          <span className="field-hint">{t("改的是游戏里显示的名字；文件夹「", "Changes the name shown in game; the folder \"")}{folder}{t("」会尽量一起改。", "\" is renamed too when possible.")}</span>
+          <span className="field-hint">{t("修改游戏内显示的存档名", "Changes the save name shown in game")}</span>
 
           <div className="save-actions">
             <Button size="sm" icon="archive" disabled={busy} onClick={() => run({ kind: "backupSave", folder })}>
@@ -142,7 +142,7 @@ export function SaveDialog({ id, folder }: { id: string; folder: string }) {
                 back();
               }}
             >
-              {confirm === "remove" ? t("确认移到回收站", "Confirm move to recycle bin") : t("移到回收站", "Move to recycle bin")}
+              {confirm === "remove" ? t("确认移入回收站", "Confirm move to recycle bin") : t("移入回收站", "Move to recycle bin")}
             </Button>
           </div>
 
@@ -172,7 +172,7 @@ export function SaveDialog({ id, folder }: { id: string; folder: string }) {
                 <span className="spinner" />{t(" 正在读取…", " Loading…")}
               </div>
             ) : packs.length === 0 ? (
-              <div className="saves-empty muted">{t("这个存档没有数据包。添加的 .zip 会在下次进入存档时生效。", "This save has no datapacks. Added .zip files apply next time you open the save.")}</div>
+              <div className="saves-empty muted">{t("暂无数据包，添加后下次进入存档生效。", "No datapacks yet; added packs apply on next load.")}</div>
             ) : (
               <div className="list">
                 {packs.map((pack) => (
@@ -191,8 +191,8 @@ export function SaveDialog({ id, folder }: { id: string; folder: string }) {
                       variant="ghost"
                       icon="trash"
                       disabled={busy}
-                      aria-label={t(`把 ${pack.name} 移到回收站`, `Move ${pack.name} to the recycle bin`)}
-                      title={t("移到回收站", "Move to recycle bin")}
+                      aria-label={t(`把 ${pack.name} 移入回收站`, `Move ${pack.name} to the recycle bin`)}
+                      title={t("移入回收站", "Move to recycle bin")}
                       onClick={() => run({ kind: "recycle", item: "datapack", name: pack.name, save: folder }, true)}
                     />
                   </div>
@@ -204,10 +204,10 @@ export function SaveDialog({ id, folder }: { id: string; folder: string }) {
           <section className="save-section">
             <div className="section-label">
               {t("备份", "Backups")}
-              {backups && backups.length > 0 && <span className="mono faint">{backups.length}{t(" 个", " more")}</span>}
+              {backups && backups.length > 0 && <span className="mono faint">{backups.length}{t(" 个", "")}</span>}
             </div>
             {backups == null ? null : backups.length === 0 ? (
-              <div className="saves-empty muted">{t("还没有备份；可在「设置 → 游戏退出后自动备份存档」开启自动备份", "No backups yet; turn on Settings → Back up saves after playing for automatic ones")}</div>
+              <div className="saves-empty muted">{t("暂无备份，可在设置中开启退出自动备份", "No backups yet; enable auto-backup in Settings")}</div>
             ) : (
               <div className="list">
                 {backups.map((backup) => (
@@ -238,7 +238,7 @@ export function SaveDialog({ id, folder }: { id: string; folder: string }) {
                 ))}
               </div>
             )}
-            <span className="field-hint">{t("恢复前，存档现在的样子会先移到回收站，不会丢。", "Before restoring, the save as it is now moves to the recycle bin, so nothing is lost.")}</span>
+            <span className="field-hint">{t("恢复前会自动把当前存档移入回收站。", "Current save moves to the recycle bin before restoring.")}</span>
           </section>
         </div>
       )}

@@ -73,7 +73,7 @@ export function LoaderPicker({
           </Button>
         )}
       </div>
-      <span className="field-hint">{loader === "vanilla" ? t("不加载模组的官方原版", "The official game, without mods") : hint ?? t("按游戏版本列出兼容加载器；可锁定具体版本", "Loaders that fit the game version; you can pin one")}</span>
+      <span className="field-hint">{loader === "vanilla" ? t("官方原版，不加载模组", "Official vanilla, no mods") : hint ?? t("选择模组加载器，可按需锁定版本", "Pick a mod loader and optional version")}</span>
       {loader !== "vanilla" && (
         <div className="col gap-6">
           <div className="row">
@@ -93,7 +93,7 @@ export function LoaderPicker({
                 <span className="faint truncate">{s.state.error}</span>
               </div>
             ) : s.state.versions.length === 0 ? (
-              <div className="picker-row faint">{minecraft ? t("这个 Minecraft 版本没有可用的加载器，请换一个游戏版本。", "No loader available for this Minecraft version; choose another game version.") : t("先选择 Minecraft 版本", "Choose a Minecraft version first")}</div>
+              <div className="picker-row faint">{minecraft ? t("当前版本暂无可用加载器", "No loader available for this version") : t("先选择 Minecraft 版本", "Choose a Minecraft version first")}</div>
             ) : (
               <>
                 <button type="button" className="picker-row" aria-selected={version == null} disabled={disabled} onClick={() => onVersion(null)}>

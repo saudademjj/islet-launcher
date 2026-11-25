@@ -220,15 +220,15 @@ impl Session {
         let connected = tokio::time::timeout(Duration::from_secs(20), client::connect(config, address, handler)).await;
         let seen = seen.lock().unwrap_or_else(|e| e.into_inner()).clone();
         let mut handle = match connected {
-            Err(_) => return Err(ssh_error("连不上服务器的 SSH 端口，检查地址、端口和云服务器的安全组。", "Couldn't reach the server's SSH port; check the address, port and the cloud firewall.", "timed out")),
+            Err(_) => return Err(ssh_error("连不上服务器的 SSH 端口，请检查地址、端口和服务器防火墙。", "Couldn't reach the server's SSH port; check the address, port, and firewall.", "timed out")),
             Ok(Ok(handle)) => handle,
             Ok(Err(error)) => {
                 if let (Some(expected), Some(seen)) = (&target.fingerprint, &seen)
                     && expected != seen
                 {
                     return Err(ssh_error(
-                        "服务器的身份指纹和上次不一样，为了安全已停止连接。如果你重装过系统，请在「编辑连接」里清除指纹后再连。",
-                        "The server's key fingerprint has changed since last time, so Islet stopped. If you reinstalled the system, clear the fingerprint under Edit connection.",
+                        "服务器身份指纹已变更，为保护安全已中止连接。若刚重装过系统，请先在「设置 → 忘记这台服务器」后重新连接。",
+                        "The server's host key changed, so Islet stopped for safety. If you reinstalled the OS, use Settings → Forget this server and reconnect.",
                         format!("expected {expected}, got {seen}"),
                     ));
                 }
@@ -461,7 +461,7 @@ pub fn pack(source: &Path, archive: &Path, update: bool) -> AppResult<u64> {
 /// replaces the mods and plugins outright, so removed ones go too.
 pub fn unpack_script(dir: &str, update: bool) -> String {
     let clear = if update { "rm -rf mods && rm -f plugins/*.jar && " } else { "" };
-    format!("mkdir -p {d} && cd \"$HOME\" && cd {d} && {clear}tar -xzf - && chmod +x start.sh islet.sh", d = quote(dir))
+    format!("cd \"$HOME\" && mkdir -p {d} && cd {d} && {clear}tar -xzf - && chmod +x start.sh islet.sh", d = quote(dir))
 }
 
 /// Settings the launcher manages in `server.properties` and beside it.
@@ -558,5 +558,6 @@ mod tests {
         };
         assert_eq!(names(false), ["mods/a.jar", "server.properties", "start.sh", "world/level.dat"]);
         assert_eq!(names(true), ["mods/a.jar", "start.sh"]);
+        assert!(unpack_script("islet/survival", false).starts_with("cd \"$HOME\" && mkdir -p 'islet/survival' && cd 'islet/survival'"));
     }
 }

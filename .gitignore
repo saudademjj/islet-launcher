@@ -3,6 +3,8 @@
 /legacy
 node_modules/
 /dist
+/.cache/
+__pycache__/
 /src-tauri/gen
 .DS_Store
 

@@ -22,7 +22,7 @@ async function start() {
     window.addEventListener("unhandledrejection", (e) => report(`unhandled rejection: ${toError(e.reason).message}`));
     // The WebView's own menu (Reload, Inspect) is noise outside text.
     document.addEventListener("contextmenu", (e) => {
-      if (!(e.target as HTMLElement).closest("input, textarea, .selectable")) e.preventDefault();
+      if (!(e.target instanceof Element) || !e.target.closest("input, textarea, .selectable")) e.preventDefault();
     });
   }
   try {

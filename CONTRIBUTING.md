@@ -22,12 +22,13 @@
 npm install
 npm run dev                # 只看界面：浏览器打开 http://localhost:5173，使用内置演示数据
 npm run tauri dev          # 真实窗口 + 真实后端，改前端代码即时生效
-cargo test -p islet  # 核心库单元测试
-npm test                   # 界面逻辑单元测试（vitest）
-npx tsc --noEmit -p .      # 类型检查
+cargo test --locked --workspace  # 核心库与客户端单元测试
+npm test                         # 界面逻辑与组件单元测试（vitest）
+npm run check:font               # 检查前端中文字符是否全部包含在像素字体子集中
+npx tsc --noEmit -p .            # 类型检查
 ```
 
-提交前请确认 `cargo test`、`npm test` 和类型检查都通过；改了界面的话附上截图。
+提交前请确认 `cargo test`、`npm test`、`npm run check:font` 和类型检查都通过；改了界面的话附上截图。
 
 ### 开发辅助
 
@@ -40,21 +41,21 @@ npx tsc --noEmit -p .      # 类型检查
 
 ```
 src/                         核心库，与界面无关
-  services.rs                服务层：后台任务、事件（UiEvent）
-  core/                      auth、mojang、download、java、launch、instances、p2p、settings ...
+  services/                  服务层：后台任务、事件（UiEvent）、安装/启动/账号/内容编排
+  core/                      auth、mojang、download/、content/、crash、java、launch、instances、p2p、settings ...
 src-tauri/
   src/main.rs                窗口、插件、窗口显示兜底
-  src/commands.rs            前端可调用的命令
+  src/commands/              前端可调用的命令（按系统/账号/世界/内容/网络分模块）
   src/events.rs              事件转发与日志批量发送
   tauri.conf.json            窗口与打包配置
   capabilities/default.json  前端权限白名单
 web/src/
   api/                       类型定义、Tauri 后端与浏览器演示后端
-  store.ts                   状态与动作（zustand）
+  store/                     状态与动作（zustand，按领域拆分）
   layout/ pages/ overlays/ components/
-  styles/                    tokens.css（颜色、动效令牌）与 app.css
+  styles/                    tokens.css（颜色、动效令牌）与分层样式（app.css 聚合导入）
   dev/selftest.ts            前后端接口自测（仅开发）
-scripts/                     打包、更新清单、第三方许可清单、字体子集化
+scripts/                     打包、更新清单、第三方许可清单、字体子集校验与生成
 ```
 
 ## 界面约定
@@ -62,7 +63,7 @@ scripts/                     打包、更新清单、第三方许可清单、字
 - 视觉：森林绿外框、纸色内容区、草方块绿作唯一强调色，全部纯实色，不用渐变和毛玻璃；像素风图标和地形。
 - 动效：统一时长（120 / 200 / 300 ms），进场 ease-out、退场 ease-in；尊重系统和设置里的「减少动效」。
 - 文案：所有界面文字用 `t("中文", "English")` 同时写中英文。
-- 界面小字用的 Fusion Pixel 已按用到的字符子集化。新增中文文字后，下载 [Fusion Pixel](https://github.com/TakWolf/fusion-pixel-font/releases) 的 12px proportional zh_hans 字体，运行 `python3 scripts/subset-font.py <字体文件>` 重新生成（需要 fontTools 和 brotli），否则新字会缺字。
+- 界面小字用的 Fusion Pixel 已按用到的字符子集化。构建与测试会自动执行 `npm run check:font`（零依赖校验）；新增中文文字导致缺字时，运行 `npm run font:subset`（或 `uv run --with fonttools --with brotli python3 scripts/subset-font.py --fetch`）即可自动下载缓存官方 OFL 源字体到 `.cache/fonts/` 并重新生成子集。
 
 ## 打包
 
@@ -84,6 +85,8 @@ macOS 打包默认 4 个并行编译任务以减少笔记本发热，`JOBS=8 ./s
 | 变量 | 作用 |
 |---|---|
 | `MC_LAUNCHER_CLIENT_ID` | 内置的微软登录 Azure Client ID（见 [docs/azure-setup.md](docs/azure-setup.md)） |
+| `MC_LAUNCHER_CURSEFORGE_KEY` | 可选：内置的 CurseForge API Key，留空时由用户在设置中自行填写 |
+| `MC_LAUNCHER_CURSEFORGE_URL` | 可选：CurseForge 只读 HTTPS 代理基址（`/v1`） |
 | `MC_LAUNCHER_UPDATE_URL` | 更新清单地址（https）；不设则不检查更新 |
 | `RELEASE_BASE_URL`、`RELEASE_PAGE` | 设置后用 `scripts/update-manifest.py` 把安装包和 SHA-256 写进 `build/latest.json` |
 | `APPLE_SIGNING_IDENTITY`、`APPLE_ID`、`APPLE_TEAM_ID`、`APPLE_PASSWORD` | macOS Developer ID 签名与公证 |
@@ -95,4 +98,4 @@ macOS 打包默认 4 个并行编译任务以减少笔记本发热，`JOBS=8 ./s
 2. 推送 `v<版本>` 标签。`.github/workflows/release.yml` 会构建 Windows、Linux 和 macOS 三个平台，生成 `latest.json`，创建一个**草稿** Release。
 3. 在打包好的版本上按 [docs/acceptance-checklist.md](docs/acceptance-checklist.md) 验收，填写更新说明后发布草稿。发布之后，已安装的启动器才会看到新版本。
 
-仓库的 Actions Variables 里可以设置 `MC_LAUNCHER_CLIENT_ID`；Secrets 里可以设置 Windows 签名证书（`WINDOWS_CERTIFICATE`，base64 的 .pfx，及 `WINDOWS_CERTIFICATE_PASSWORD`）。
+仓库的 Actions Variables 里可以设置 `MC_LAUNCHER_CLIENT_ID`、`MC_LAUNCHER_CURSEFORGE_URL`；Secrets 里可以设置 `CURSEFORGE_API_KEY` 以及 Windows 签名证书（`WINDOWS_CERTIFICATE`，base64 的 .pfx，及 `WINDOWS_CERTIFICATE_PASSWORD`）。

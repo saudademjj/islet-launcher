@@ -198,7 +198,7 @@ pub fn clean_up_later(cache: std::path::PathBuf) {
 #[cfg(target_os = "macos")]
 fn old_backups() -> Vec<std::path::PathBuf> {
     let Some(app) = std::env::current_exe().ok().and_then(|exe| exe.ancestors().nth(3).map(std::path::Path::to_path_buf)) else { return Vec::new() };
-    if !app.extension().is_some_and(|x| x == "app") {
+    if app.extension().is_none_or(|x| x != "app") {
         return Vec::new();
     }
     let Some(parent) = app.parent() else { return Vec::new() };

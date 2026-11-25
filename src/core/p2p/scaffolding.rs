@@ -278,7 +278,12 @@ impl Host {
             "c:server_port" => (0, self.game_port.to_be_bytes().to_vec()),
             "c:player_ping" => match serde_json::from_slice::<Profile>(&body) {
                 Ok(profile) if !profile.machine_id.is_empty() => {
-                    self.seen(Profile { name: profile.name.chars().take(64).collect(), vendor: profile.vendor.chars().take(64).collect(), kind: None, ..profile });
+                    self.seen(Profile {
+                        name: profile.name.chars().take(64).collect(),
+                        machine_id: profile.machine_id.chars().take(128).collect(),
+                        vendor: profile.vendor.chars().take(64).collect(),
+                        kind: None,
+                    });
                     (0, Vec::new())
                 }
                 _ => bad("invalid player profile"),
@@ -304,22 +309,34 @@ async fn handle<S: AsyncRead + AsyncWrite + Unpin>(mut stream: S, host: &Host) -
         };
         let (kind, body) = request?;
         let (status, answer) = host.answer(&String::from_utf8_lossy(&kind), body);
-        stream.write_u8(status).await?;
-        stream.write_u32(answer.len() as u32).await?;
-        stream.write_all(&answer).await?;
-        stream.flush().await?;
+        let write = async {
+            stream.write_u8(status).await?;
+            stream.write_u32(answer.len() as u32).await?;
+            stream.write_all(&answer).await?;
+            stream.flush().await
+        };
+        let Ok(written) = tokio::time::timeout(Duration::from_secs(15), write).await else {
+            return Ok(());
+        };
+        written?;
     }
 }
 
 /// The host's service, until the task running it is aborted.
 pub async fn serve(listener: tokio::net::TcpListener, host: std::sync::Arc<Host>) {
+    let slots = std::sync::Arc::new(tokio::sync::Semaphore::new(MAX_GUESTS));
     loop {
+        let Ok(permit) = slots.clone().acquire_owned().await else {
+            break;
+        };
         let Ok((stream, _)) = listener.accept().await else {
+            drop(permit);
             tokio::time::sleep(Duration::from_millis(200)).await;
             continue;
         };
         let host = host.clone();
         tokio::spawn(async move {
+            let _permit = permit;
             let _ = handle(stream, &host).await;
         });
     }
@@ -372,6 +389,11 @@ mod tests {
         assert_eq!(heartbeat(&mut stream, &me).await.unwrap().len(), 2);
         assert_eq!(request(&mut stream, "c:ping", b"hello").await.unwrap(), (0, b"hello".to_vec()));
         assert_eq!(request(&mut stream, "x:unknown", b"").await.unwrap().0, 255);
+        // An oversized machine_id must be truncated so the player list stays bounded.
+        let huge = Profile::new("Flood", &"x".repeat(4096));
+        let listed = heartbeat(&mut stream, &huge).await.unwrap();
+        let flood = listed.iter().find(|p| p.name == "Flood").unwrap();
+        assert_eq!(flood.machine_id.len(), 128);
         server.abort();
     }
 

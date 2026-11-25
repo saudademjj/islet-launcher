@@ -1,0 +1,979 @@
+/* ---------- primitives ---------- */
+
+.icon {
+  flex: none;
+  display: inline-block;
+}
+
+/* The second tone of a pixel icon: its own colour, lighter. */
+.icon-tone {
+  opacity: 0.4;
+}
+
+.kbd {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--faint);
+  letter-spacing: 0.02em;
+}
+
+/* Raised controls stand on a solid edge and sink into it when pressed. */
+.btn {
+  --edge: var(--border-strong);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 550;
+  white-space: nowrap;
+  box-shadow: 0 2px 0 var(--edge);
+  transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), color var(--dur-fast),
+    transform 80ms var(--ease-out), box-shadow 80ms var(--ease-out);
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 0 0 var(--edge);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+}
+
+.btn-sm {
+  height: 28px;
+  padding: 0 12px;
+  font-size: var(--text-xs);
+  gap: 6px;
+  border-radius: var(--radius);
+}
+
+.btn-lg {
+  height: 40px;
+  padding: 0 20px;
+  font-size: var(--text-md);
+  font-weight: 650;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 3px 0 var(--edge);
+}
+
+.btn-lg:active:not(:disabled) {
+  transform: translateY(3px);
+}
+
+.btn-xl {
+  height: 52px;
+  padding: 0 32px;
+  gap: 12px;
+  font-size: var(--text-md);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border-radius: var(--radius-xl);
+  box-shadow: 0 4px 0 var(--edge);
+}
+
+.btn-xl:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 0 var(--edge);
+}
+
+.btn-xl:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 var(--edge);
+}
+
+.btn-primary {
+  --edge: var(--accent-edge);
+  background: var(--accent);
+  border-color: var(--accent-edge);
+  color: var(--accent-ink);
+  font-weight: 650;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn-primary .kbd {
+  color: var(--accent-ink);
+  opacity: 0.55;
+}
+
+.btn-danger {
+  --edge: var(--danger-edge);
+  background: var(--danger);
+  border-color: var(--danger-edge);
+  color: var(--on-solid);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--danger-hover);
+}
+
+.btn-hero {
+  --edge: var(--hero-edge);
+  background: var(--hero-2);
+  border-color: var(--hero-edge);
+  color: var(--on-dark);
+}
+
+.btn-hero:hover:not(:disabled) {
+  background: var(--hero-3);
+}
+
+.btn-ghost,
+.btn-danger-ghost {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.btn-ghost {
+  color: var(--muted);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.btn-danger-ghost {
+  color: var(--danger-text);
+}
+
+.btn-danger-ghost:hover:not(:disabled) {
+  background: var(--danger-soft);
+}
+
+.btn-ghost:active:not(:disabled),
+.btn-danger-ghost:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+.btn-icon {
+  width: 32px;
+  padding: 0;
+}
+
+.btn-sm.btn-icon {
+  width: 28px;
+}
+
+/* Four pixels chasing round a square, turned a quarter at a time. */
+.spinner {
+  width: 4px;
+  height: 4px;
+  margin: 4px 8px 8px 4px;
+  background: currentColor;
+  box-shadow:
+    6px 0 0 color-mix(in srgb, currentColor 70%, transparent),
+    6px 6px 0 color-mix(in srgb, currentColor 45%, transparent),
+    0 6px 0 color-mix(in srgb, currentColor 22%, transparent);
+  transform-origin: 5px 5px;
+  animation: spin 0.8s steps(4) infinite;
+  flex: none;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.input {
+  width: 100%;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  outline: none;
+  user-select: text;
+  -webkit-user-select: text;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+
+.input::placeholder {
+  color: var(--faint);
+}
+
+.input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft-2);
+}
+
+.input.invalid {
+  border-color: var(--danger);
+}
+
+.input.invalid:focus {
+  box-shadow: 0 0 0 3px var(--danger-soft);
+}
+
+.input:disabled {
+  opacity: 0.55;
+}
+
+.input.mono {
+  font-size: var(--text-xs);
+}
+
+.input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-wrap .icon {
+  position: absolute;
+  left: 11px;
+  color: var(--faint);
+  pointer-events: none;
+}
+
+.input-wrap .input {
+  padding-left: 32px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field-label {
+  font-size: var(--text-xs);
+  font-weight: 650;
+  color: var(--muted);
+}
+
+.field-hint {
+  font-size: var(--text-xs);
+  color: var(--faint);
+  line-height: 1.5;
+}
+
+.field-hint.ok {
+  color: var(--accent-text);
+}
+
+.field-hint.bad {
+  color: var(--danger-text);
+}
+
+.segmented {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  padding: 4px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-3);
+}
+
+.segmented button {
+  position: relative;
+  height: 26px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 550;
+  white-space: nowrap;
+  transition: color var(--dur-fast);
+}
+
+.segmented button:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.segmented button[aria-pressed="true"] {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.segmented button:disabled {
+  opacity: 0.55;
+}
+
+.segmented-thumb {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 1px 0 var(--border-strong);
+  z-index: -1;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  font-weight: 550;
+  white-space: nowrap;
+}
+
+.status::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  background: currentColor;
+  flex: none;
+}
+
+.status.pulse::before {
+  animation: pulse 1.4s var(--ease-out) infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.tone-accent {
+  color: var(--accent-text);
+}
+
+.tone-warn {
+  color: var(--warn);
+}
+
+.tone-danger {
+  color: var(--danger-text);
+}
+
+.tone-neutral {
+  color: var(--muted);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--radius);
+  background: var(--surface-3);
+  font-size: var(--text-xs);
+  font-weight: 550;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.pill-accent {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: var(--radius-xl);
+  background: var(--accent-soft-2);
+  color: var(--accent-text);
+  font-size: var(--text-xs);
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.identicon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  background: var(--surface-3);
+}
+
+.identicon-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.identicon-cell {
+  background: var(--text);
+}
+
+.identicon.accent {
+  background: var(--accent-soft-2);
+}
+
+.identicon.accent .identicon-cell {
+  background: var(--accent-text);
+}
+
+.identicon.hero {
+  position: relative;
+  background: var(--hero-2);
+  color: var(--on-dark);
+}
+
+.identicon.hero .identicon-cell {
+  background: var(--on-dark-accent);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.card-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: var(--radius-lg);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.card-heading {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.card-title {
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+
+.card-meta {
+  margin-left: 8px;
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--faint);
+}
+
+.card-text {
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--faint);
+}
+
+.card-body {
+  padding: 20px 20px 20px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.section-mark {
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  flex: none;
+}
+
+.link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--accent-text);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* A notice is a raised card like the others under a pixel signpost, its
+   tone only in the mark painted on the sign. The actions share the
+   title's line, so the explanation below gets the full width. */
+.notice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  padding: 12px 16px 12px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 3px 0 var(--border-strong);
+  /* Its own ink: on the stage the text around it is light. */
+  color: var(--text);
+}
+
+.notice > .sign {
+  grid-row: 1 / span 3;
+  align-self: start;
+}
+
+.notice-title {
+  grid-column: 2;
+  grid-row: 1;
+  min-height: 30px;
+  padding: 6px 0;
+  font-weight: 650;
+  line-height: 20px;
+}
+
+.notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.notice-body,
+.notice-detail {
+  grid-column: 2 / -1;
+}
+
+.notice-body {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
+.notice-detail {
+  margin-top: 4px;
+  font-size: var(--text-xs);
+  color: var(--faint);
+}
+
+.notice-detail summary {
+  width: fit-content;
+  font-weight: 650;
+}
+
+.notice-detail pre {
+  max-height: 120px;
+  margin: 6px 0 0;
+  padding: 8px 12px;
+  overflow: auto;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* On the forest panels: a raised panel of the same green, like the room
+   strip, so it reads as part of the scene. */
+.notice.dark {
+  border-color: var(--hero-edge);
+  background: var(--hero-2);
+  box-shadow: 0 3px 0 var(--hero-edge);
+  color: var(--on-dark);
+}
+
+.notice.dark .notice-body {
+  color: var(--on-dark-muted);
+}
+
+.notice.dark .notice-detail {
+  color: var(--on-dark-muted);
+}
+
+.notice.dark .notice-detail pre {
+  background: var(--hero-edge);
+  color: var(--on-dark-muted);
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  padding: 56px 24px;
+  color: var(--muted);
+}
+
+.empty-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 4px;
+  border-radius: var(--radius-xl);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.empty-title {
+  color: var(--text);
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+
+.switch {
+  position: relative;
+  width: 40px;
+  height: 24px;
+  border-radius: var(--radius-xl);
+  border: 0;
+  background: var(--border-strong);
+  padding: 0;
+  transition: background var(--dur) var(--ease-out);
+  flex: none;
+}
+
+/* On: a green knob on a pale green track, so a column of switches reads
+   as state, not as a column of buttons. */
+.switch[aria-checked="true"] {
+  background: var(--accent-soft-2);
+}
+
+.switch[aria-checked="true"] .switch-knob {
+  background: var(--accent-text);
+}
+
+.switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  background: var(--knob);
+}
+
+.progress {
+  position: relative;
+  height: 6px;
+  border-radius: var(--radius);
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.progress-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  transform-origin: left center;
+  transition: transform 260ms linear;
+}
+
+.progress.indeterminate .progress-fill {
+  width: 35%;
+  right: auto;
+  transition: none;
+  animation: indeterminate 1.3s var(--ease-out) infinite;
+}
+
+@keyframes indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+.tabs {
+  position: relative;
+  display: flex;
+  gap: 4px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  position: relative;
+  height: 40px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 550;
+  transition: color var(--dur-fast);
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab[aria-selected="true"] {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.tab-indicator {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: -1px;
+  height: 3px;
+  background: var(--accent);
+}
+
+.list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.list-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.list-row:last-child {
+  border-bottom: 0;
+}
+
+.list-row.clickable:hover {
+  background: var(--surface-2);
+}
+
+.list-row.selected {
+  background: var(--accent-soft);
+}
+
+.selected-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--accent);
+}
+
+.picker {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  overflow: auto;
+}
+
+.picker-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  text-align: left;
+}
+
+/* A version row inside a list that already has its own frame. */
+.picker-row.flat {
+  border: 0;
+  border-radius: var(--radius-xl);
+}
+
+.picker-row:last-child {
+  border-bottom: 0;
+}
+
+.picker-row:hover {
+  background: var(--surface-2);
+}
+
+.picker-row[aria-selected="true"] {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.virtual {
+  position: relative;
+  overflow: auto;
+}
+
+.virtual-inner {
+  position: relative;
+}
+
+.path-box {
+  flex: 1 1 200px;
+  min-width: 0;
+  height: 34px;
+  line-height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.boot-error {
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  height: 100%;
+  text-align: center;
+  background: var(--bg);
+}
+
+/* ---------- slider ---------- */
+
+.slider {
+  position: relative;
+  display: block;
+  flex: 1;
+  min-width: 120px;
+  height: 22px;
+}
+
+.slider-track,
+.slider-fill {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  height: 6px;
+  border-radius: var(--radius);
+  pointer-events: none;
+}
+
+.slider-track {
+  right: 0;
+  background: var(--surface-3);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+
+.slider-fill {
+  background: var(--accent);
+}
+
+.slider input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.slider input::-webkit-slider-runnable-track {
+  height: 22px;
+  background: transparent;
+}
+
+.slider input::-webkit-slider-thumb {
+  width: 14px;
+  height: 20px;
+  margin-top: 0;
+  border: 1px solid var(--accent-edge);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 2px 0 var(--accent-edge);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.slider input:active::-webkit-slider-thumb {
+  background: var(--accent-soft);
+  box-shadow: 0 1px 0 var(--accent-edge);
+}
+
+.slider input:focus-visible {
+  outline: none;
+}
+
+.slider input:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.slider.disabled {
+  opacity: 0.5;
+}
+
+.slider.disabled input {
+  cursor: default;
+}
+
+/* ---------- outlined go: repeated row actions (join, enter) ---------- */
+
+.btn-go {
+  --edge: var(--accent-soft-2);
+  background: var(--surface);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  font-weight: 650;
+}
+
+.btn-go:hover:not(:disabled) {
+  --edge: var(--accent-edge);
+  background: var(--accent);
+  border-color: var(--accent-edge);
+  color: var(--accent-ink);
+}
+
+/* On forest cards (servers) the outline is the light grass of dark text. */
+.server .btn-go {
+  --edge: var(--hero-edge);
+  background: transparent;
+  border-color: var(--on-dark-accent);
+  color: var(--on-dark-accent);
+}
+
+.server .btn-go:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent-edge);
+  color: var(--accent-ink);
+}
+
+.browse-have {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: var(--text-xs);
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.browse-have.update {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+/* The palette preview changes with every arrow key; its land must not rise each time. */
+.pv-scene .land {
+  animation: none;
+}

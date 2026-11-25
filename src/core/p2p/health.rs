@@ -87,15 +87,10 @@ pub fn node(value: &Value) -> Node {
 
 pub fn nat_name(code: u64) -> &'static str {
     match code {
-        1 => pick("公网直连", "open internet"),
-        2 => pick("公网（无端口转换）", "no port translation"),
-        3 => pick("全锥形 NAT", "full-cone NAT"),
-        4 => pick("限制锥形 NAT", "restricted-cone NAT"),
-        5 => pick("端口限制锥形 NAT", "port-restricted NAT"),
-        6 => pick("对称型 NAT", "symmetric NAT"),
-        7 => pick("对称型 NAT（UDP 受限）", "symmetric NAT with UDP firewall"),
-        8 | 9 => pick("对称型 NAT（端口可预测）", "symmetric NAT (predictable ports)"),
-        _ => pick("未知 NAT", "unknown NAT"),
+        1 | 2 => pick("公网直连", "Direct public IP"),
+        3..=5 => pick("宽松网络", "Direct-friendly"),
+        6..=9 => pick("受限网络", "Restricted network"),
+        _ => pick("未知网络", "Unknown network"),
     }
 }
 
@@ -204,30 +199,30 @@ pub fn grade(inputs: &Inputs) -> Report {
         check("core", level, core, detail.to_string());
         return finish(inputs.role, checks, Vec::new(), None);
     };
-    check("core", Level::Good, core, tr!("EasyTier {} 运行中", "EasyTier {} running", super::easytier::VERSION));
+    check("core", Level::Good, core, pick("运行正常", "Running").to_string());
 
     let room: Vec<&Peer> = peers.iter().filter(|p| !p.local && !p.public).collect();
     let nodes: Vec<&Peer> = peers.iter().filter(|p| p.public).collect();
     let fastest = nodes.iter().filter_map(|p| p.latency_ms).min_by(f64::total_cmp);
     let (level, detail) = match (nodes.len(), fastest) {
-        (0, _) if !room.is_empty() => (Level::Fair, pick("没连上共享节点，但已和房间里的玩家连通。", "No shared node reached, but the room's players are connected.").to_string()),
-        (0, _) if within(15) => (Level::Starting, pick("正在连接共享节点…", "Reaching the shared nodes…").to_string()),
-        (0, _) => (Level::Poor, pick("连不上任何共享节点：检查网络，或在高级设置里换一组节点。", "Can't reach any shared node. Check the network, or try other nodes under Advanced.").to_string()),
+        (0, _) if !room.is_empty() => (Level::Fair, pick("未连接联机节点，但已和房间内玩家连通。", "No relay node reached, but players in the room are connected.").to_string()),
+        (0, _) if within(15) => (Level::Starting, pick("正在连接联机节点…", "Connecting to relay nodes…").to_string()),
+        (0, _) => (Level::Poor, pick("无法连接联机节点：请检查网络，或在高级设置中更换节点。", "Can't reach any relay node. Check your network or switch nodes under Advanced.").to_string()),
         (n, Some(ms)) => (Level::Good, tr!("已连接 {n} 个，最快 {ms:.0} ms", "{n} connected, fastest {ms:.0} ms")),
         (n, None) => (Level::Good, tr!("已连接 {n} 个", "{n} connected")),
     };
-    check("nodes", level, pick("共享节点", "Shared nodes"), detail);
+    check("nodes", level, pick("联机节点", "Relay nodes"), detail);
 
     let nat = inputs.node.map_or(0, |n| n.nat);
     let name = nat_name(nat);
     let (level, detail) = match nat {
         _ if room.iter().any(|p| p.direct) => (Level::Good, tr!("{name}，已和玩家直连", "{name}, connected directly")),
         0 if within(20) => (Level::Starting, pick("正在检测…", "Detecting…").to_string()),
-        0 => (Level::Fair, pick("检测不出 NAT 类型，可能只能通过中转连接。", "The NAT type couldn't be detected; connections may need a relay.").to_string()),
+        0 => (Level::Fair, pick("未检测到网络类型，可能会通过中转连接。", "Network type unknown; connections may use a relay.").to_string()),
         1..=5 => (Level::Good, tr!("{name}，通常可以直连", "{name}, usually connects directly")),
-        _ => (Level::Fair, tr!("{name}，和部分玩家可能只能走中转，延迟会高一些", "{name}; some players may need a relay, with more delay")),
+        _ => (Level::Fair, tr!("{name}，部分玩家可能需通过中转连接", "{name}; some players may connect via relay")),
     };
-    check("nat", level, pick("NAT 类型", "NAT type"), detail);
+    check("nat", level, pick("网络环境", "Network"), detail);
 
     let own_ip = inputs.node.map(|n| n.ipv4.clone()).filter(|ip| !ip.is_empty()).or_else(|| peers.iter().find(|p| p.local).map(|p| p.ipv4.clone()).filter(|ip| !ip.is_empty()));
     // Only a guest's ping crosses the room, and only to the host.
@@ -253,7 +248,7 @@ pub fn grade(inputs: &Inputs) -> Report {
                 Some(true) => (Level::Good, tr!("已对局域网开放（端口 {port}）", "Open to LAN (port {port})")),
                 Some(false) => (
                     Level::Down,
-                    tr!("端口 {port} 上没有游戏：回到游戏重新“对局域网开放”，再重新创建房间。", "No game on port {port}. Open the world to LAN again, then create a new room."),
+                    tr!("端口 {port} 上没有游戏：请回到游戏重新“对局域网开放”，确认防火墙允许 Java 通信后再重试。", "No game on port {port}. Open the world to LAN again and make sure your firewall allows Java, then retry."),
                 ),
                 None => (Level::Starting, pick("正在检查游戏…", "Checking the game…").to_string()),
             };
@@ -288,8 +283,8 @@ pub fn grade(inputs: &Inputs) -> Report {
                 None => (
                     Level::Down,
                     pick(
-                        "找不到房主：确认房主还开着房间、房间码没错，并且双方至少有一个相同的共享节点。",
-                        "The host can't be found. Check that the room is still open, the code is right, and you share at least one node.",
+                        "找不到房主：请确认房间仍开启、房间码正确，且双方至少有一个相同的联机节点。",
+                        "Host not found. Check that the room is open, the code is right, and both sides share a relay node.",
                     )
                     .to_string(),
                 ),
@@ -299,7 +294,11 @@ pub fn grade(inputs: &Inputs) -> Report {
                 (true, Some(true)) => (Level::Good, pick("房主的世界在线，可以加入。", "The host's world is up; you can join.").to_string()),
                 (true, Some(false)) => (
                     Level::Poor,
-                    pick("连上了房主，但他的世界没有响应：可能已关闭或换了端口。", "Connected to the host, but the world isn't answering. It may have closed or changed port.").to_string(),
+                    pick(
+                        "连上了房主，但他的世界没有响应：请确认房主世界仍开放、端口未变，且房主防火墙允许 Java 通信。",
+                        "Connected to the host, but the world isn't answering. Check that the world is still open on the same port and the host's firewall allows Java.",
+                    )
+                    .to_string(),
                 ),
                 _ => (Level::Starting, pick("连上房主后检查…", "Checked once the host is connected…").to_string()),
             };
@@ -435,6 +434,7 @@ mod tests {
         let report = grade(&inputs(Role::Guest, &peers, &clash, Some(false), 40));
         assert_eq!(level_of(&report, "ip"), Level::Fair);
         assert_eq!(level_of(&report, "game"), Level::Poor);
+        assert!(report.checks.iter().any(|c| c.id == "game" && c.detail.contains("Java")), "{report:?}");
         assert_eq!(level_of(&report, "nodes"), Level::Fair);
         assert_eq!(report.level, Level::Poor);
     }

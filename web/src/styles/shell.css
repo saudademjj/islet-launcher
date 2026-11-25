@@ -1,0 +1,827 @@
+/* ---------- shell ----------
+   The forest frame (sidebar + status bar) holds a paper sheet with rounded
+   inner corners. */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  height: 100%;
+  background: var(--frame);
+}
+
+.sidebar {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 0 12px 12px;
+  color: var(--on-dark-muted);
+  min-height: 0;
+}
+
+.sidebar-drag {
+  height: 50px;
+  flex: none;
+}
+
+/* Windows: no traffic lights to clear, and the page drops below the title
+   bar strip, so the frame wraps the paper on the top too. */
+.shell.win .sidebar-drag {
+  height: var(--titlebar-h);
+}
+
+.shell.win .main {
+  padding-top: var(--titlebar-h);
+}
+
+.window-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 85;
+  height: var(--titlebar-h);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.window-btn {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--on-dark-muted);
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+
+.window-btn:hover {
+  background: var(--frame-2);
+  color: var(--on-dark);
+}
+
+.window-btn:active {
+  background: var(--frame-3);
+}
+
+.window-btn.close:hover {
+  background: var(--danger);
+  color: var(--on-dark);
+}
+
+.window-btn.close:active {
+  background: var(--danger-edge);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 8px 24px;
+}
+
+.brand-mark {
+  display: block;
+  flex: none;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.brand-name {
+  color: var(--on-dark);
+  font-weight: 700;
+  font-size: var(--text-md);
+  letter-spacing: 0.02em;
+}
+
+/* Sliding highlights sit in the container's stacking context, behind every
+   item, so a highlight in flight never covers a neighbour's label. */
+.nav {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 40px;
+  padding: 0 12px 0 16px;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--on-dark-muted);
+  font-size: var(--text-sm);
+  text-align: left;
+  transition: color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+
+.nav-item:not([aria-current]):hover {
+  color: var(--on-dark);
+  background: var(--frame-2);
+}
+
+.nav-item[aria-current="page"] {
+  color: var(--on-dark);
+  font-weight: 650;
+}
+
+.nav-item[aria-current="page"] .icon {
+  color: var(--on-dark-accent);
+}
+
+.nav-highlight {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-lg);
+  background: var(--frame-3);
+  z-index: -1;
+}
+
+.nav-bar {
+  position: absolute;
+  left: 0;
+  top: 11px;
+  bottom: 11px;
+  width: 3px;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: var(--accent);
+}
+
+.nav-item .kbd {
+  margin-left: auto;
+  color: var(--on-dark-faint);
+}
+
+/* Shortcuts stay out of sight until asked for: tooltips name them, and
+   holding ⌘ (Ctrl) a moment shows them all at once. Only ⌘K, the way into
+   everything, is always on show. */
+.nav-item .kbd,
+.sidebar-dock .kbd {
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+:root[data-keys] .nav-item .kbd,
+:root[data-keys] .sidebar-dock .kbd {
+  opacity: 1;
+}
+
+/* The foot: the account and the settings, destinations like the list
+   above, so the same highlight slides down to them. */
+.sidebar-dock {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--frame-line);
+}
+
+.sidebar-account,
+.sidebar-gear {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--on-dark-faint);
+  text-align: left;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.sidebar-account {
+  flex: 1;
+  min-width: 0;
+  gap: 12px;
+  padding: 8px 12px 8px 8px;
+}
+
+.sidebar-account-add {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-lg);
+}
+
+.sidebar-gear {
+  flex: none;
+  justify-content: center;
+  width: 48px;
+  color: var(--on-dark-muted);
+}
+
+.sidebar-account:not([aria-current]):hover,
+.sidebar-gear:not([aria-current]):hover {
+  background: var(--frame-2);
+  color: var(--on-dark);
+}
+
+.sidebar-gear[aria-current="page"] {
+  color: var(--on-dark-accent);
+}
+
+.sidebar-account .kbd {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  translate: 0 -50%;
+}
+
+.sidebar-gear .kbd {
+  position: absolute;
+  top: -6px;
+  right: -4px;
+}
+
+.sidebar-account-name {
+  color: var(--on-dark);
+  font-weight: 650;
+}
+
+.sidebar-account-kind {
+  font-size: var(--text-xs);
+}
+
+.nav-label {
+  min-width: 0;
+}
+
+.main {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) var(--status-h);
+  min-width: 0;
+  min-height: 0;
+}
+
+.page-frame {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg);
+  border-radius: var(--radius-xl) 0 0 var(--radius-xl);
+  overflow: hidden;
+}
+
+.page-anim {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* The toolbar spans the window so all of it drags, but its actions end
+   where the page measure (below) does. */
+.toolbar {
+  position: relative;
+  z-index: 1;
+  height: var(--toolbar-h);
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px max(32px, calc(100% - 1088px)) 0 32px;
+  transition: box-shadow var(--dur) var(--ease-out);
+}
+
+/* The scroll edge: a line under the toolbar once the page has moved up
+   beneath it, none while the page sits at its top. */
+.page-anim[data-scrolled] > .toolbar {
+  box-shadow: 0 1px 0 var(--border);
+}
+
+.toolbar-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.toolbar-title {
+  font-size: var(--text-xl);
+  font-weight: 750;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+}
+
+.toolbar-meta {
+  color: var(--faint);
+  font-size: var(--text-sm);
+}
+
+.content {
+  position: relative;
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+/* The page grid. Every page has one measure, 1120px at most, so the right
+   edge stays put from page to page; the gutter is 24px and sections are
+   32px apart. A page with secondary material splits 2:1 into a main column
+   and an aside, stacking on narrower windows. */
+.page {
+  padding: 12px 32px 48px;
+  max-width: 1120px;
+}
+
+.page-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(260px, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.page-main,
+.page-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+.page-split > .page-main > *,
+.page-split > .page-aside > * {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* Small print under a section: the same 12px step below its content. */
+.fine-print {
+  margin-top: 12px;
+  font-size: var(--text-xs);
+  line-height: 1.7;
+  color: var(--faint);
+}
+
+.statusbar {
+  display: flex;
+  align-items: center;
+  padding: 0 8px 0 12px;
+  font-size: var(--text-xs);
+  color: var(--on-dark-muted);
+  overflow: hidden;
+}
+
+.status-seg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+button.status-seg {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.status-seg + .status-seg,
+.statusbar .spacer + .status-seg {
+  border-left: 1px solid var(--frame-line);
+}
+
+button.status-seg:hover {
+  color: var(--on-dark);
+  background: var(--frame-2);
+}
+
+.statusbar .dim {
+  color: var(--on-dark-faint);
+}
+
+.statusbar .tone-accent {
+  color: var(--on-dark-accent);
+}
+
+.statusbar .tone-warn {
+  color: var(--on-dark-warn);
+}
+
+.status-progress {
+  width: 120px;
+}
+
+.statusbar .progress {
+  background: var(--frame-3);
+}
+
+/* ---------- sidebar: current world ---------- */
+
+.sidebar-foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.now {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 12px 32px;
+  border-radius: var(--radius-xl);
+  background: var(--frame-2);
+  overflow: hidden;
+}
+
+.now-land {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: -1;
+  line-height: 0;
+}
+
+.now-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.now-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--on-dark-faint);
+}
+
+.now-name {
+  font-size: var(--text-sm);
+  font-weight: 650;
+  color: var(--on-dark);
+}
+
+.now-meta {
+  font-size: var(--text-xs);
+  color: var(--on-dark-muted);
+}
+
+.now-meta.live {
+  color: var(--on-dark-accent);
+}
+
+.now-go {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: 0 3px 0 var(--accent-edge);
+  transition: transform 80ms var(--ease-out), box-shadow 80ms var(--ease-out), background var(--dur-fast);
+}
+
+.now-go:hover {
+  background: var(--accent-hover);
+}
+
+.now-go:active {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 var(--accent-edge);
+}
+
+.now-go.stop {
+  background: var(--danger);
+  color: var(--on-solid);
+  box-shadow: 0 3px 0 var(--danger-edge);
+}
+
+.now-go.stop:active {
+  box-shadow: 0 0 0 var(--danger-edge);
+}
+
+.now-go.busy {
+  background: var(--frame-3);
+  color: var(--on-dark-muted);
+  box-shadow: none;
+}
+
+.now-progress {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 22px;
+}
+
+.now .progress {
+  background: var(--frame-3);
+}
+
+/* ---------- tasks ---------- */
+
+.status-tasks {
+  color: var(--on-dark);
+  font-weight: 650;
+}
+
+/* Floats above the status bar, outside its clipped strip. */
+.task-panel {
+  position: fixed;
+  left: calc(var(--sidebar-w) + 8px);
+  bottom: calc(var(--status-h) + 6px);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: min(440px, calc(100vw - var(--sidebar-w) - 24px));
+  padding: 6px;
+  border: 1px solid var(--frame-line);
+  border-radius: var(--radius-lg);
+  background: var(--frame-2);
+  box-shadow: 0 4px 0 var(--hero-edge);
+  color: var(--on-dark);
+  font-size: var(--text-sm);
+}
+
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 38px;
+  padding: 4px 8px;
+  border-radius: var(--radius);
+}
+
+.task-row:hover {
+  background: var(--frame-3);
+}
+
+.task-panel .btn-ghost {
+  color: var(--on-dark-muted);
+}
+
+/* ---------- intro: the island builds itself, then breaks into squares ---------- */
+
+.intro {
+  position: fixed;
+  inset: 0;
+  z-index: 84;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--frame);
+  user-select: none;
+}
+.intro.leave {
+  background: transparent;
+  pointer-events: none;
+}
+.intro-cells {
+  position: absolute;
+  inset: 0;
+  display: grid;
+}
+.intro-cells i {
+  background: var(--frame);
+}
+.intro.leave .intro-cells i {
+  animation: intro-shrink 240ms steps(3, end) var(--d) both;
+}
+
+.intro-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-12);
+  /* Room above the island for the sun and the tree. */
+  padding-top: calc(var(--b) * 2);
+}
+.intro-sky {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.intro:not(.wait) .intro-sky {
+  animation: intro-drift 2400ms steps(12, end) both;
+}
+.intro.wait .intro-stage,
+.intro.wait .intro-sky {
+  visibility: hidden;
+}
+.intro.leave .intro-sky {
+  visibility: hidden;
+}
+.intro.leave .intro-stage {
+  animation: intro-stage-out 180ms steps(3, end) both;
+}
+
+.intro-scene {
+  position: relative;
+}
+.intro-scene > div {
+  position: absolute;
+}
+.intro:not(.wait) .intro-scene {
+  /* The last block lands with a thud. */
+  animation: intro-thud 140ms steps(2, end) var(--d) both;
+}
+.intro:not(.wait) .intro-block {
+  animation: intro-drop 300ms cubic-bezier(0.55, 0, 1, 0.45) var(--d) both;
+}
+.intro-dust {
+  position: absolute;
+  bottom: 0;
+  width: var(--u);
+  height: var(--u);
+  background: var(--t-dirt-light);
+  opacity: 0;
+}
+.intro-block.grass .intro-dust {
+  background: var(--t-grass-light);
+}
+.intro-dust.left {
+  left: calc(var(--u) * -1);
+  --dx: -4;
+  --dy: -3;
+}
+.intro-dust.right {
+  right: calc(var(--u) * -1);
+  --dx: 4;
+  --dy: -3;
+}
+.intro-dust.high {
+  right: calc(var(--u) * -1);
+  --dx: 2;
+  --dy: -6;
+}
+.intro:not(.wait) .intro-dust {
+  animation: intro-dust 360ms steps(4, end) calc(var(--d) + 300ms) both;
+}
+.intro:not(.wait) .intro-tree {
+  animation: intro-grow 400ms steps(5, end) var(--d) both;
+}
+.intro:not(.wait) .intro-flower {
+  animation: intro-grow 160ms steps(2, end) var(--d) both;
+}
+.intro:not(.wait) .intro-sun {
+  animation: intro-rise 560ms steps(7, end) var(--d) both;
+}
+.intro-ray {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--u) * 2);
+  height: calc(var(--u) * 2);
+  margin: calc(var(--u) * -1);
+  background: var(--sun-light);
+  opacity: 0;
+}
+.intro:not(.wait) .intro-ray {
+  animation: intro-ray 480ms steps(5, end) var(--d) both;
+}
+
+.intro-word {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+}
+.intro-han {
+  display: flex;
+  gap: var(--space-2);
+  font-family: var(--font-pixel);
+  font-size: 48px;
+  line-height: 48px;
+  color: var(--on-dark);
+}
+.intro-latin {
+  display: flex;
+  margin-right: -0.5em;
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  line-height: 12px;
+  letter-spacing: 0.5em;
+  color: var(--on-dark-muted);
+}
+.intro-bar {
+  width: 100%;
+  height: var(--u);
+  background: var(--accent);
+  transform-origin: left;
+}
+.intro:not(.wait) .intro-han span {
+  animation: intro-grow 240ms steps(4, end) var(--d) both;
+}
+.intro:not(.wait) .intro-bar {
+  animation: intro-bar 400ms steps(8, end) var(--d) both;
+}
+.intro:not(.wait) .intro-latin span {
+  animation: intro-appear 1ms steps(1, end) var(--d) both;
+}
+
+@keyframes intro-drop {
+  from {
+    transform: translateY(calc(var(--b) * -2.5));
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes intro-drift {
+  to {
+    transform: translateX(-36px);
+  }
+}
+@keyframes intro-thud {
+  from {
+    transform: translateY(var(--u));
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes intro-dust {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translate(calc(var(--dx) * var(--u)), calc(var(--dy) * var(--u)));
+  }
+}
+@keyframes intro-grow {
+  from {
+    clip-path: inset(100% 0 0 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+@keyframes intro-rise {
+  from {
+    transform: translateY(var(--b));
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes intro-ray {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translate(var(--x), var(--y));
+  }
+}
+@keyframes intro-bar {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes intro-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes intro-stage-out {
+  to {
+    opacity: 0;
+    transform: translateY(calc(var(--u) * -2));
+  }
+}
+@keyframes intro-shrink {
+  to {
+    transform: scale(0);
+  }
+}

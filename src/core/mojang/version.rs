@@ -233,19 +233,23 @@ pub fn artifact_path(library: &Library) -> Option<String> {
         .or_else(|| maven_path(&library.name))
 }
 
-/// Pick the native classifier for the current OS/arch. On Apple Silicon we try
-/// the arm64 classifier before falling back to the x64 one.
+/// Pick the native classifier for the current OS/arch. On ARM64 we try
+/// the arm64/aarch64 classifier before falling back to the x64 one.
 pub fn native_classifier(library: &Library) -> Option<String> {
     native_classifier_for(library, std::env::consts::ARCH)
 }
 
 /// The native classifier for a game running as `arch`.
 pub fn native_classifier_for(library: &Library, arch: &str) -> Option<String> {
+    native_classifier_in(library, current_os_name(), arch)
+}
+
+fn native_classifier_in(library: &Library, os_name: &str, arch: &str) -> Option<String> {
     let arch = crate::core::mojang::rules::mojang_arch(arch);
     let template = library
         .natives
         .as_ref()?
-        .get(current_os_name())?
+        .get(os_name)?
         .replace("${arch}", if arch == "x86" { "32" } else { "64" });
 
     let classifiers = library
@@ -256,8 +260,9 @@ pub fn native_classifier_for(library: &Library, arch: &str) -> Option<String> {
     let mut candidates = Vec::new();
     if arch == "arm64" {
         candidates.push(format!("{template}-arm64"));
+        candidates.push(format!("{template}-aarch64"));
     }
-    candidates.push(template.clone());
+    candidates.push(template);
     candidates
         .into_iter()
         .find(|candidate| classifiers.contains_key(candidate))
@@ -277,22 +282,69 @@ pub fn native_download_for<'a>(library: &'a Library, arch: &str) -> Option<&'a D
         .get(&classifier)
 }
 
-/// The architecture the game runs as. Usually the machine's own; but
-/// versions up to 1.18 ship macOS native libraries (LWJGL 2 and 3.2) only
-/// for Intel, so on Apple Silicon they run as x86_64 under Rosetta 2, with
-/// an Intel Java.
+fn is_arm64_native_tag(value: &str) -> bool {
+    value.ends_with("-arm64") || value.ends_with("-aarch64")
+}
+
+/// Whether `version` only ships x86_64 native libraries for `os_name`
+/// ("osx", "windows" or "linux") when evaluated on an ARM64 host.
+pub fn has_x86_only_natives_for_os(version: &VersionJson, os_name: &str) -> bool {
+    let allowed_on_arm = |library: &Library| {
+        if library.rules.is_empty() {
+            return true;
+        }
+        let mut allowed = false;
+        for rule in &library.rules {
+            let os_ok = rule.os.as_ref().is_none_or(|os| {
+                os.name.as_deref().is_none_or(|name| name == os_name)
+                    && os.arch.as_deref().is_none_or(|arch| arch == "arm64")
+            });
+            let feat_ok = rule
+                .features
+                .as_ref()
+                .is_none_or(|features| features.iter().all(|(_, wanted)| !*wanted));
+            if os_ok && feat_ok {
+                allowed = rule.action == "allow";
+            }
+        }
+        allowed
+    };
+
+    let legacy_x86_only = version.libraries.iter().any(|library| {
+        allowed_on_arm(library)
+            && native_classifier_in(library, os_name, "aarch64")
+                .is_some_and(|classifier| !is_arm64_native_tag(&classifier))
+    });
+    if legacy_x86_only {
+        return true;
+    }
+
+    let coord_natives: Vec<&str> = version
+        .libraries
+        .iter()
+        .filter(|library| library.natives.is_none() && allowed_on_arm(library))
+        .filter_map(|library| {
+            let (_, tail) = library.name.split_once(":natives-")?;
+            Some(tail)
+        })
+        .collect();
+    !coord_natives.is_empty() && !coord_natives.iter().any(|tail| is_arm64_native_tag(tail))
+}
+
+/// The architecture the game runs as. Usually the machine's own; but versions
+/// up to 1.18 (and some older LWJGL bundles) ship native libraries only for
+/// x86_64, so on ARM64 Macs, Windows 11 ARM and Linux ARM64 they must run
+/// with an x86_64 Java rather than crashing when loading x64 native libraries.
 pub fn game_arch(version: &VersionJson) -> &'static str {
     let host = crate::core::platform::normalize_arch(std::env::consts::ARCH);
-    if !cfg!(target_os = "macos") || host != "aarch64" {
+    if host != "aarch64" {
         return host;
     }
-    let intel_only = version.libraries.iter().any(|library| {
-        crate::core::mojang::rules::rules_allow_in(
-            &library.rules,
-            crate::core::mojang::rules::RuleEnv { arch: "aarch64", custom_resolution: false },
-        ) && native_classifier_for(library, "aarch64").is_some_and(|classifier| !classifier.ends_with("-arm64"))
-    });
-    if intel_only { "x86_64" } else { host }
+    if has_x86_only_natives_for_os(version, current_os_name()) {
+        "x86_64"
+    } else {
+        host
+    }
 }
 
 pub fn version_asset_index_id(version: &VersionJson) -> Option<&str> {
@@ -345,7 +397,11 @@ mod tests {
         }]));
         let host = crate::core::platform::normalize_arch(std::env::consts::ARCH);
         assert_eq!(game_arch(&modern), host);
-        if cfg!(target_os = "macos") && host == "aarch64" {
+        assert!(has_x86_only_natives_for_os(&old, "osx"));
+        assert!(has_x86_only_natives_for_os(&old, "windows"));
+        assert!(has_x86_only_natives_for_os(&old, "linux"));
+        assert!(!has_x86_only_natives_for_os(&modern, "osx"));
+        if host == "aarch64" {
             assert_eq!(game_arch(&old), "x86_64");
         } else {
             assert_eq!(game_arch(&old), host);

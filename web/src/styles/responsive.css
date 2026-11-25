@@ -1,0 +1,201 @@
+/* ---------- narrow windows ---------- */
+
+@media (max-width: 1080px) {
+  .page-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .page-split .page-aside .options {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+  .options {
+    grid-template-columns: 1fr;
+  }
+  .option {
+    min-height: 0;
+    padding-right: 48px;
+  }
+  .option-icon {
+    margin-bottom: 4px;
+  }
+  .server-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .server-list {
+    position: static;
+  }
+}
+
+/* ---------- home: servers beside screenshots ---------- */
+
+.home-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+}
+
+.home-pair .shot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+/* Too narrow for two columns: servers above, the screenshots in one row
+   below, so nothing is cut short. */
+@container home (max-width: 760px) {
+  .home-pair {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .home-pair .shot-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.server-grid.stacked {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.stage-continue-icon {
+  width: 16px;
+  height: 16px;
+  image-rendering: pixelated;
+  border-radius: var(--radius-sm);
+}
+
+.stage-continue-label {
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---------- pixel type ----------
+   Fusion Pixel for the game-voiced bits only: eyebrows, tags, status
+   chips, section titles, fact labels and numbers, keys and the status bar.
+   Always 12px or 24px and regular weight, so no glyph is scaled or
+   faux-bolded off its grid. Titles and body text stay in the system face. */
+.px-type,
+.stage-eyebrow,
+.scene-head-eyebrow,
+.hero-status,
+.status,
+.chip,
+.world-biome,
+.world-badge,
+.section-title,
+.fact-label,
+.kbd,
+.status-version,
+.tab-count,
+.step-index,
+.now-label,
+.room-eyebrow,
+.settings-index-item .kbd,
+.hotbar-key,
+.hotbar-more {
+  font-family: var(--font-pixel);
+  font-size: var(--px-font);
+  font-weight: 400;
+  letter-spacing: 0;
+  -webkit-font-smoothing: none;
+}
+
+.fact-number,
+.fact-word,
+.install-percent {
+  font-family: var(--font-pixel);
+  font-size: var(--px-font-2);
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1;
+  -webkit-font-smoothing: none;
+}
+
+/* Narrow windows: the sidebar folds to a rail of icons, wide enough for
+   the window buttons above it. Names and shortcuts move to tooltips; the
+   labels stay for screen readers. Kept last so it wins over the sidebar
+   rules above. */
+@media (max-width: 999px) {
+  :root {
+    --sidebar-w: 76px;
+  }
+
+  .sidebar {
+    padding: 0 12px 12px;
+  }
+
+  .brand {
+    justify-content: center;
+    padding: 4px 0 20px;
+  }
+
+  .brand-name,
+  .sidebar-search span,
+  .sidebar-search .kbd,
+  .sidebar-account-text,
+  .now-main > .col,
+  .now-land {
+    display: none;
+  }
+
+  .sidebar-search,
+  .nav-item,
+  .sidebar-account {
+    justify-content: center;
+    padding: 0;
+  }
+
+  /* Held-⌘ hints ride on the icons' corners. */
+  .nav-item .kbd,
+  .sidebar-account .kbd {
+    position: absolute;
+    top: auto;
+    bottom: 2px;
+    right: 2px;
+    translate: none;
+  }
+
+  .sidebar-dock {
+    flex-direction: column;
+  }
+
+  .sidebar-account {
+    flex: none;
+    height: 48px;
+  }
+
+  .sidebar-gear {
+    width: auto;
+    height: 40px;
+  }
+
+  .nav-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .nav-item .nav-dot {
+    position: absolute;
+    top: 7px;
+    right: 8px;
+    margin: 0;
+  }
+
+  /* the current world stacks: its face above the play button */
+  .now {
+    flex-direction: column;
+    padding: 8px 0 16px;
+  }
+
+  .now-main {
+    flex: none;
+  }
+
+  .now-progress {
+    left: 8px;
+    right: 8px;
+    bottom: 5px;
+  }
+}

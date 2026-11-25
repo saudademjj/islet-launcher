@@ -205,8 +205,8 @@ function CreateServer({ first, onCancel, onCreated }: { first: boolean; onCancel
         {first && (
           <span className="field-hint">
             {t(
-              "内存、JVM 参数和视距按运行它的机器自动设置。",
-              "Memory, JVM flags and view distance fit the machine it runs on.",
+              "内存与视距会按服务器配置自动优化。",
+              "Memory and view distance are tuned automatically for the server.",
             )}
           </span>
         )}
@@ -294,8 +294,10 @@ function ProjectView({ project, bar }: { project: Instance; bar: HTMLDivElement 
   const port = Number(form.port);
   const valid = form.name.trim().length > 0 && form.motd.length <= 120 && maxPlayers >= 1 && maxPlayers <= 1000 && port > 0 && port < 65536 && memoryValid(form.memory) && form.versionId.length > 0;
   const dirty = !same(form, saved);
+  const [saving, setSaving] = useState(false);
 
   const save = async () => {
+    if (saving) return false;
     if (!valid) {
       useStore.getState().toast(t("有设置没填对，先改一下", "Some settings aren't right yet"), "error");
       return false;
@@ -312,7 +314,12 @@ function ProjectView({ project, bar }: { project: Instance; bar: HTMLDivElement 
       memoryMb: Number(form.memory),
       seed: form.seed.trim(),
     };
-    return useStore.getState().mutate("configure_server_project", { id: project.id, name: form.name.trim(), versionId: form.versionId, loader: form.loader, project: next }, t("服务器设置已保存", "Server settings saved"));
+    setSaving(true);
+    try {
+      return await useStore.getState().mutate("configure_server_project", { id: project.id, name: form.name.trim(), versionId: form.versionId, loader: form.loader, project: next }, t("服务器设置已保存", "Server settings saved"));
+    } finally {
+      setSaving(false);
+    }
   };
   // A saved project comes back as new props; the form follows. Snapshots
   // for other changes bring an equal project and keep the edits.
@@ -386,14 +393,14 @@ function ProjectView({ project, bar }: { project: Instance; bar: HTMLDivElement 
             ) : (
               <span className="field-hint">
                 {plugins
-                  ? t("还没有插件；本地 .jar 可以拖进管理窗口", "No plugins yet; local .jar files can be dropped into the manage window")
-                  : t("还没有模组；下载列表只含服务端能运行的模组，仅客户端的会在导出时去掉", "No mods yet; downloads list only mods that run on a server, and client-only ones are left out when exporting")}
+                  ? t("还没有插件，可在管理窗口拖入 .jar 文件", "No plugins yet; drag .jar files into Manage")
+                  : t("还没有模组，下载页会自动筛选服务端模组", "No mods yet; downloads only show server-compatible mods")}
               </span>
             )}
           </div>
         </section>
       )}
-      {project.loader === "vanilla" && <span className="field-hint">{t("原版服务端不加载模组和插件；想装插件，把类型换成 Paper。", "A vanilla server runs no mods or plugins; switch to Paper for plugins.")}</span>}
+      {project.loader === "vanilla" && <span className="field-hint">{t("原版不支持模组和插件，需要插件请换用 Paper。", "Vanilla doesn't support mods or plugins; switch to Paper for plugins.")}</span>}
 
       <section className="card form-sections">
         <CardHeader icon="sliders" title={t("服务器设置", "Server settings")} />
@@ -401,12 +408,12 @@ function ProjectView({ project, bar }: { project: Instance; bar: HTMLDivElement 
           <Field label={t("名称", "Name")} tone={form.name.trim() ? undefined : "bad"}>
             <Input value={form.name} maxLength={64} invalid={!form.name.trim()} onChange={(e) => set("name", e.target.value)} />
           </Field>
-          <Field label={t("服务器介绍（MOTD）", "Message of the day")} hint={t("不填就用名称", "The name when left empty")}>
+          <Field label={t("服务器简介", "Server description")} hint={t("不填就用名称", "The name when left empty")}>
             <Input value={form.motd} maxLength={120} placeholder={form.name} onChange={(e) => set("motd", e.target.value.replace(/[\r\n]/g, ""))} />
           </Field>
         </FormSection>
         <FormSection title={t("服务端", "Server")}>
-          <Field label={t("服务端类型", "Kind of server")} tone={kindChanged ? "bad" : undefined} hint={kindChanged ? t(`换类型后，已添加的${what}可能用不了，保存后去「管理」里检查`, `Changing the kind may leave the ${what.toLowerCase()} you added unusable; check them under Manage after saving`) : undefined}>
+          <Field label={t("服务端类型", "Kind of server")} tone={kindChanged ? "bad" : undefined} hint={kindChanged ? t(`更换类型后，已添加的${what}可能不兼容`, `Existing ${what.toLowerCase()} may be incompatible after switching`) : undefined}>
             <KindPicker value={form.loader} onChange={(loader) => set("loader", loader)} />
           </Field>
           <Field label={t("游戏版本", "Game version")}>
@@ -451,26 +458,26 @@ function ProjectView({ project, bar }: { project: Instance; bar: HTMLDivElement 
             <Field label={t("最多玩家", "Max players")} tone={maxPlayers >= 1 && maxPlayers <= 1000 ? undefined : "bad"}>
               <Input mono inputMode="numeric" value={form.maxPlayers} style={{ width: 100 }} invalid={!(maxPlayers >= 1 && maxPlayers <= 1000)} onChange={(e) => set("maxPlayers", e.target.value.replace(/\D/g, "").slice(0, 4))} />
             </Field>
-            <Field label={t("端口", "Port")} tone={port > 0 && port < 65536 ? undefined : "bad"} hint={t("默认 25565；记得在安全组放行", "25565 by default; open it in the security group")}>
+            <Field label={t("端口", "Port")} tone={port > 0 && port < 65536 ? undefined : "bad"} hint={t("默认 25565，需在防火墙放行", "Default 25565; open in firewall")}>
               <Input mono inputMode="numeric" value={form.port} style={{ width: 110 }} invalid={!(port > 0 && port < 65536)} onChange={(e) => set("port", e.target.value.replace(/\D/g, "").slice(0, 5))} />
             </Field>
           </div>
           <div className="setting-row">
             <div className="col">
               <span className="setting-name">{t("白名单", "Whitelist")}</span>
-              <span className="field-hint">{t("开服后用 whitelist add <名字> 添加", "Add players with whitelist add <name> once it runs")}</span>
+              <span className="field-hint">{t("开服后在控制台输入 whitelist add 玩家名", "Run whitelist add <name> in the console")}</span>
             </div>
             <Switch label={t("白名单", "Whitelist")} checked={form.whitelist} onChange={(v) => set("whitelist", v)} />
           </div>
           <div className="setting-row">
             <div className="col">
               <span className="setting-name">{t("正版验证", "Online mode")}</span>
-              <span className="field-hint">{t("关闭后离线账号也能进，但名字可被冒用", "Off, offline accounts can join too, and names can be faked")}</span>
+              <span className="field-hint">{t("关闭后离线账号可加入，但名称无验证", "Off lets offline accounts join without name checks")}</span>
             </div>
             <Switch label={t("正版验证", "Online mode")} checked={form.onlineMode} onChange={(v) => set("onlineMode", v)} />
           </div>
         </FormSection>
-        <FormSection title={t("性能", "Performance")} text={t("JVM 参数和视距在开服时按机器配置自动调整", "JVM flags and view distance fit the machine at start")}>
+        <FormSection title={t("性能", "Performance")} text={t("启动时按机器配置自动优化", "Auto-tuned to the server on start")}>
           <MemoryField value={form.memory} onChange={(memory) => set("memory", memory)} />
         </FormSection>
       </section>
@@ -498,7 +505,7 @@ function ProjectView({ project, bar }: { project: Instance; bar: HTMLDivElement 
                 <Button variant="hero" size="sm" onClick={() => setForm(saved)}>
                   {t("还原", "Revert")}
                 </Button>
-                <Button variant="primary" size="sm" icon="check" disabled={!valid} onClick={() => void save()}>
+                <Button variant="primary" size="sm" icon="check" busy={saving} disabled={!valid} onClick={() => void save()}>
                   {t("保存", "Save")}
                 </Button>
               </>

@@ -26,6 +26,7 @@ pub enum Fix {
     RaiseMemory { mb: u32 },
     InstallMod { query: String },
     OpenMods,
+    OpenTools,
     Repair,
     None,
 }
@@ -67,7 +68,7 @@ fn diagnose(text: &str, total_mb: u64) -> Vec<Diagnosis> {
         diagnoses.push(Diagnosis {
             kind: "javaVersion".to_string(),
             title: crate::tr!("需要 Java {major}", "Needs Java {major}"),
-            detail: crate::tr!("游戏或模组中有用 Java {major} 编译的类（class file version {version}），当前使用的 Java 版本太低。请准备 Java {major}，启动器会把它设为这个世界使用的 Java。", "The game or a mod has classes built for Java {major} (class file version {version}), and the Java in use is too old. Get Java {major}; the launcher will set it for this world."
+            detail: crate::tr!("当前 Java 版本过低，该游戏或模组需要 Java {major}。准备完成后启动器会自动为此世界切换。", "The current Java version is too old; this game or mod requires Java {major}. Preparing it will switch this world automatically."
             ),
             fix: Some(Fix::UseJava { major }),
         });
@@ -79,13 +80,27 @@ fn diagnose(text: &str, total_mb: u64) -> Vec<Diagnosis> {
         diagnoses.push(diagnosis);
     }
 
-    // 3/4. Fabric and Forge report missing dependencies in different formats.
+    // 3/4. Fabric, Forge, and NeoForge report missing or mismatched dependencies
+    //      in different formats.
     let mut missing = HashSet::new();
+    let mut mismatched = HashSet::new();
     for id in fabric_missing(&lower, text) {
         push_missing(&mut diagnoses, &mut missing, &id);
     }
-    for id in forge_missing(&lower, text) {
+    let (forge_miss, forge_mismatch) = forge_dependencies(&lower, text);
+    for id in forge_miss {
         push_missing(&mut diagnoses, &mut missing, &id);
+    }
+    let (neo_miss, neo_mismatch) = neoforge_dependencies(&lower, text);
+    for id in neo_miss {
+        push_missing(&mut diagnoses, &mut missing, &id);
+    }
+    for id in fabric_version_mismatches(&lower, text)
+        .into_iter()
+        .chain(forge_mismatch)
+        .chain(neo_mismatch)
+    {
+        push_version_mismatch(&mut diagnoses, &missing, &mut mismatched, &id);
     }
 
     // 5. Two versions of the same mod.
@@ -97,10 +112,43 @@ fn diagnose(text: &str, total_mb: u64) -> Vec<Diagnosis> {
             kind: "duplicateMods".to_string(),
             title: crate::core::i18n::pick("发现重复的模组", "Duplicate mods").to_string(),
             detail:
-                crate::core::i18n::pick("同一个模组存在多个版本的 jar，游戏无法决定加载哪一个。请打开本地模组页，每个模组只保留一个版本。", "Several jars of the same mod are present and the game can't choose. Open the Mods tab and keep one version of each mod.")
+                crate::core::i18n::pick("同一模组安装了多个版本，请打开「模组」页，每个模组只保留一个。", "Multiple versions of the same mod are installed. Open the Mods tab and keep only one per mod.")
                     .to_string(),
             fix: Some(Fix::OpenMods),
         });
+    }
+
+    // 5b. OptiFine / OptiFabric installed alongside Sodium / Iris / Embeddium / Oculus,
+    //     or Fabric reporting explicit "breaks with" mod incompatibilities.
+    let optifine_conflict = has_optifine_render_conflict(&lower);
+    if optifine_conflict {
+        diagnoses.push(Diagnosis {
+            kind: "modConflict".to_string(),
+            title: crate::core::i18n::pick("OptiFine 与光影/优化模组冲突", "OptiFine conflicts with rendering mods").to_string(),
+            detail: crate::core::i18n::pick(
+                "OptiFine 不能与 Sodium、Iris、Embeddium、Rubidium 或 Oculus 同时安装。请打开「模组」页移除 OptiFine（或改用 Sodium + Iris 组合）。",
+                "OptiFine can't run alongside Sodium, Iris, Embeddium, Rubidium, or Oculus. Open Mods and remove OptiFine (or switch to Sodium + Iris).",
+            )
+            .to_string(),
+            fix: Some(Fix::OpenMods),
+        });
+    }
+    let mut conflict_mods = HashSet::new();
+    for id in fabric_conflicts(&lower, text) {
+        if optifine_conflict && matches!(id.as_str(), "optifine" | "optifabric" | "sodium" | "iris") {
+            continue;
+        }
+        if !NON_MOD_IDS.contains(&id.as_str()) && conflict_mods.insert(id.clone()) {
+            diagnoses.push(Diagnosis {
+                kind: "modConflict".to_string(),
+                title: crate::tr!("模组 {id} 与其他模组冲突", "Mod {id} conflicts with another mod"),
+                detail: crate::tr!(
+                    "加载器报告模组 {id} 与当前已安装的其他模组不兼容。请打开「模组」页禁用或移除冲突模组。",
+                    "The loader reports that {id} is incompatible with another installed mod. Open Mods to disable or remove the conflicting mod."
+                ),
+                fix: Some(Fix::OpenMods),
+            });
+        }
     }
 
     // 6. A mixin that no longer matches the game or loader classes.
@@ -110,11 +158,44 @@ fn diagnose(text: &str, total_mb: u64) -> Vec<Diagnosis> {
             diagnoses.push(Diagnosis {
                 kind: "mixinConflict".to_string(),
                 title: crate::tr!("模组 {id} 与当前版本不兼容", "Mod {id} doesn't fit this version"),
-                detail: crate::tr!("模组 {id} 的 Mixin 注入失败，通常是因为模组版本与 Minecraft 或加载器版本不匹配。请更新该模组到适配版本，或暂时禁用它。", "Mod {id} failed to apply its mixins, usually because it doesn't match the Minecraft or loader version. Update it to a fitting version or disable it for now."
+                detail: crate::tr!("模组 {id} 与当前游戏版本或加载器不兼容，请更新到适配版本或先禁用它。", "Mod {id} is incompatible with this Minecraft or loader version. Update it to a matching version or disable it for now."
                 ),
                 fix: Some(Fix::OpenMods),
             });
         }
+    }
+
+    // 6b. Server-only mod loaded in a client environment.
+    if is_wrong_side_mod(&lower) {
+        diagnoses.push(Diagnosis {
+            kind: "wrongSideMod".to_string(),
+            title: crate::core::i18n::pick("安装了仅限服务端的模组", "Server-only mod installed on client").to_string(),
+            detail: crate::core::i18n::pick(
+                "日志显示有模组尝试在客户端加载仅限服务端的代码（Invalid dist: CLIENT）。请打开「模组」页排查并移除仅服务端模组。",
+                "A mod tried to load server-only code on the client (invalid dist: CLIENT). Open Mods and disable or remove server-only mods.",
+            )
+            .to_string(),
+            fix: Some(Fix::OpenMods),
+        });
+    }
+
+    // 6c. Corrupted NightConfig / TOML / JSON mod configuration file.
+    if is_corrupt_config(&lower) {
+        let file = config_file_name(text);
+        let title = match file {
+            Some(ref name) => crate::tr!("配置文件 {name} 已损坏", "Config file {name} is corrupted"),
+            None => crate::core::i18n::pick("模组配置文件已损坏", "A mod config file is corrupted").to_string(),
+        };
+        diagnoses.push(Diagnosis {
+            kind: "corruptConfig".to_string(),
+            title,
+            detail: crate::core::i18n::pick(
+                "模组配置文件格式损坏导致无法读取。请前往世界管理的「工具 → 配置文件」检查或删除损坏的文件，游戏重启后会自动重建默认配置。",
+                "A mod config file couldn't be parsed. Open Tools → Configs for this world to inspect or delete the broken file; the game will recreate a default copy on next launch.",
+            )
+            .to_string(),
+            fix: Some(Fix::OpenTools),
+        });
     }
 
     // 7. The driver cannot provide the OpenGL context the game needs.
@@ -129,7 +210,7 @@ fn diagnose(text: &str, total_mb: u64) -> Vec<Diagnosis> {
             kind: "graphics".to_string(),
             title: crate::core::i18n::pick("显卡驱动太旧或不支持", "Graphics driver too old or unsupported").to_string(),
             detail:
-                crate::core::i18n::pick("游戏无法创建所需的 OpenGL 图形上下文。请更新显卡驱动，并确认这台电脑和系统满足该 Minecraft 版本的要求；虚拟机或远程桌面环境可能无法运行游戏。", "The game couldn't create the OpenGL context it needs. Update the graphics driver and check that this computer meets the version's requirements; virtual machines and remote desktops may not run the game.")
+                crate::core::i18n::pick("无法初始化显卡画面（OpenGL）。请更新显卡驱动；虚拟机或远程桌面通常无法运行游戏。", "Failed to initialize graphics (OpenGL). Update your graphics driver; virtual machines and remote desktops usually can't run the game.")
                     .to_string(),
             fix: Some(Fix::None),
         });
@@ -146,9 +227,26 @@ fn diagnose(text: &str, total_mb: u64) -> Vec<Diagnosis> {
             kind: "corruptFiles".to_string(),
             title: crate::core::i18n::pick("游戏文件缺失或损坏", "Game files missing or damaged").to_string(),
             detail:
-                crate::core::i18n::pick("游戏主类或依赖文件无法加载，通常是下载不完整或被误删。请使用「校验并修复」重新核对并下载缺失的文件，存档不会受影响。", "The game's main class or a library couldn't load, usually from an incomplete download or a deleted file. Use Verify and repair to check and download what's missing; saves are not affected.")
+                crate::core::i18n::pick("游戏核心文件缺失或损坏，请点击「校验并修复」重新下载，不会影响存档。", "Core game files are missing or damaged. Use Verify and repair to redownload them without touching your saves.")
                     .to_string(),
             fix: Some(Fix::Repair),
+        });
+    }
+
+    // 8b. Port binding conflict (usually another server or game holding the port).
+    if lower.contains("java.net.bindexception")
+        || lower.contains("failed to bind to port")
+        || lower.contains("address already in use: bind")
+    {
+        diagnoses.push(Diagnosis {
+            kind: "portInUse".to_string(),
+            title: crate::core::i18n::pick("网络端口已被占用", "Network port is already in use").to_string(),
+            detail: crate::core::i18n::pick(
+                "目标端口已被其他游戏或服务端进程占用。请关闭重复启动的实例，或更换端口后重试。",
+                "Another game or server process is already using that port. Close the duplicate instance or switch to a different port.",
+            )
+            .to_string(),
+            fix: Some(Fix::None),
         });
     }
 
@@ -167,13 +265,13 @@ fn diagnose(text: &str, total_mb: u64) -> Vec<Diagnosis> {
             let frame = frame.clone().unwrap_or_default();
             (
                 crate::core::i18n::pick("显卡驱动崩溃了", "The graphics driver crashed").to_string(),
-                crate::tr!("游戏在显卡驱动里崩溃了（{frame}）。请把显卡驱动更新到最新版本；笔记本请确认游戏用的是独立显卡。光影或某些渲染模组也可能触发驱动问题。", "The game crashed inside the graphics driver ({frame}). Update the graphics driver; on a laptop, make sure the game runs on the dedicated GPU. Shaders or some rendering mods can also trigger driver bugs."),
+                crate::tr!("显卡驱动发生崩溃（{frame}）。请更新显卡驱动，双显卡笔记本请确认使用独立显卡，或排查光影与渲染模组。", "Graphics driver crashed ({frame}). Update the driver, ensure a laptop uses its discrete GPU, or check shaders and rendering mods."),
             )
         } else {
-            let at = frame.map(|frame| crate::tr!("（崩溃位置：{frame}）", " (crashed in {frame})")).unwrap_or_default();
+            let at = frame.map(|frame| crate::tr!("（位置：{frame}）", " ({frame})")).unwrap_or_default();
             (
-                crate::core::i18n::pick("Java 虚拟机崩溃了", "The Java VM crashed").to_string(),
-                crate::tr!("Java 虚拟机本身崩溃了{at}。常见原因是显卡驱动、最近添加的模组自带的本地库，或这个 Java 版本有问题。可以更新驱动、移除最近加的模组，或换一个 Java 再试。", "The Java VM itself crashed{at}. Common causes are the graphics driver, a native library in a recently added mod, or a problem with this Java build. Update the driver, remove recently added mods, or try another Java."),
+                crate::core::i18n::pick("Java 运行时崩溃了", "Java runtime crashed").to_string(),
+                crate::tr!("Java 运行时意外崩溃{at}。常见原因包括显卡驱动过旧、近期安装的模组冲突或当前 Java 异常，建议更新驱动、排查新装模组或更换 Java。", "The Java runtime crashed unexpectedly{at}. Common causes are an outdated graphics driver, a recently added mod, or a faulty Java build. Try updating drivers, removing recent mods, or switching Java."),
             )
         };
         diagnoses.push(Diagnosis { kind: "jvmCrash".to_string(), title, detail, fix: Some(Fix::None) });
@@ -204,8 +302,7 @@ pub fn clamp_memory_mb(suggested: u32, total_mb: u64) -> u32 {
     let usable = total_mb
         .saturating_sub(1024)
         .min(total_mb.saturating_mul(3) / 4)
-        .max(512)
-        .min(32768);
+        .clamp(512, 32768);
     let capped = suggested.min(usable as u32);
     ((capped / 512).max(1) * 512).min(32768)
 }
@@ -253,7 +350,7 @@ fn memory_diagnosis(lower: &str, total_mb: u64) -> Option<Diagnosis> {
             return Some(Diagnosis {
                 kind: "memory".to_string(),
                 title: crate::core::i18n::pick("内存不足", "Out of memory").to_string(),
-                detail: crate::tr!("游戏堆内存（-Xmx）已经耗尽。这个世界已使用 {current} MB，已接近或超过这台电脑可安全分配的上限（约 {next} MB），继续提高反而可能让系统内存不足。请关闭其他占用内存的程序、减少同时加载的模组或降低渲染距离，也可以手动检查内存设置后再试。", "The game ran out of heap memory (-Xmx). This world already uses {current} MB, at or past what this computer can safely give (about {next} MB); raising it further may starve the system. Close other programs, load fewer mods or lower the render distance, or review the memory setting and try again."
+                detail: crate::tr!("游戏内存已耗尽。当前已分配 {current} MB，已接近电脑安全上限（约 {next} MB），继续调高可能影响系统。请关闭其他程序、减少模组或调低渲染距离后重试。", "The game ran out of memory. It already uses {current} MB, near this computer's safe limit (about {next} MB). Close other programs, reduce mods, or lower render distance and try again."
                 ),
                 fix: Some(Fix::None),
             });
@@ -261,7 +358,7 @@ fn memory_diagnosis(lower: &str, total_mb: u64) -> Option<Diagnosis> {
         return Some(Diagnosis {
             kind: "memory".to_string(),
             title: crate::core::i18n::pick("内存不足", "Out of memory").to_string(),
-            detail: crate::tr!("游戏堆内存（-Xmx）已经耗尽，常见于大型整合包或加载大量区块时。建议把这个世界的内存提高到 {next} MB；如果启动器提示系统内存不足，请关闭其他程序后再试。", "The game ran out of heap memory (-Xmx), common with big modpacks or many loaded chunks. Raise this world's memory to {next} MB; if the system then runs short, close other programs and try again."
+            detail: crate::tr!("游戏内存已耗尽，常见于大型整合包或高渲染距离。建议将此世界内存提高到 {next} MB，必要时关闭其他程序后重试。", "The game ran out of memory, common with large modpacks or high render distance. Raise this world's memory to {next} MB and close other programs if needed."
             ),
             fix: Some(Fix::RaiseMemory { mb: next }),
         });
@@ -280,7 +377,7 @@ fn memory_diagnosis(lower: &str, total_mb: u64) -> Option<Diagnosis> {
             return Some(Diagnosis {
                 kind: "memory".to_string(),
                 title: crate::core::i18n::pick("内存设置过高", "Memory set too high").to_string(),
-                detail: crate::tr!("系统无法为 Java 预留请求的内存。这个世界已使用 {current} MB，自动调整内存无法解决这个问题。请关闭其他占用内存的程序后重试，或手动把这个世界的内存设得低一些。", "The system couldn't reserve the memory Java asked for. This world uses {current} MB and automatic memory can't fix it. Close other programs and try again, or set a lower memory for this world."
+                detail: crate::tr!("系统无法分配当前设定的 {current} MB 内存。请先关闭其他占用内存的程序，或手动调低该世界的内存设置。", "The system couldn't allocate the configured {current} MB of memory. Close other programs or lower this world's memory setting."
                 ),
                 fix: Some(Fix::None),
             });
@@ -288,7 +385,7 @@ fn memory_diagnosis(lower: &str, total_mb: u64) -> Option<Diagnosis> {
         return Some(Diagnosis {
             kind: "memory".to_string(),
             title: crate::core::i18n::pick("内存设置过高", "Memory set too high").to_string(),
-            detail: crate::tr!("系统无法为 Java 预留请求的内存，通常是世界内存（-Xmx）高于可用物理内存。建议把这个世界的内存降到 {next} MB；如果仍然失败，请关闭其他程序或改用自动内存。", "The system couldn't reserve the memory Java asked for, usually because the world's memory (-Xmx) is above the free physical memory. Lower it to {next} MB; if that still fails, close other programs or use automatic memory."
+            detail: crate::tr!("系统可用内存不足，无法分配当前设定的游戏内存。建议降到 {next} MB，或改用自动内存。", "Not enough free system memory for the current setting. Lower it to {next} MB or switch to automatic memory."
             ),
             fix: Some(Fix::RaiseMemory { mb: next }),
         });
@@ -343,17 +440,20 @@ fn fabric_missing(lower: &str, text: &str) -> Vec<String> {
     let mut ids = Vec::new();
     for line in text.lines() {
         let line_lower = line.to_ascii_lowercase();
-        if line_lower.contains("requires") && line_lower.contains("which is missing") {
-            if let Some(id) = missing_after_requires(line) {
+        if line_lower.contains("requires") && line_lower.contains("which is missing")
+            && let Some(id) = missing_after_requires(line) {
                 ids.push(id);
             }
-        }
     }
     for line in text.lines() {
         let trimmed = line.trim_start_matches(|c: char| c == '-' || c.is_whitespace());
         let lower_trimmed = trimmed.to_ascii_lowercase();
         if lower_trimmed.starts_with("install ") {
-            if let Some(id) = parse_mod_id(&trimmed["install ".len()..]) {
+            let rest = &trimmed["install ".len()..];
+            if let Some(id) = parenthesized_id(rest)
+                .or_else(|| first_quoted(rest))
+                .or_else(|| unquoted_required_id(rest))
+            {
                 ids.push(id);
             }
         }
@@ -370,9 +470,7 @@ fn missing_after_requires(line: &str) -> Option<String> {
         rest
     } else if let Some(rest) = strip_prefix_ci(segment.trim(), "version ") {
         // "requires version 1.2.3 of fabric-api"; without "of" this is not an id.
-        let Some(position) = find_ci(rest, " of ") else {
-            return None;
-        };
+        let position = find_ci(rest, " of ")?;
         &rest[position + " of ".len()..]
     } else {
         segment
@@ -423,20 +521,278 @@ fn unquoted_required_id(segment: &str) -> Option<String> {
     parse_mod_id(trimmed)
 }
 
-fn forge_missing(lower: &str, text: &str) -> Vec<String> {
+fn forge_dependencies(lower: &str, text: &str) -> (Vec<String>, Vec<String>) {
     let Some(marker) = lower.find("missing or unsupported mandatory dependencies") else {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     };
-    let mut ids = Vec::new();
+    let mut missing = Vec::new();
+    let mut mismatched = Vec::new();
     for line in text[marker..].lines().take(200) {
         let Some(offset) = find_ci(line, "mod id:") else {
             continue;
         };
-        if let Some(id) = parse_mod_id(&line[offset + "mod id:".len()..]) {
+        let Some(id) = parse_mod_id(&line[offset + "mod id:".len()..]) else {
+            continue;
+        };
+        if let Some(actual_off) = find_ci(line, "actual version:") {
+            let actual = line[actual_off + "actual version:".len()..]
+                .trim()
+                .trim_matches(|c: char| matches!(c, '\'' | '"' | '[' | ']' | ','))
+                .to_ascii_lowercase();
+            if !actual.is_empty() && actual != "missing" && actual != "none" {
+                mismatched.push(id);
+                continue;
+            }
+        }
+        missing.push(id);
+    }
+    (missing, mismatched)
+}
+
+/// NeoForge 1.21+ dependency errors:
+/// `Mod create requires flywheel 0.6.9 or above`
+/// `Currently, flywheel is not installed` (missing)
+/// `Currently, flywheel is 0.6.8` (version mismatch)
+fn neoforge_dependencies(lower: &str, text: &str) -> (Vec<String>, Vec<String>) {
+    if !lower.contains("currently,") {
+        return (Vec::new(), Vec::new());
+    }
+    let has_requires = lower.contains("requires");
+    let mut missing = Vec::new();
+    let mut mismatched = Vec::new();
+    for line in text.lines() {
+        let Some(pos) = find_ci(line, "currently,") else {
+            continue;
+        };
+        let rest = line[pos + "currently,".len()..].trim();
+        let Some(is_pos) = find_ci(rest, " is ") else {
+            continue;
+        };
+        let lhs = rest[..is_pos].trim();
+        let Some(id) = parenthesized_id(lhs)
+            .or_else(|| first_quoted(lhs))
+            .or_else(|| unquoted_required_id(lhs))
+        else {
+            continue;
+        };
+        let value = rest[is_pos + " is ".len()..]
+            .trim()
+            .trim_matches(|c: char| matches!(c, '\'' | '"' | '[' | ']' | '.' | ','));
+        let value_lower = value.to_ascii_lowercase();
+        if value_lower.starts_with("not installed") {
+            missing.push(id);
+        } else if has_requires
+            && (value.as_bytes().first().is_some_and(u8::is_ascii_digit)
+                || (value_lower.starts_with('v')
+                    && value.as_bytes().get(1).is_some_and(u8::is_ascii_digit)))
+        {
+            mismatched.push(id);
+        }
+    }
+    (missing, mismatched)
+}
+
+fn fabric_conflicts(lower: &str, text: &str) -> Vec<String> {
+    if !lower.contains("breaks with") && !lower.contains("incompatible with") {
+        return Vec::new();
+    }
+    let mut ids = Vec::new();
+    for line in text.lines() {
+        let line_lower = line.to_ascii_lowercase();
+        let marker = if line_lower.contains("breaks with") && line_lower.contains("which is present") {
+            "breaks with"
+        } else if line_lower.contains("incompatible with") && line_lower.contains("which is present") {
+            "incompatible with"
+        } else {
+            continue;
+        };
+        let Some(start) = find_ci(line, marker).map(|i| i + marker.len()) else {
+            continue;
+        };
+        let after = &line[start..];
+        let end = find_ci(after, "which is present").unwrap_or(after.len());
+        let segment = &after[..end];
+        let segment = if let Some(rest) = strip_prefix_ci(segment.trim(), "any version of ") {
+            rest
+        } else if let Some(rest) = strip_prefix_ci(segment.trim(), "version ") {
+            let Some(pos) = find_ci(rest, " of ") else { continue };
+            &rest[pos + " of ".len()..]
+        } else {
+            segment
+        };
+        if let Some(id) = parenthesized_id(segment)
+            .or_else(|| first_quoted(segment))
+            .or_else(|| unquoted_required_id(segment))
+        {
             ids.push(id);
         }
     }
     ids
+}
+
+fn fabric_version_mismatches(lower: &str, text: &str) -> Vec<String> {
+    let context = lower.contains("mod resolution encountered an incompatible mod set")
+        || lower.contains("only the wrong version is present");
+    if !context {
+        return Vec::new();
+    }
+    let mut ids = Vec::new();
+    for line in text.lines() {
+        let line_lower = line.to_ascii_lowercase();
+        if line_lower.contains("requires") && line_lower.contains("only the wrong version is present") {
+            let start = match find_ci(line, "requires") {
+                Some(i) => i + "requires".len(),
+                None => continue,
+            };
+            let after = &line[start..];
+            let end = find_ci(after, ", but ")
+                .or_else(|| find_ci(after, "only the wrong version"))
+                .unwrap_or(after.len());
+            let segment = &after[..end];
+            let segment = if let Some(rest) = strip_prefix_ci(segment.trim(), "any version of ") {
+                rest
+            } else if let Some(rest) = strip_prefix_ci(segment.trim(), "version ") {
+                let Some(pos) = find_ci(rest, " of ") else { continue };
+                &rest[pos + " of ".len()..]
+            } else {
+                segment
+            };
+            if let Some(id) = parenthesized_id(segment)
+                .or_else(|| first_quoted(segment))
+                .or_else(|| unquoted_required_id(segment))
+            {
+                ids.push(id);
+            }
+            continue;
+        }
+        let trimmed = line.trim_start_matches(|c: char| c == '-' || c.is_whitespace());
+        if trimmed.to_ascii_lowercase().starts_with("replace ") {
+            let rest = &trimmed["replace ".len()..];
+            if let Some(id) = parenthesized_id(rest)
+                .or_else(|| first_quoted(rest))
+                .or_else(|| unquoted_required_id(rest))
+            {
+                ids.push(id);
+            }
+        }
+    }
+    ids
+}
+
+fn has_optifine_render_conflict(lower: &str) -> bool {
+    let mut explicit_conflict = false;
+    let mut optifine_present = false;
+    for line in lower.lines() {
+        if !line.contains("optifine") && !line.contains("optifabric") {
+            continue;
+        }
+        // Ignore negative capability checks such as "OptiFine not detected" or "No OptiFine found".
+        if line.contains("optifine not detected")
+            || line.contains("optifine was not")
+            || line.contains("optifine is not installed")
+            || line.contains("no optifine")
+            || line.contains("without optifine")
+            || line.contains("not using optifine")
+            || line.contains("optifine not found")
+        {
+            continue;
+        }
+        if line.contains("optifine is not compatible with")
+            || line.contains("incompatible with optifine")
+            || line.contains("optifine detected")
+        {
+            explicit_conflict = true;
+            break;
+        }
+        if contains_word(line, "optifabric")
+            || line.contains("optifine.jar")
+            || line.contains("optifine_")
+            || line.contains("optifine-")
+            || line.contains("net.optifine.")
+            || line.contains("optifine.shaders")
+            || line.trim_start().starts_with("- optifine")
+            || line.contains("mod 'optifine'")
+            || line.contains("(optifine)")
+        {
+            optifine_present = true;
+        }
+    }
+    if explicit_conflict {
+        return true;
+    }
+    if !optifine_present {
+        return false;
+    }
+    let has_render_mod = ["sodium", "iris", "embeddium", "rubidium", "oculus"]
+        .iter()
+        .any(|m| contains_word(lower, m));
+    if !has_render_mod {
+        return false;
+    }
+    lower.contains("mixin")
+        || lower.contains("exception")
+        || lower.contains("error")
+        || lower.contains("incompatible")
+        || lower.contains("breaks with")
+        || lower.contains("crash report")
+}
+
+fn is_wrong_side_mod(lower: &str) -> bool {
+    lower.contains("for invalid dist client")
+        || lower.contains("invalid dist: client")
+        || lower.contains("invalid dist client")
+        || (lower.contains("cannot load class") && lower.contains("environment type client"))
+}
+
+fn is_corrupt_config(lower: &str) -> bool {
+    lower.contains("com.electronwill.nightconfig.core.io.parsingexception")
+        || lower.contains("configloadingexception")
+        || lower.contains("failed loading config file")
+}
+
+fn config_file_name(text: &str) -> Option<String> {
+    for line in text.lines() {
+        let lower = line.to_ascii_lowercase();
+        if !lower.contains("config") && !lower.contains("nightconfig") && !lower.contains("parsingexception") {
+            continue;
+        }
+        for ext in [".toml", ".json5", ".json", ".cfg", ".yaml", ".yml"] {
+            if let Some(end) = lower.find(ext) {
+                let bytes = line.as_bytes();
+                let mut start = end;
+                while start > 0
+                    && (bytes[start - 1].is_ascii_alphanumeric()
+                        || matches!(bytes[start - 1], b'-' | b'_' | b'.'))
+                {
+                    start -= 1;
+                }
+                if start < end {
+                    let name = &line[start..end + ext.len()];
+                    if name.len() <= 80 {
+                        return Some(name.to_string());
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+fn contains_word(haystack: &str, word: &str) -> bool {
+    let bytes = haystack.as_bytes();
+    let wlen = word.len();
+    let mut from = 0;
+    while let Some(rel) = haystack[from..].find(word) {
+        let pos = from + rel;
+        let left_ok = pos == 0 || !(bytes[pos - 1].is_ascii_alphanumeric() || bytes[pos - 1] == b'_');
+        let right_ok = pos + wlen >= bytes.len()
+            || !(bytes[pos + wlen].is_ascii_alphanumeric() || bytes[pos + wlen] == b'_');
+        if left_ok && right_ok {
+            return true;
+        }
+        from = pos + wlen;
+    }
+    false
 }
 
 fn mixin_conflicts(text: &str) -> Vec<String> {
@@ -447,7 +803,11 @@ fn mixin_conflicts(text: &str) -> Vec<String> {
         // the next line, so either line can start the rule.
         let failed = line_lower.contains("mixin apply failed")
             || (line_lower.contains("mixin apply for mod ") && line_lower.contains("failed"))
-            || line_lower.contains("invalidinjectionexception");
+            || line_lower.contains("invalidinjectionexception")
+            || line_lower.contains("mixinapplyerror")
+            || line_lower.contains("mixintransformererror")
+            || line_lower.contains("mixinprepareerror")
+            || line_lower.contains("critical injection failure");
         if !failed {
             continue;
         }
@@ -466,9 +826,15 @@ fn mixin_conflicts(text: &str) -> Vec<String> {
     ids
 }
 
-/// The stem of an explicit `name.mixins.json` config on a failure line, e.g.
-/// `sodium.mixins.json` -> `sodium`. This is a real config name, unlike the
-/// package path `org.spongepowered.asm.mixin.injection`.
+/// Generic mixin config stems that describe a side or layer rather than a mod id.
+const GENERIC_MIXIN_STEMS: &[&str] = &[
+    "common", "client", "server", "main", "default", "core", "mixin", "mixins", "compat",
+    "fabric", "forge", "neoforge", "quilt", "minecraft",
+];
+
+/// The stem of an explicit `name.mixins.json` or `mixins.name.json` config on
+/// a failure line, e.g. `sodium.mixins.json` -> `sodium` or
+/// `mixins.oculus.json` -> `oculus`.
 fn mixins_config_id(line: &str) -> Option<String> {
     const SUFFIX: &str = ".mixins.json";
     let lower = line.to_ascii_lowercase();
@@ -491,26 +857,82 @@ fn mixins_config_id(line: &str) -> Option<String> {
         }
         if start < end
             && let Some(id) = clean_mod_id(&line[start..end])
+            && !GENERIC_MIXIN_STEMS.contains(&id.as_str())
         {
             return Some(id);
         }
         from = end + SUFFIX.len();
     }
+
+    const PREFIX: &str = "mixins.";
+    from = 0;
+    while let Some(haystack) = lower.get(from..) {
+        let Some(offset) = haystack.find(PREFIX) else {
+            break;
+        };
+        let start = from + offset + PREFIX.len();
+        if let Some(json_off) = lower[start..].find(".json") {
+            let stem = &line[start..start + json_off];
+            if !stem.is_empty()
+                && stem.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+                && let Some(id) = clean_mod_id(stem)
+                && !GENERIC_MIXIN_STEMS.contains(&id.as_str())
+            {
+                return Some(id);
+            }
+        }
+        from = start;
+    }
     None
 }
 
+/// Platform and loader ids that loaders report alongside missing mods, but
+/// cannot be downloaded as mods from Modrinth or CurseForge.
+const NON_MOD_IDS: &[&str] = &[
+    "minecraft",
+    "java",
+    "forge",
+    "neoforge",
+    "fabricloader",
+    "quilt_loader",
+    "fmlcore",
+    "javafml",
+    "lowcodefml",
+    "mclanguage",
+];
+
 fn push_missing(diagnoses: &mut Vec<Diagnosis>, seen: &mut HashSet<String>, id: &str) {
-    if !seen.insert(id.to_string()) {
+    if NON_MOD_IDS.contains(&id) || !seen.insert(id.to_string()) {
         return;
     }
     diagnoses.push(Diagnosis {
         kind: "missingMod".to_string(),
         title: crate::tr!("缺少前置模组 {id}", "Missing dependency {id}"),
-        detail: crate::tr!("这个世界缺少模组 {id} 或它的必需依赖，游戏在解析模组时停止加载。请在下载模组页搜索并安装 {id}，然后重新启动。", "The world is missing the mod {id} or one of its required dependencies, so loading stopped. Search for and install {id} on the Download tab, then start again."
+        detail: crate::tr!("缺少必需模组 {id}，请在「下载」页搜索并安装后重试。", "Missing required mod {id}. Search and install it on the Download tab, then try again."
         ),
         fix: Some(Fix::InstallMod {
             query: id.to_string(),
         }),
+    });
+}
+
+fn push_version_mismatch(
+    diagnoses: &mut Vec<Diagnosis>,
+    missing: &HashSet<String>,
+    seen: &mut HashSet<String>,
+    id: &str,
+) {
+    if NON_MOD_IDS.contains(&id) || missing.contains(id) || !seen.insert(id.to_string()) {
+        return;
+    }
+    diagnoses.push(Diagnosis {
+        kind: "modVersionMismatch".to_string(),
+        title: crate::tr!("模组 {id} 版本不匹配", "Mod {id} has the wrong version"),
+        detail: crate::tr!(
+            "已安装的模组 {id} 版本不符合其他模组的要求，请打开「模组」页更新或更换为适配版本。",
+            "The installed version of {id} doesn't match what another mod requires. Open Mods to update or replace it."
+        ),
+        fix: Some(Fix::OpenMods),
     });
 }
 
@@ -805,6 +1227,20 @@ mod tests {
     }
 
     #[test]
+    fn install_suggestions_skip_mod_keyword_and_runtime_ids() {
+        let log = "Mod resolution encountered an incompatible mod set!\n\
+                   \t- Install mod 'Fabric API' (fabric-api), version 0.92.2 or later.\n\
+                   \t- Install java, version 21 or later.\n\
+                   \t- Install minecraft, version 1.21.1.\n\
+                   \t- Install fabricloader, version 0.16.0 or later.\n\
+                   Missing or unsupported mandatory dependencies:\n\
+                   \tMod ID: 'minecraft', Requested by: 'create', Expected range: '[1.20.1]', Actual version: '1.21.1'\n\
+                   \tMod ID: 'forge', Requested by: 'create', Expected range: '[47.2,)', Actual version: '[MISSING]'";
+        let diagnoses = analyze(log, None);
+        assert_eq!(title(&diagnoses), vec!["缺少前置模组 fabric-api"]);
+    }
+
+    #[test]
     fn duplicate_mods_open_the_local_mod_list() {
         let diagnoses = analyze(
             "net.minecraftforge.fml.ModLoadingException: DuplicateModsFoundException: Found duplicate mods: jei",
@@ -958,5 +1394,141 @@ mod tests {
         let mut other = Fix::UseJava { major: 21 };
         clamp_memory_fix(&mut other, 4096);
         assert_eq!(other, Fix::UseJava { major: 21 });
+    }
+
+    #[test]
+    fn neoforge_missing_and_version_mismatch_dependencies_are_diagnosed() {
+        let log = "Mod create requires flywheel 0.6.9 or above\n\
+                   Currently, flywheel is not installed\n\
+                   Mod create requires ponder 1.0.50 or above\n\
+                   Currently, ponder is 1.0.40\n\
+                   Mod create requires minecraft 1.21.1\n\
+                   Currently, minecraft is 1.21.4";
+        let diagnoses = analyze(log, None);
+        assert_eq!(
+            title(&diagnoses),
+            vec!["缺少前置模组 flywheel", "模组 ponder 版本不匹配"]
+        );
+        assert_eq!(
+            diagnoses[0].fix,
+            Some(Fix::InstallMod { query: "flywheel".into() })
+        );
+        assert_eq!(diagnoses[1].kind, "modVersionMismatch");
+        assert_eq!(diagnoses[1].fix, Some(Fix::OpenMods));
+    }
+
+    #[test]
+    fn fabric_and_forge_wrong_versions_suggest_opening_mods() {
+        let fabric = "Mod resolution encountered an incompatible mod set!\n\
+                      \t- Mod 'Create' (create) requires version 0.92.2 or later of mod 'Fabric API' (fabric-api), but only the wrong version is present: 0.88.0!\n\
+                      \t- Replace mod 'Cloth Config' (cloth-config) 10.0.0 with version 11.1.0 or later.";
+        let diagnoses = analyze(fabric, None);
+        assert_eq!(
+            title(&diagnoses),
+            vec!["模组 fabric-api 版本不匹配", "模组 cloth-config 版本不匹配"]
+        );
+        assert!(diagnoses.iter().all(|d| d.fix == Some(Fix::OpenMods)));
+
+        let forge = "Missing or unsupported mandatory dependencies:\n\
+                     \tMod ID: 'geckolib', Requested by: 'bosses', Expected range: '[4.4,)', Actual version: '4.2.1'";
+        let diagnoses = analyze(forge, None);
+        assert_eq!(title(&diagnoses), vec!["模组 geckolib 版本不匹配"]);
+        assert_eq!(diagnoses[0].fix, Some(Fix::OpenMods));
+    }
+
+    #[test]
+    fn optifine_conflict_with_sodium_or_iris_is_detected_without_driver_false_positives() {
+        let log = "org.spongepowered.asm.mixin.transformer.throwables.MixinTransformerError: OptiFine is not compatible with Iris / Sodium";
+        let diagnoses = analyze(log, None);
+        assert!(diagnoses.iter().any(|d| d.kind == "modConflict" && d.fix == Some(Fix::OpenMods)));
+
+        let crash = "---- Minecraft Crash Report ----\n\
+                     OptiFabric loaded alongside sodium and iris\n\
+                     java.lang.IncompatibleClassChangeError: boom";
+        let diagnoses = analyze(crash, None);
+        assert!(diagnoses.iter().any(|d| d.kind == "modConflict"));
+
+        // Linux Mesa driver `iris_dri` alongside a mention of optifine must not false-positive.
+        let driver = "# A fatal error has been detected by the Java Runtime Environment:\n\
+                      # Problematic frame:\n\
+                      # C  [iris_dri.so+0x1234]\n\
+                      optifine";
+        let diagnoses = analyze("", Some(driver));
+        assert!(!diagnoses.iter().any(|d| d.kind == "modConflict"));
+
+        // Negative checks like "OptiFine not detected" alongside Sodium must never false-positive.
+        let benign = "[main/INFO]: Loading 2 mods: - sodium 0.6.0\n\
+                      [main/INFO]: OptiFine not detected, continuing normally\n\
+                      java.lang.RuntimeException: unrelated tick crash";
+        let diagnoses = analyze(benign, None);
+        assert!(!diagnoses.iter().any(|d| d.kind == "modConflict"));
+    }
+
+    #[test]
+    fn fabric_breaks_with_reports_mod_conflict() {
+        let log = "Mod resolution encountered an incompatible mod set!\n\
+                   \t- Mod 'Sodium' (sodium) 0.5.8 breaks with any version of mod 'Indium' (indium), which is present!";
+        let diagnoses = analyze(log, None);
+        assert_eq!(title(&diagnoses), vec!["模组 indium 与其他模组冲突"]);
+        assert_eq!(diagnoses[0].kind, "modConflict");
+        assert_eq!(diagnoses[0].fix, Some(Fix::OpenMods));
+    }
+
+    #[test]
+    fn mixin_transformer_and_prefix_config_names_are_attributed() {
+        let log = "org.spongepowered.asm.mixin.transformer.throwables.MixinTransformerError: An unexpected critical error was encountered in mixins.oculus.json";
+        let diagnoses = analyze(log, None);
+        assert_eq!(title(&diagnoses), vec!["模组 oculus 与当前版本不兼容"]);
+        assert_eq!(diagnoses[0].fix, Some(Fix::OpenMods));
+
+        // Generic stems like mixins.common.json must not blame a bogus "common" mod.
+        let generic = "org.spongepowered.asm.mixin.transformer.throwables.MixinTransformerError: failed in mixins.common.json";
+        let diagnoses = analyze(generic, None);
+        assert!(!diagnoses.iter().any(|d| d.title.contains("common")));
+    }
+
+    #[test]
+    fn neoforge_quoted_and_parenthesized_ids_are_parsed() {
+        let log = "Mod create requires flywheel 0.6.9\n\
+                   Currently, mod 'Flywheel' (flywheel) is not installed\n\
+                   Currently, 'ponder' is '1.0.40'.";
+        let diagnoses = analyze(log, None);
+        assert_eq!(
+            title(&diagnoses),
+            vec!["缺少前置模组 flywheel", "模组 ponder 版本不匹配"]
+        );
+    }
+
+    #[test]
+    fn server_only_mod_on_client_is_detected() {
+        let log = "java.lang.RuntimeException: Attempted to load class net/minecraft/server/Foo for invalid dist CLIENT";
+        let diagnoses = analyze(log, None);
+        assert_eq!(diagnoses.len(), 1);
+        assert_eq!(diagnoses[0].kind, "wrongSideMod");
+        assert_eq!(diagnoses[0].fix, Some(Fix::OpenMods));
+
+        let fabric = "java.lang.RuntimeException: Cannot load class com.example.ServerOnly in environment type CLIENT";
+        let diagnoses = analyze(fabric, None);
+        assert_eq!(diagnoses[0].kind, "wrongSideMod");
+    }
+
+    #[test]
+    fn corrupt_nightconfig_names_the_broken_config_and_offers_tools() {
+        let log = "net.minecraftforge.fml.config.ConfigFileTypeHandler$ConfigLoadingException: Failed loading config file create-client.toml of type CLIENT for modid create\n\
+                   Caused by: com.electronwill.nightconfig.core.io.ParsingException: Not enough data available";
+        let diagnoses = analyze(log, None);
+        assert_eq!(diagnoses.len(), 1);
+        assert_eq!(diagnoses[0].kind, "corruptConfig");
+        assert_eq!(diagnoses[0].title, "配置文件 create-client.toml 已损坏");
+        assert_eq!(diagnoses[0].fix, Some(Fix::OpenTools));
+    }
+
+    #[test]
+    fn bind_exception_reports_port_in_use() {
+        let log = "java.net.BindException: Address already in use: bind";
+        let diagnoses = analyze(log, None);
+        assert_eq!(diagnoses.len(), 1);
+        assert_eq!(diagnoses[0].kind, "portInUse");
+        assert_eq!(diagnoses[0].fix, Some(Fix::None));
     }
 }

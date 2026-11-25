@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { toError } from "../api/backend";
 import type { Instance, Screenshot } from "../api/types";
@@ -83,7 +83,7 @@ export function ScreenshotsTab({ instance }: { instance: Instance }) {
               </span>
             )}
           </div>
-          <span className="pane-hint">{t("在游戏里按 F2 截图。删除的截图会移到启动器的回收站目录。", "Press F2 in game for screenshots. Deleted ones move to the launcher's recycle folder.")}</span>
+          <span className="pane-hint">{t("游戏内按 F2 截图，删除后会移入回收站。", "Press F2 in game; deleted screenshots go to the recycle bin.")}</span>
         </div>
         <div className="spacer" />
         <Button size="sm" variant="ghost" icon="folder" onClick={() => void s.open({ kind: "screenshotsDir", id: instance.id })}>
@@ -134,6 +134,7 @@ export function ShotViewer({ id, name, back }: { id: string; name: string; back?
   const shot = index >= 0 ? shots[index] : null;
   const [full, setFull] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [direction, setDirection] = useState(0);
 
   const go = (delta: number) => {
@@ -143,32 +144,43 @@ export function ShotViewer({ id, name, back }: { id: string; name: string; back?
     setConfirm(false);
     useStore.setState({ modal: { kind: "shot", id, name: next.name, back } });
   };
+  const goRef = useRef(go);
+  goRef.current = go;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft") go(-1);
-      if (e.key === "ArrowRight") go(1);
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        goRef.current(-1);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        goRef.current(1);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  });
+  }, []);
 
   if (!shot) return null;
   const remove = async () => {
+    if (deleting) return;
     if (!confirm) {
       setConfirm(true);
       return;
     }
     const next = shots[index + 1] ?? shots[index - 1] ?? null;
+    setDeleting(true);
     try {
       await useShots.getState().recycle(id, shot.name);
-      s.toast(t("截图已移到回收站目录", "Screenshot moved to the recycle folder"), "success");
+      s.toast(t("截图已移入回收站", "Screenshot moved to the recycle bin"), "success");
       if (next) {
         setConfirm(false);
         useStore.setState({ modal: { kind: "shot", id, name: next.name, back } });
       } else s.closeModal();
     } catch (error) {
       s.toast(toError(error).message, "error");
+    } finally {
+      setDeleting(false);
     }
   };
   const taken = shotTime(shot);
@@ -227,7 +239,7 @@ export function ShotViewer({ id, name, back }: { id: string; name: string; back?
             {t("用系统应用打开", "Open with system app")}
           </Button>
           <Button size="sm" variant="hero" icon="folder" aria-label={t("打开截图文件夹", "Open the screenshots folder")} title={t("打开截图文件夹", "Open the screenshots folder")} onClick={() => void s.open({ kind: "screenshotsDir", id })} />
-          <Button size="sm" variant={confirm ? "danger" : "hero"} icon="trash" onClick={() => void remove()} onBlur={() => setConfirm(false)}>
+          <Button size="sm" variant={confirm ? "danger" : "hero"} icon="trash" busy={deleting} onClick={() => void remove()} onBlur={() => setConfirm(false)}>
             {confirm ? t("确认删除", "Confirm delete") : t("删除", "Delete")}
           </Button>
           <Button size="sm" variant="hero" icon="close" aria-label={t("关闭", "Close")} onClick={s.closeModal} />

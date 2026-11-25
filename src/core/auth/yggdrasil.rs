@@ -101,10 +101,10 @@ pub async fn resolve(client: &reqwest::Client, address: &str) -> AppResult<Serve
         .send()
         .await?
         .error_for_status()
-        .map_err(|_| fail(crate::core::i18n::pick("这个地址不是 Yggdrasil 认证服务器。", "This address isn't a Yggdrasil authentication server.")))?
+        .map_err(|_| fail(crate::core::i18n::pick("该地址不是有效的皮肤站认证服务器。", "This address isn't a valid skin-site auth server.")))?
         .text()
         .await?;
-    let json: serde_json::Value = serde_json::from_str(&metadata).map_err(|_| fail(crate::core::i18n::pick("这个地址不是 Yggdrasil 认证服务器。", "This address isn't a Yggdrasil authentication server.")))?;
+    let json: serde_json::Value = serde_json::from_str(&metadata).map_err(|_| fail(crate::core::i18n::pick("该地址不是有效的皮肤站认证服务器。", "This address isn't a valid skin-site auth server.")))?;
     let name = json
         .pointer("/meta/serverName")
         .and_then(|v| v.as_str())
@@ -307,15 +307,29 @@ pub async fn session(client: &reqwest::Client, account: &Account, tokens: &Token
     let fresh = if valid {
         None
     } else {
-        let refreshed: AuthResponse = post(
-            client,
-            &format!("{api}/authserver/refresh"),
-            serde_json::json!({ "accessToken": tokens.access_token, "clientToken": tokens.client_token }),
-        )
-        .await
-        .map_err(|_| AppError::new("auth_expired", crate::tr!("{} 的登录已过期，请在账号页重新登录。", "The sign-in to {} expired; sign in again on the Accounts page.", account.server_name.as_deref().unwrap_or(crate::core::i18n::pick("认证服务器", "the authentication server")))))?
-        .json()
-        .await?;
+        // Distinguish real auth rejections (401/403 -> auth_expired) from
+        // network or 5xx outages so offline singleplayer fallback still works.
+        let response = client
+            .post(format!("{api}/authserver/refresh"))
+            .json(&serde_json::json!({ "accessToken": tokens.access_token, "clientToken": tokens.client_token }))
+            .timeout(Duration::from_secs(20))
+            .send()
+            .await?;
+        let status = response.status();
+        if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
+            return Err(AppError::new(
+                "auth_expired",
+                crate::tr!(
+                    "{} 的登录已过期，请在账号页重新登录。",
+                    "The sign-in to {} expired; sign in again on the Accounts page.",
+                    account.server_name.as_deref().unwrap_or(crate::core::i18n::pick("认证服务器", "the authentication server"))
+                ),
+            ));
+        }
+        if !status.is_success() {
+            return Err(fail(crate::tr!("认证服务器暂时不可用（{}）。", "The authentication server is temporarily unavailable ({}).", status.as_u16())));
+        }
+        let refreshed: AuthResponse = response.json().await?;
         Some(Tokens { access_token: refreshed.access_token, client_token: refreshed.client_token })
     };
     let token = fresh.as_ref().map_or(&tokens.access_token, |t| &t.access_token).clone();
@@ -399,24 +413,22 @@ async fn download_agent(client: &reqwest::Client, dir: &std::path::Path) -> AppR
                 .json()
                 .await?;
             if !crate::core::fabric::valid_version(&artifact.version) {
-                return Err(fail(crate::core::i18n::pick("authlib-injector 版本号无效。", "Invalid authlib-injector version.")));
+                return Err(fail(crate::core::i18n::pick("外置登录组件版本号无效。", "Invalid third-party sign-in component version.")));
             }
             let target = dir.join(format!("authlib-injector-{}.jar", artifact.version));
             if target.is_file() && sha256(&std::fs::read(&target)?) == artifact.checksums.sha256.to_lowercase() {
                 return Ok(target);
             }
             // The mirror rewrites download links to itself.
-            let url = url::Url::parse(&artifact.download_url).map_err(|_| fail(crate::core::i18n::pick("authlib-injector 下载地址无效。", "Invalid authlib-injector download address.")))?;
+            let url = url::Url::parse(&artifact.download_url).map_err(|_| fail(crate::core::i18n::pick("外置登录组件下载地址无效。", "Invalid third-party sign-in component URL.")))?;
             if url.scheme() != "https" {
-                return Err(fail(crate::core::i18n::pick("authlib-injector 下载地址无效。", "Invalid authlib-injector download address.")));
+                return Err(fail(crate::core::i18n::pick("外置登录组件下载地址无效。", "Invalid third-party sign-in component URL.")));
             }
             let bytes = client.get(url).timeout(Duration::from_secs(60)).send().await?.error_for_status()?.bytes().await?;
             if sha256(&bytes) != artifact.checksums.sha256.to_lowercase() {
-                return Err(fail(crate::core::i18n::pick("authlib-injector 校验失败，已丢弃。", "authlib-injector failed verification and was discarded.")));
+                return Err(fail(crate::core::i18n::pick("外置登录组件文件损坏，请重试。", "Third-party sign-in component failed verification.")));
             }
-            let temporary = target.with_extension("jar.part");
-            std::fs::write(&temporary, &bytes)?;
-            std::fs::rename(&temporary, &target)?;
+            crate::core::util::atomic_write(&target, &bytes)?;
             Ok(target)
         }
         .await;
@@ -425,7 +437,7 @@ async fn download_agent(client: &reqwest::Client, dir: &std::path::Path) -> AppR
             Err(error) => last_error = Some(error),
         }
     }
-    Err(last_error.unwrap_or_else(|| fail(crate::core::i18n::pick("无法下载 authlib-injector。", "Couldn't download authlib-injector."))))
+    Err(last_error.unwrap_or_else(|| fail(crate::core::i18n::pick("无法下载外置登录组件，请稍后重试。", "Couldn't download the third-party sign-in component."))))
 }
 
 /// The newest authlib-injector already downloaded.
@@ -485,14 +497,12 @@ pub async fn ensure_nide8_agent(client: &reqwest::Client, paths: &AppPaths) -> A
 }
 
 async fn download_nide8_agent(client: &reqwest::Client, target: &std::path::Path) -> AppResult<()> {
-    let failed = || fail(crate::core::i18n::pick("无法下载统一通行证的 nide8auth.jar，请稍后再试。", "Couldn't download 统一通行证's nide8auth.jar; try again later."));
+    let failed = || fail(crate::core::i18n::pick("无法下载统一通行证登录组件，请稍后再试。", "Couldn't download the Nide8 sign-in component; try again later."));
     let bytes = client.get(NIDE8_AGENT).timeout(Duration::from_secs(60)).send().await?.error_for_status().map_err(|_| failed())?.bytes().await?;
     if bytes.len() < 1024 || bytes.len() > 16 * 1024 * 1024 || !bytes.starts_with(b"PK\x03\x04") {
         return Err(failed());
     }
-    let temporary = target.with_extension("jar.part");
-    std::fs::write(&temporary, &bytes)?;
-    std::fs::rename(&temporary, target)?;
+    crate::core::util::atomic_write(target, &bytes)?;
     Ok(())
 }
 
@@ -546,5 +556,50 @@ mod tests {
         assert!(is_nide8_id(id) && !is_nide8_id("littleskin.cn"));
         let args = nide8_args(std::path::Path::new("/a/nide8auth.jar"), id);
         assert_eq!(args, vec![format!("-javaagent:/a/nide8auth.jar={id}"), "-Dnide8auth.client=true".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn session_preserves_network_errors_and_marks_403_expired() {
+        use std::io::{Read, Write};
+        let client = reqwest::Client::builder().no_proxy().build().unwrap();
+        let tokens = Tokens { access_token: "tok".into(), client_token: "cli".into() };
+
+        // 1. Unreachable server (port closed) -> keeps "network" code so offline play is offered.
+        let closed_port = {
+            let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            l.local_addr().unwrap().port()
+        };
+        let offline_account = Account {
+            id: "yggdrasil:local:1".into(),
+            provider: AccountProvider::Yggdrasil,
+            username: "Alex".into(),
+            uuid: "00000000-0000-0000-0000-000000000001".into(),
+            xuid: None,
+            ownership: None,
+            skin_url: None,
+            skin_slim: false,
+            created_at: 0,
+            server: Some(format!("http://127.0.0.1:{closed_port}")),
+            server_name: Some("Local".into()),
+        };
+        let err = session(&client, &offline_account, &tokens).await.unwrap_err();
+        assert_eq!(err.code(), "network");
+
+        // 2. Server explicitly rejecting /validate and /refresh with 403 -> "auth_expired".
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            for _ in 0..2 {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut buf = [0u8; 2048];
+                let _ = stream.read(&mut buf);
+                let _ = write!(stream, "HTTP/1.1 403 Forbidden\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{{}}");
+            }
+        });
+        let mut expired_account = offline_account;
+        expired_account.server = Some(format!("http://{addr}"));
+        let err = session(&client, &expired_account, &tokens).await.unwrap_err();
+        server.join().unwrap();
+        assert_eq!(err.code(), "auth_expired");
     }
 }

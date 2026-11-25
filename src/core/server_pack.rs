@@ -236,7 +236,7 @@ async fn install(
             Ok(Start::Jar("quilt-server-launch.jar".into()))
         }
         loader => {
-            let installer = crate::core::loaders::fetch_installer(client, paths, loader, mc, loader_version, cancel).await?;
+            let installer = crate::core::loaders::fetch_installer_with_source(client, paths, loader, mc, loader_version, cancel, source).await?;
             run_installer(java, &installer, &["--installServer", &destination.display().to_string()], destination, cancel).await?;
             for log in ["installer.log", &format!("{}.log", installer.file_name().unwrap_or_default().to_string_lossy())] {
                 let _ = fs::remove_file(destination.join(log));
@@ -306,9 +306,12 @@ async fn plugin_server(client: &reqwest::Client, instance: &Instance, base: &Ver
     }
     let vanilla = destination.join("cache").join(format!("mojang_{mc}.jar"));
     if let Err(error) = fetch(client, crate::core::mojang::install::server_jar_task(base, source, vanilla.clone())?, cancel).await {
+        let _ = fs::remove_file(&vanilla);
+        if error.code() == "cancelled" {
+            return Err(error);
+        }
         // The server fetches it itself then.
         tracing::warn!(%error, "couldn't fetch the vanilla server for patching");
-        let _ = fs::remove_file(&vanilla);
     }
     Ok(())
 }
@@ -432,7 +435,7 @@ if [ "$MC_MEMORY" -gt 12288 ]; then G1="{large}"; else G1="{small}"; fi
 echo "Starting with ${{MC_MEMORY}} MB of memory"
 "$JAVA" -Xms${{MC_MEMORY}}M -Xmx${{MC_MEMORY}}M {flags} $G1 {unix}
 "#,
-        java = java.display().to_string().replace('"', "\\\""),
+        java = escape_sh_default(&java.display().to_string()),
         large = GC_LARGE,
         small = GC_SMALL,
         flags = GC_FLAGS,
@@ -492,6 +495,18 @@ exit /b\r\n",
     Ok(())
 }
 
+/// Escapes characters active inside `JAVA="${JAVA:-...}"` in POSIX sh.
+fn escape_sh_default(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for ch in value.chars() {
+        if matches!(ch, '\\' | '"' | '$' | '`' | '}') {
+            out.push('\\');
+        }
+        out.push(ch);
+    }
+    out
+}
+
 /// A save as the server's world. The host's player lives in `level.dat` in
 /// singleplayer; it moves to `playerdata` so they keep their things.
 fn copy_world(save: &Path, world: &Path, host_uuid: Option<&str>) -> AppResult<WorldRules> {
@@ -500,7 +515,9 @@ fn copy_world(save: &Path, world: &Path, host_uuid: Option<&str>) -> AppResult<W
     crate::core::manage::copy_tree(save, world)?;
     let _ = fs::remove_file(world.join("session.lock"));
     let mut bytes = Vec::new();
-    flate2::read::GzDecoder::new(fs::File::open(world.join("level.dat"))?).read_to_end(&mut bytes)?;
+    flate2::read::GzDecoder::new(fs::File::open(world.join("level.dat"))?)
+        .take(16 * 1024 * 1024)
+        .read_to_end(&mut bytes)?;
     let Ok((_, root)) = nbt::read(&bytes) else {
         return Ok(WorldRules::default());
     };
@@ -601,6 +618,8 @@ mod tests {
     fn properties_are_escaped() {
         assert_eq!(properties_escape("My World"), "My World");
         assert_eq!(properties_escape("生存=1"), "\\u751f\\u5b58\\u003d1");
+        assert_eq!(escape_sh_default("/opt/java/bin/java"), "/opt/java/bin/java");
+        assert_eq!(escape_sh_default(r#"C:\Users\$a`b}"c"#), r#"C:\\Users\\\$a\`b\}\"c"#);
     }
 
     #[test]

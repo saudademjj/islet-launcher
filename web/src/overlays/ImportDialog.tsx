@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { call } from "../api/backend";
 import type { ImportCandidate } from "../api/types";
@@ -22,9 +22,18 @@ export function ImportDialog() {
   const [scanning, setScanning] = useState(false);
   const [imported, setImported] = useState<string[]>([]);
   const [pending, setPending] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+  const scanSeqRef = useRef(0);
 
   useEffect(() => {
-    call<[string, string][]>("known_game_dirs").then(setKnown, () => setKnown([]));
+    mountedRef.current = true;
+    call<[string, string][]>("known_game_dirs").then(
+      (list) => mountedRef.current && setKnown(list),
+      () => mountedRef.current && setKnown([]),
+    );
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   // An import finished: mark it done (a failure was already shown).
@@ -35,25 +44,29 @@ export function ImportDialog() {
   }, [s.filesChanged]);
 
   const scan = async (path: string) => {
+    const seq = ++scanSeqRef.current;
     setFolder(path);
     setScanning(true);
     setFound(null);
     try {
-      setFound(await call<ImportCandidate[]>("scan_games", { path }));
+      const results = await call<ImportCandidate[]>("scan_games", { path });
+      if (!mountedRef.current || scanSeqRef.current !== seq) return;
+      setFound(results);
     } catch {
+      if (!mountedRef.current || scanSeqRef.current !== seq) return;
       setFound([]);
     }
-    setScanning(false);
+    if (mountedRef.current && scanSeqRef.current === seq) setScanning(false);
   };
 
   return (
-    <Modal title={t("导入", "Import")} subtitle={t("整合包，或者其他启动器里已有的游戏；原来的文件不会被改动", "A modpack, or games you already have in other launchers; the original files are left untouched")} onClose={s.closeModal}>
+    <Modal title={t("导入", "Import")} subtitle={t("导入整合包或其他启动器的游戏，不会改动原文件", "Import a modpack or games from other launchers without touching original files")} onClose={s.closeModal}>
       <div className="import-dialog">
         <section className="import-section">
           <div className="section-label">{t("整合包", "Modpack")}</div>
           <div className="row">
             <span className="muted" style={{ flex: 1 }}>
-              {t("Modrinth 的 .mrpack，或 CurseForge 的整合包 .zip（需要在设置里填 CurseForge API Key）。", "A Modrinth .mrpack, or a CurseForge modpack .zip (needs a CurseForge API key in Settings).")}
+              {t("支持 Modrinth (.mrpack) 和 CurseForge (.zip) 整合包。", "Supports Modrinth (.mrpack) and CurseForge (.zip) modpacks.")}
             </span>
             <Button
               icon="archive"
@@ -90,7 +103,7 @@ export function ImportDialog() {
               {t("选择文件夹…", "Choose folder…")}
             </Button>
           </div>
-          <span className="field-hint">{t("可以选 .minecraft、其中某个版本的文件夹、HMCL / PCL 的游戏目录，或 Prism 的 instances 文件夹。", "Pick .minecraft, one of its version folders, an HMCL / PCL game folder, or Prism's instances folder.")}</span>
+          <span className="field-hint">{t("支持 .minecraft、HMCL、PCL 或 Prism 游戏目录。", "Supports .minecraft, HMCL, PCL, or Prism game folders.")}</span>
           {folder && (
             <div className="mono faint truncate" style={{ fontSize: "var(--text-xs)" }} title={folder}>
               {folder}
@@ -102,7 +115,7 @@ export function ImportDialog() {
             </div>
           ) : found == null ? null : found.length === 0 ? (
             <Empty icon="search" title={t("这里没有找到游戏版本", "No game versions found here")}>
-              {t("试试选 .minecraft 文件夹本身，或者它里面 versions 下的某个版本。", "Try the .minecraft folder itself, or a version inside its versions folder.")}
+              {t("试试选择 .minecraft 目录，或其中的 versions 版本文件夹。", "Try selecting the .minecraft folder or a version inside versions/.")}
             </Empty>
           ) : (
             <div className="list">
@@ -146,7 +159,7 @@ export function ImportDialog() {
             </div>
           )}
           {found && found.some((g) => g.kind === "official") && (
-            <span className="field-hint">{t("官方启动器的各个版本共用一份存档，导入多个版本会各自复制一份。", "The official launcher's versions share one set of saves; importing several copies it into each.")}</span>
+            <span className="field-hint">{t("官方启动器多版本共用存档，导入多个时会各自复制一份。", "Official launcher versions share saves; each import gets its own copy.")}</span>
           )}
         </section>
       </div>

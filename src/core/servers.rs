@@ -461,8 +461,14 @@ pub fn edit(paths: &AppPaths, id: &str, change: ServerEdit) -> AppResult<()> {
         }
         ServerEdit::Raise { index, expected } => {
             locate(&mut list, index, &expected)?;
-            if index > 0 {
-                list.swap(index - 1, index);
+            // Skip hidden quick-play entries so moving up always advances one
+            // visible row in the player's server list.
+            let visible = |entry: &Tag| {
+                entry.get("hidden").and_then(Tag::as_byte).unwrap_or(0) == 0
+                    && entry.get("ip").and_then(Tag::as_str).is_some_and(|ip| !ip.trim().is_empty())
+            };
+            if let Some(prev) = (0..index).rev().find(|&i| visible(&list[i])) {
+                list.swap(prev, index);
             }
         }
     }
@@ -572,7 +578,7 @@ fn best_srv(body: &Value) -> Option<(String, u16)> {
             let weight: u16 = parts.next()?.parse().ok()?;
             let port: u16 = parts.next()?.parse().ok()?;
             let target = parts.next()?.trim_end_matches('.');
-            (!target.is_empty() && port > 0)
+            (!target.is_empty() && target.len() <= 253 && port > 0)
                 .then(|| (priority, std::cmp::Reverse(weight), target.to_string(), port))
         })
         .min_by_key(|(priority, weight, ..)| (*priority, *weight))
@@ -753,7 +759,13 @@ fn status_from_json(value: &Value, latency_ms: u32) -> ServerStatus {
             .get("favicon")
             .and_then(Value::as_str)
             .map(|icon| icon.replace(['\n', '\r'], ""))
-            .filter(|icon| icon.starts_with("data:image/png;base64,") && icon.len() <= 256 * 1024),
+            .filter(|icon| {
+                icon.len() <= 256 * 1024
+                    && icon.strip_prefix("data:image/png;base64,").is_some_and(|b64| {
+                        !b64.is_empty()
+                            && b64.bytes().all(|b| b.is_ascii_alphanumeric() || b"+/=".contains(&b))
+                    })
+            }),
     }
 }
 
@@ -1129,6 +1141,32 @@ mod tests {
         assert_eq!(status.players, vec!["Alex".to_string()]);
         assert_eq!(status.motd[0].text, "欢迎");
         assert_eq!(status.favicon.as_deref(), Some("data:image/png;base64,AAAA"));
+
+        let bad_icon = serde_json::json!({"favicon": "data:image/png;base64,AAA<script>"});
+        assert!(status_from_json(&bad_icon, 10).favicon.is_none());
+    }
+
+    #[test]
+    fn raise_skips_hidden_entries_between_visible_servers() {
+        let (_dir, paths, id) = temp_paths();
+        let file = paths.instance_game_dir(&id).join("servers.dat");
+        let root = Tag::Compound(vec![(
+            "servers".into(),
+            Tag::List(
+                10,
+                vec![
+                    Tag::Compound(vec![("ip".into(), Tag::String("a.example.com".into())), ("name".into(), Tag::String("A".into()))]),
+                    Tag::Compound(vec![("ip".into(), Tag::String("hidden.example.com".into())), ("name".into(), Tag::String("H".into())), ("hidden".into(), Tag::Byte(1))]),
+                    Tag::Compound(vec![("ip".into(), Tag::String("b.example.com".into())), ("name".into(), Tag::String("B".into()))]),
+                ],
+            ),
+        )]);
+        fs::write(&file, nbt::write("", &root)).unwrap();
+        let before = list(&paths, &id).unwrap();
+        assert_eq!(before.iter().map(|s| s.address.as_str()).collect::<Vec<_>>(), ["a.example.com", "b.example.com"]);
+        edit(&paths, &id, ServerEdit::Raise { index: before[1].index, expected: "b.example.com".into() }).unwrap();
+        let after = list(&paths, &id).unwrap();
+        assert_eq!(after.iter().map(|s| s.address.as_str()).collect::<Vec<_>>(), ["b.example.com", "a.example.com"]);
     }
 
     /// A local server that speaks the status protocol answers a real ping.

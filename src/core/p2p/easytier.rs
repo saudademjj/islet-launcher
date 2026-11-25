@@ -70,6 +70,10 @@ pub struct Remote {
     /// Replaces `DEFAULT_NODES` when not empty.
     #[serde(default)]
     pub nodes: Vec<String>,
+    /// Replaces `scaffolding::NODES` when not empty, so dead interoperability
+    /// nodes can be swapped out without shipping a new launcher release.
+    #[serde(default)]
+    pub scaffolding_nodes: Vec<String>,
     /// Extra places to download EasyTier from, tried alongside GitHub and
     /// its proxies: HTTPS URLs where `{name}` is the archive's file name,
     /// `{version}` the EasyTier version and `{url}` the GitHub download URL.
@@ -82,6 +86,13 @@ impl Remote {
     fn clean(self) -> Self {
         Self {
             nodes: self.nodes.into_iter().map(|n| n.trim().to_string()).filter(|n| valid_node(n)).take(32).collect(),
+            scaffolding_nodes: self
+                .scaffolding_nodes
+                .into_iter()
+                .map(|n| n.trim().to_string())
+                .filter(|n| valid_node(n))
+                .take(16)
+                .collect(),
             sources: self
                 .sources
                 .into_iter()
@@ -309,9 +320,19 @@ pub fn nodes(custom: &[String], remote: &Remote) -> Vec<String> {
 }
 
 /// The nodes for a Scaffolding room: `nodes` plus the ones Terracotta-based
-/// launchers use, so either side can find the other.
-pub fn room_nodes(mut nodes: Vec<String>) -> Vec<String> {
-    for node in super::scaffolding::NODES {
+/// launchers use (overridable via `Remote::scaffolding_nodes`), so either
+/// side can find the other.
+pub fn room_nodes(nodes: Vec<String>) -> Vec<String> {
+    room_nodes_with(nodes, &Remote::default())
+}
+
+pub fn room_nodes_with(mut nodes: Vec<String>, remote: &Remote) -> Vec<String> {
+    let interop: Vec<&str> = if remote.scaffolding_nodes.is_empty() {
+        super::scaffolding::NODES.to_vec()
+    } else {
+        remote.scaffolding_nodes.iter().map(String::as_str).collect()
+    };
+    for node in interop {
         if !nodes.iter().any(|n| n == node) {
             nodes.push(node.to_string());
         }
@@ -544,8 +565,15 @@ mod tests {
         let none = Remote::default();
         assert_eq!(nodes(&[" udp://my.node:1 ".into(), "junk".into()], &none), vec!["udp://my.node:1".to_string()]);
         assert_eq!(nodes(&["junk".into()], &none).len(), DEFAULT_NODES.len());
-        let published = Remote { nodes: vec!["tcp://new.node:1".into(), "junk".into()], sources: vec!["https://cdn.example/et/{name}".into(), "http://plain/{name}".into(), "https://no-placeholder/".into()] }.clean();
+        let published = Remote {
+            nodes: vec!["tcp://new.node:1".into(), "junk".into()],
+            scaffolding_nodes: vec!["tcp://interop.node:2".into(), "bad".into()],
+            sources: vec!["https://cdn.example/et/{name}".into(), "http://plain/{name}".into(), "https://no-placeholder/".into()],
+        }
+        .clean();
         assert_eq!(nodes(&[], &published), vec!["tcp://new.node:1".to_string()]);
+        assert_eq!(published.scaffolding_nodes, vec!["tcp://interop.node:2".to_string()]);
+        assert_eq!(room_nodes_with(vec!["tcp://new.node:1".into()], &published), vec!["tcp://new.node:1".to_string(), "tcp://interop.node:2".to_string()]);
         assert_eq!(published.sources, vec!["https://cdn.example/et/{name}".to_string()]);
         assert_eq!(Remote::source(&published.sources[0], "easytier-x.zip", "https://github.com/x"), "https://cdn.example/et/easytier-x.zip");
         let room = room_nodes(vec!["tcp://public.easytier.top:11010".into()]);

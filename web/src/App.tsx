@@ -1,10 +1,8 @@
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { backend } from "./api/backend";
 import type { Theme } from "./api/types";
-import { TunnelDialog } from "./overlays/TunnelDialog";
-import { GroupDialog } from "./overlays/GroupDialog";
 import { migrateFavorites, usePrefs } from "./lib/prefs";
 import { FileDrop } from "./components/FileDrop";
 import { Intro } from "./components/Intro";
@@ -14,30 +12,37 @@ import { Toasts } from "./components/overlay";
 import { Sidebar, StatusBar, WindowBar } from "./layout/Shell";
 import { pageIn } from "./lib/motion";
 import { isMac } from "./lib/platform";
-import { SaveDialog } from "./overlays/SaveDialog";
-import { ConfigDialog } from "./overlays/ConfigDialog";
-import { ImportDialog } from "./overlays/ImportDialog";
-import { ExportPack } from "./overlays/ExportPack";
-import { ExportServer } from "./overlays/ExportServer";
-import { RemoteServer } from "./overlays/RemoteServer";
-import { ServerModsDialog } from "./overlays/ServerModsDialog";
-import { AddYggdrasil, SkinDialog } from "./overlays/AccountDialogs";
-import { CommandPalette } from "./overlays/CommandPalette";
-import { CrashDialog } from "./overlays/CrashDialog";
-import { CreateInstance } from "./overlays/CreateInstance";
 import { EnterWorld } from "./overlays/EnterWorld";
-import { ModpackBrowser } from "./overlays/ModpackBrowser";
 import { AddOffline, DeleteAccount, DeleteInstance, LoginOverlay, LogsPanel, QuitConfirm, RecycleBin, StopGame } from "./overlays/Dialogs";
-import { ManageInstance } from "./overlays/ManageInstance";
 import { ShotViewer } from "./overlays/Screenshots";
-import { AccountsPage } from "./pages/AccountsPage";
 import { HomePage } from "./pages/HomePage";
-import { InstancesPage } from "./pages/InstancesPage";
-import { MultiplayerPage } from "./pages/MultiplayerPage";
-import { ServerPage } from "./pages/ServerPage";
 import { useP2pPolling } from "./lib/p2p";
-import { SettingsPage } from "./pages/SettingsPage";
 import { overlayOpen, usePick, useStore, type Page } from "./store";
+
+// Secondary pages and heavy modals load on demand so first paint only parses
+// the home screen, shell and lightweight core dialogs.
+const InstancesPage = lazy(() => import("./pages/InstancesPage").then((m) => ({ default: m.InstancesPage })));
+const MultiplayerPage = lazy(() => import("./pages/MultiplayerPage").then((m) => ({ default: m.MultiplayerPage })));
+const ServerPage = lazy(() => import("./pages/ServerPage").then((m) => ({ default: m.ServerPage })));
+const AccountsPage = lazy(() => import("./pages/AccountsPage").then((m) => ({ default: m.AccountsPage })));
+const SettingsPage = lazy(() => import("./pages/SettingsPage").then((m) => ({ default: m.SettingsPage })));
+
+const ManageInstance = lazy(() => import("./overlays/ManageInstance").then((m) => ({ default: m.ManageInstance })));
+const CommandPalette = lazy(() => import("./overlays/CommandPalette").then((m) => ({ default: m.CommandPalette })));
+const RemoteServer = lazy(() => import("./overlays/RemoteServer").then((m) => ({ default: m.RemoteServer })));
+const ModpackBrowser = lazy(() => import("./overlays/ModpackBrowser").then((m) => ({ default: m.ModpackBrowser })));
+const CreateInstance = lazy(() => import("./overlays/CreateInstance").then((m) => ({ default: m.CreateInstance })));
+const CrashDialog = lazy(() => import("./overlays/CrashDialog").then((m) => ({ default: m.CrashDialog })));
+const ImportDialog = lazy(() => import("./overlays/ImportDialog").then((m) => ({ default: m.ImportDialog })));
+const ExportPack = lazy(() => import("./overlays/ExportPack").then((m) => ({ default: m.ExportPack })));
+const ExportServer = lazy(() => import("./overlays/ExportServer").then((m) => ({ default: m.ExportServer })));
+const ConfigDialog = lazy(() => import("./overlays/ConfigDialog").then((m) => ({ default: m.ConfigDialog })));
+const SaveDialog = lazy(() => import("./overlays/SaveDialog").then((m) => ({ default: m.SaveDialog })));
+const AddYggdrasil = lazy(() => import("./overlays/AccountDialogs").then((m) => ({ default: m.AddYggdrasil })));
+const SkinDialog = lazy(() => import("./overlays/AccountDialogs").then((m) => ({ default: m.SkinDialog })));
+const TunnelDialog = lazy(() => import("./overlays/TunnelDialog").then((m) => ({ default: m.TunnelDialog })));
+const GroupDialog = lazy(() => import("./overlays/GroupDialog").then((m) => ({ default: m.GroupDialog })));
+const ServerModsDialog = lazy(() => import("./overlays/ServerModsDialog").then((m) => ({ default: m.ServerModsDialog })));
 
 export function App() {
   const page = useStore((s) => s.page);
@@ -75,12 +80,14 @@ export function App() {
         <main className="main">
           <div className="page-frame">
             <motion.div key={page} className="page-anim" {...pageIn(direction)}>
-              {page === "home" && <HomePage />}
-              {page === "instances" && <InstancesPage />}
-              {page === "multiplayer" && <MultiplayerPage />}
-              {page === "server" && <ServerPage />}
-              {page === "accounts" && <AccountsPage />}
-              {page === "settings" && <SettingsPage />}
+              <Suspense fallback={null}>
+                {page === "home" && <HomePage />}
+                {page === "instances" && <InstancesPage />}
+                {page === "multiplayer" && <MultiplayerPage />}
+                {page === "server" && <ServerPage />}
+                {page === "accounts" && <AccountsPage />}
+                {page === "settings" && <SettingsPage />}
+              </Suspense>
             </motion.div>
           </div>
           <StatusBar />
@@ -102,35 +109,37 @@ function Overlays() {
   const s = usePick((s) => ({ modal: s.modal, logsOpen: s.logsOpen, login: s.auth !== null || s.authBusy }));
   const modal = s.modal;
   return (
-    <AnimatePresence>
-      {modal?.kind === "create" && <CreateInstance key="create" />}
-      {modal?.kind === "manage" && <ManageInstance key={`manage-${modal.id}`} id={modal.id} tab={modal.tab} />}
-      {modal?.kind === "crash" && (
-        <CrashDialog key="crash" instanceId={modal.instanceId} code={modal.code} analysis={modal.analysis} />
-      )}
-      {modal?.kind === "recycle" && <RecycleBin key="recycle" />}
-      {modal?.kind === "deleteInstance" && <DeleteInstance key="delete-instance" instance={modal.instance} />}
-      {modal?.kind === "addOffline" && <AddOffline key="add-offline" />}
-      {modal?.kind === "deleteAccount" && <DeleteAccount key="delete-account" account={modal.account} />}
-      {modal?.kind === "quit" && <QuitConfirm key="quit" />}
-      {modal?.kind === "stopGame" && <StopGame key={`stop-${modal.id}`} id={modal.id} />}
-      {modal?.kind === "modpacks" && <ModpackBrowser key="modpacks" />}
-      {modal?.kind === "palette" && <CommandPalette key="palette" />}
-      {modal?.kind === "shot" && <ShotViewer key="shot" id={modal.id} name={modal.name} back={modal.back} />}
-      {modal?.kind === "import" && <ImportDialog key="import" />}
-      {modal?.kind === "exportPack" && <ExportPack key="export-pack" id={modal.id} />}
-      {modal?.kind === "exportServer" && <ExportServer key="export-server" id={modal.id} />}
-      {modal?.kind === "remote" && <RemoteServer key={`remote-${modal.id}`} id={modal.id} />}
-      {modal?.kind === "serverMods" && <ServerModsDialog key={`server-mods-${modal.id}`} id={modal.id} address={modal.address} check={modal.check} offline={modal.offline} />}
-      {modal?.kind === "addYggdrasil" && <AddYggdrasil key="add-yggdrasil" />}
-      {modal?.kind === "tunnel" && <TunnelDialog key={`tunnel-${modal.id}`} id={modal.id} />}
-      {modal?.kind === "group" && <GroupDialog key={`group-${modal.id}`} id={modal.id} />}
-      {modal?.kind === "skin" && <SkinDialog key={`skin-${modal.accountId}`} accountId={modal.accountId} />}
-      {modal?.kind === "save" && <SaveDialog key={`save-${modal.id}-${modal.folder}`} id={modal.id} folder={modal.folder} />}
-      {modal?.kind === "configs" && <ConfigDialog key={`configs-${modal.id}`} id={modal.id} initial={modal.query} />}
-      {s.logsOpen && <LogsPanel key="logs" />}
-      {s.login && <LoginOverlay key="login" />}
-    </AnimatePresence>
+    <Suspense fallback={null}>
+      <AnimatePresence>
+        {modal?.kind === "create" && <CreateInstance key="create" />}
+        {modal?.kind === "manage" && <ManageInstance key={`manage-${modal.id}`} id={modal.id} tab={modal.tab} />}
+        {modal?.kind === "crash" && (
+          <CrashDialog key="crash" instanceId={modal.instanceId} code={modal.code} analysis={modal.analysis} />
+        )}
+        {modal?.kind === "recycle" && <RecycleBin key="recycle" />}
+        {modal?.kind === "deleteInstance" && <DeleteInstance key="delete-instance" instance={modal.instance} />}
+        {modal?.kind === "addOffline" && <AddOffline key="add-offline" />}
+        {modal?.kind === "deleteAccount" && <DeleteAccount key="delete-account" account={modal.account} />}
+        {modal?.kind === "quit" && <QuitConfirm key="quit" />}
+        {modal?.kind === "stopGame" && <StopGame key={`stop-${modal.id}`} id={modal.id} />}
+        {modal?.kind === "modpacks" && <ModpackBrowser key="modpacks" />}
+        {modal?.kind === "palette" && <CommandPalette key="palette" />}
+        {modal?.kind === "shot" && <ShotViewer key="shot" id={modal.id} name={modal.name} back={modal.back} />}
+        {modal?.kind === "import" && <ImportDialog key="import" />}
+        {modal?.kind === "exportPack" && <ExportPack key="export-pack" id={modal.id} />}
+        {modal?.kind === "exportServer" && <ExportServer key="export-server" id={modal.id} />}
+        {modal?.kind === "remote" && <RemoteServer key={`remote-${modal.id}`} id={modal.id} />}
+        {modal?.kind === "serverMods" && <ServerModsDialog key={`server-mods-${modal.id}`} id={modal.id} address={modal.address} check={modal.check} offline={modal.offline} />}
+        {modal?.kind === "addYggdrasil" && <AddYggdrasil key="add-yggdrasil" />}
+        {modal?.kind === "tunnel" && <TunnelDialog key={`tunnel-${modal.id}`} id={modal.id} />}
+        {modal?.kind === "group" && <GroupDialog key={`group-${modal.id}`} id={modal.id} />}
+        {modal?.kind === "skin" && <SkinDialog key={`skin-${modal.accountId}`} accountId={modal.accountId} />}
+        {modal?.kind === "save" && <SaveDialog key={`save-${modal.id}-${modal.folder}`} id={modal.id} folder={modal.folder} />}
+        {modal?.kind === "configs" && <ConfigDialog key={`configs-${modal.id}`} id={modal.id} initial={modal.query} />}
+        {s.logsOpen && <LogsPanel key="logs" />}
+        {s.login && <LoginOverlay key="login" />}
+      </AnimatePresence>
+    </Suspense>
   );
 }
 

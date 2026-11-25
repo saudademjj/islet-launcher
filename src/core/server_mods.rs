@@ -1,7 +1,7 @@
 //! The mods a server made with Islet runs, carried in the pack friends
 //! import. Before they join, the launcher compares their mods with it and
 //! can fetch what is missing, so nobody is turned away at the door.
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs;
 use std::sync::Arc;
 
@@ -91,7 +91,10 @@ pub fn check(paths: &AppPaths, id: &str, address: &str) -> AppResult<Option<Chec
         .filter(|(name, sha1)| !wanted.contains(sha1.as_str()) && meta.get(name).and_then(|m| m.id.as_deref()).is_some_and(|mod_id| missing_ids.contains(mod_id)))
         .map(|(name, _)| name.clone())
         .collect();
-    let fixable = missing.iter().all(|m| m.url.as_deref().is_some_and(crate::core::modpacks::trusted_url));
+    let valid_sha1 = |s: &str| s.len() == 40 && s.bytes().all(|b| b.is_ascii_hexdigit());
+    let fixable = missing
+        .iter()
+        .all(|m| valid_sha1(&m.sha1) && m.url.as_deref().is_some_and(crate::core::modpacks::trusted_url));
     Ok(Some(Check { server: manifest.name, missing, outdated, fixable }))
 }
 
@@ -102,8 +105,9 @@ fn jar_name(name: &str) -> Option<String> {
     (single && name.to_lowercase().ends_with(".jar") && !name.chars().any(|c| c.is_control() || matches!(c, '/' | '\\' | ':'))).then(|| name.to_string())
 }
 
-/// Downloads the missing mods (each checked against its SHA-1) and moves
-/// the versions they replace to the recycle bin. Returns (added, removed).
+/// Downloads the missing mods (each checked against its SHA-1) into a staging
+/// folder, then moves replaced versions to the recycle bin and publishes the
+/// new jars. Returns (added, removed).
 pub async fn fix(client: &reqwest::Client, paths: &AppPaths, id: &str, address: &str, cancel: &CancellationToken) -> AppResult<(usize, usize)> {
     let Some(check) = check(paths, id, address)? else {
         return Ok((0, 0));
@@ -111,28 +115,47 @@ pub async fn fix(client: &reqwest::Client, paths: &AppPaths, id: &str, address: 
     if !check.fixable {
         return Err(AppError::new(
             "server_mods",
-            crate::core::i18n::pick("有的模组没法自动下载，请向服主要最新的整合包，用「从整合包更新」装上。", "Some mods can't be downloaded; ask the host for the latest pack and use \"Update from pack\"."),
+            crate::core::i18n::pick("部分模组无法自动下载，请向服主获取最新整合包，在「管理 → 工具」中用「更新整合包」安装。", "Some mods can't be downloaded; ask the host for the latest modpack and use \"Update modpack\" under Manage → Tools."),
         ));
     }
     let mods = paths.instance_game_dir(id).join("mods");
-    let mut names = HashMap::new();
-    let mut tasks = Vec::new();
-    for item in &check.missing {
-        let file = jar_name(&item.file).ok_or_else(|| AppError::detail("server_mods", crate::core::i18n::pick("整合包里的模组文件名不安全。", "A mod file name in the pack isn't safe."), item.file.clone()))?;
-        let target = mods.join(&file);
-        // A disabled or differently named copy may sit under the same name.
-        if target.exists() {
-            return Err(AppError::detail("server_mods", crate::core::i18n::pick("模组文件夹里已有同名但内容不同的文件。", "The mods folder already has a different file with that name."), file));
+    fs::create_dir_all(&mods)?;
+    let outdated_lower: HashSet<String> = check.outdated.iter().map(|n| n.to_ascii_lowercase()).collect();
+    let stage = paths.instance_dir(id).join(format!(".server-mods-{}", uuid::Uuid::new_v4().simple()));
+    fs::create_dir_all(&stage)?;
+    let result = async {
+        let mut names = HashSet::new();
+        let mut planned = Vec::new();
+        let mut tasks = Vec::new();
+        for item in &check.missing {
+            let file = jar_name(&item.file).ok_or_else(|| AppError::detail("server_mods", crate::core::i18n::pick("整合包里的模组文件名不安全。", "A mod file name in the pack isn't safe."), item.file.clone()))?;
+            let lower = file.to_ascii_lowercase();
+            if !names.insert(lower.clone()) {
+                return Err(AppError::detail("server_mods", crate::core::i18n::pick("服务器模组清单里包含重复的文件名。", "The server mod manifest lists duplicate file names."), file));
+            }
+            let target = mods.join(&file);
+            // Refuse to overwrite an unrelated local file, but allow replacing
+            // an outdated version of the same mod that kept the same filename.
+            if target.exists() && !outdated_lower.contains(&lower) {
+                return Err(AppError::detail("server_mods", crate::core::i18n::pick("模组文件夹里已有同名但内容不同的文件。", "The mods folder already has a different file with that name."), file));
+            }
+            let staged = stage.join(&file);
+            planned.push((staged.clone(), target));
+            tasks.push(DownloadTask::new(file, item.url.clone().unwrap_or_default(), Vec::new(), staged, Some(item.sha1.clone()), None));
         }
-        names.insert(file.clone(), ());
-        tasks.push(DownloadTask::new(file, item.url.clone().unwrap_or_default(), Vec::new(), target, Some(item.sha1.clone()), None));
+        let progress = Arc::new(DownloadProgress::new(&tasks));
+        download::download_all(tasks, client.clone(), 4, cancel.clone(), progress).await?;
+        for name in &check.outdated {
+            manage::recycle_item(paths, id, ItemKind::Mod, name, None)?;
+        }
+        for (staged, target) in &planned {
+            crate::core::util::replace_file(staged, target)?;
+        }
+        Ok((planned.len(), check.outdated.len()))
     }
-    let progress = Arc::new(DownloadProgress::new(&tasks));
-    download::download_all(tasks, client.clone(), 4, cancel.clone(), progress).await?;
-    for name in &check.outdated {
-        manage::recycle_item(paths, id, ItemKind::Mod, name, None)?;
-    }
-    Ok((names.len(), check.outdated.len()))
+    .await;
+    let _ = fs::remove_dir_all(&stage);
+    result
 }
 
 #[cfg(test)]
@@ -195,5 +218,14 @@ mod tests {
         assert_eq!(found.missing.iter().map(|m| m.file.as_str()).collect::<Vec<_>>(), ["tech-1.1.jar"]);
         assert_eq!(found.outdated, ["tech-1.0.jar"]);
         assert!(found.fixable);
+
+        // Missing or malformed SHA-1 is not auto-fixable.
+        let bad = Manifest {
+            name: "生存".into(),
+            address: "example.com".into(),
+            mods: vec![ManifestMod { file: "x.jar".into(), sha1: "not-a-sha1".into(), id: None, url: Some("https://cdn.modrinth.com/data/x/x.jar".into()) }],
+        };
+        fs::write(paths.instance_game_dir(w).join(FILE), serde_json::to_vec(&bad).unwrap()).unwrap();
+        assert!(!check(&paths, w, "example.com").unwrap().unwrap().fixable);
     }
 }

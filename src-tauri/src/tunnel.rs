@@ -12,7 +12,10 @@ use tauri::{Manager, State};
 pub struct Tunnels(Mutex<HashMap<String, Running>>);
 impl Tunnels {
     pub fn has_activity(&self) -> bool {
-        self.0.try_lock().map_or(true, |map| !map.is_empty())
+        self.0.try_lock().map_or(true, |mut map| {
+            map.values_mut()
+                .any(|tunnel| matches!(tunnel.child.try_wait(), Ok(None)))
+        })
     }
 
     /// Kills every forwarding ssh; called when the launcher exits.
@@ -52,6 +55,7 @@ fn valid_host(host: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b".-".contains(&b))
 }
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn start_tunnel(
     app: tauri::AppHandle,
     state: State<'_, Tunnels>,
@@ -129,8 +133,8 @@ pub fn start_tunnel(
         running: true,
         address,
         detail: islet::tr!(
-            "正在连接；SSH 主机需允许 GatewayPorts clientspecified，且开放转发端口。",
-            "Connecting; the SSH host must allow GatewayPorts clientspecified and open the forwarded port."
+            "正在连接，请确认服务器已放行公网转发端口。",
+            "Connecting; make sure the server allows public port forwarding."
         ),
     })
 }
@@ -183,5 +187,30 @@ mod tests {
             assert!(!valid_host(bad));
         }
         assert!(valid_host("relay.example.org"));
+    }
+
+    #[test]
+    fn exited_tunnel_does_not_report_activity() {
+        let mut cmd = if cfg!(windows) {
+            let mut c = std::process::Command::new("cmd");
+            c.args(["/C", "exit 0"]);
+            c
+        } else {
+            let mut c = std::process::Command::new("/bin/sh");
+            c.args(["-c", "exit 0"]);
+            c
+        };
+        let mut child = cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().unwrap();
+        let _ = child.wait();
+        let tunnels = Tunnels::default();
+        tunnels.0.lock().unwrap().insert(
+            "w1".into(),
+            Running {
+                child,
+                address: "example.org:25565".into(),
+                log: std::path::PathBuf::new(),
+            },
+        );
+        assert!(!tunnels.has_activity());
     }
 }

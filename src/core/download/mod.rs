@@ -1,16 +1,26 @@
+mod segmented;
+mod speed;
+#[cfg(test)]
+mod tests;
+
+pub use speed::fastest_first;
+
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use futures::StreamExt;
 use sha1::{Digest, Sha1};
 use sha2::Sha256;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::core::error::{AppError, AppResult};
+
+use segmented::{PARALLEL_PARTS, RANGE_SPLIT_THRESHOLD, SegmentedOutcome, attempt_segmented};
+use speed::{SLOW_WINDOW, SpeedWindow, content_range_start};
 
 #[derive(Debug, Clone)]
 pub struct DownloadTask {
@@ -65,8 +75,8 @@ impl DownloadTask {
 pub struct DownloadProgress {
     files_total: AtomicU64,
     files_done: AtomicU64,
-    bytes_total: AtomicU64,
-    bytes_done: AtomicU64,
+    pub(super) bytes_total: AtomicU64,
+    pub(super) bytes_done: AtomicU64,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -97,7 +107,7 @@ impl DownloadProgress {
         }
     }
 
-    fn add_bytes(&self, bytes: u64, unknown_total: bool) {
+    pub(super) fn add_bytes(&self, bytes: u64, unknown_total: bool) {
         self.bytes_done.fetch_add(bytes, Ordering::Relaxed);
         if unknown_total {
             self.bytes_total.fetch_add(bytes, Ordering::Relaxed);
@@ -274,43 +284,58 @@ async fn download_one(
     ))
 }
 
+/// Verifies an existing file on disk in a single blocking task using a stack
+/// buffer, keeping SHA-1/SHA-256 CPU work off the async worker threads.
 async fn verify_existing(task: &DownloadTask) -> bool {
-    let Ok(metadata) = tokio::fs::metadata(&task.dest).await else {
-        return false;
-    };
-    if let Some(size) = task.size {
-        if metadata.len() != size {
+    let dest = task.dest.clone();
+    let expected_size = task.size;
+    let expected_sha256 = task.sha256.clone();
+    let expected_sha1 = task.sha1.clone();
+    tokio::task::spawn_blocking(move || {
+        use std::io::Read;
+        let Ok(metadata) = std::fs::metadata(&dest) else {
+            return false;
+        };
+        if let Some(size) = expected_size
+            && metadata.len() != size
+        {
             return false;
         }
-    }
-    if let Some(expected) = &task.sha256 {
-        return hash_sha256(&task.dest)
-            .await
-            .is_ok_and(|actual| actual.eq_ignore_ascii_case(expected));
-    }
-    let Some(expected) = &task.sha1 else {
-        // Without a hash, an existing file with the expected size is the best
-        // signal we have. Metadata entries always include a SHA-1.
-        return task.size.is_some() || metadata.len() > 0;
-    };
-    match hash_file(&task.dest).await {
-        Ok(actual) => actual.eq_ignore_ascii_case(expected),
-        Err(_) => false,
-    }
-}
-
-async fn hash_file(path: &Path) -> AppResult<String> {
-    let mut file = tokio::fs::File::open(path).await?;
-    let mut hasher = Sha1::new();
-    let mut buffer = vec![0u8; 64 * 1024];
-    loop {
-        let read = file.read(&mut buffer).await?;
-        if read == 0 {
-            break;
+        let mut buf = [0u8; 32 * 1024];
+        if let Some(expected) = expected_sha256 {
+            let Ok(mut file) = std::fs::File::open(&dest) else {
+                return false;
+            };
+            let mut hasher = Sha256::new();
+            loop {
+                match file.read(&mut buf) {
+                    Ok(0) => break,
+                    Ok(n) => hasher.update(&buf[..n]),
+                    Err(_) => return false,
+                }
+            }
+            return hex::encode(hasher.finalize()).eq_ignore_ascii_case(&expected);
         }
-        hasher.update(&buffer[..read]);
-    }
-    Ok(hex::encode(hasher.finalize()))
+        let Some(expected) = expected_sha1 else {
+            // Without a hash, an existing file with the expected size is the best
+            // signal we have. Metadata entries always include a SHA-1.
+            return expected_size.is_some() || metadata.len() > 0;
+        };
+        let Ok(mut file) = std::fs::File::open(&dest) else {
+            return false;
+        };
+        let mut hasher = Sha1::new();
+        loop {
+            match file.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => hasher.update(&buf[..n]),
+                Err(_) => return false,
+            }
+        }
+        hex::encode(hasher.finalize()).eq_ignore_ascii_case(&expected)
+    })
+    .await
+    .unwrap_or(false)
 }
 
 async fn attempt_download(
@@ -321,6 +346,30 @@ async fn attempt_download(
     partial: &mut Partial,
     accounting: &mut FileBytes<'_>,
     floor: Option<u64>,
+) -> AppResult<()> {
+    attempt_download_with_threshold(
+        client,
+        url,
+        task,
+        cancel,
+        partial,
+        accounting,
+        floor,
+        RANGE_SPLIT_THRESHOLD,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn attempt_download_with_threshold(
+    client: &reqwest::Client,
+    url: &str,
+    task: &DownloadTask,
+    cancel: &CancellationToken,
+    partial: &mut Partial,
+    accounting: &mut FileBytes<'_>,
+    floor: Option<u64>,
+    split_threshold: u64,
 ) -> AppResult<()> {
     if let Some(parent) = task.dest.parent() {
         tokio::fs::create_dir_all(parent).await?;
@@ -335,9 +384,26 @@ async fn attempt_download(
         partial.restart(accounting);
     }
 
+    if partial.len == 0
+        && (task.sha1.is_some() || task.sha256.is_some())
+        && let Some(total) = task.size.filter(|&size| size >= split_threshold && size >= PARALLEL_PARTS as u64)
+    {
+        match attempt_segmented(client, url, task, total, cancel, partial, accounting, floor).await {
+            SegmentedOutcome::Completed(result) => return result,
+            SegmentedOutcome::FallbackWhole(response) => {
+                return finish_single_stream(response, false, task, cancel, partial, accounting, floor).await;
+            }
+            SegmentedOutcome::RetrySingle => {
+                partial.restart(accounting);
+            }
+        }
+    }
+
     let mut request = client.get(url);
     if partial.len > 0 {
-        request = request.header(reqwest::header::RANGE, format!("bytes={}-", partial.len));
+        request = request
+            .header(reqwest::header::RANGE, format!("bytes={}-", partial.len))
+            .header(reqwest::header::ACCEPT_ENCODING, "identity");
     }
     let response = tokio::select! {
         _ = cancel.cancelled() => return Err(cancelled_error()),
@@ -358,6 +424,18 @@ async fn attempt_download(
     let resumed = partial.len > 0
         && status == reqwest::StatusCode::PARTIAL_CONTENT
         && content_range_start(&response) == Some(partial.len);
+    finish_single_stream(response, resumed, task, cancel, partial, accounting, floor).await
+}
+
+async fn finish_single_stream(
+    response: reqwest::Response,
+    resumed: bool,
+    task: &DownloadTask,
+    cancel: &CancellationToken,
+    partial: &mut Partial,
+    accounting: &mut FileBytes<'_>,
+    floor: Option<u64>,
+) -> AppResult<()> {
     let mut file = if resumed {
         tokio::fs::OpenOptions::new()
             .append(true)
@@ -414,14 +492,22 @@ async fn attempt_download(
     }
     drop(file);
 
-    if let Some(expected_size) = task.size {
-        if partial.len != expected_size {
-            partial.restart(accounting);
-            return Err(AppError::new(
-                "download_size",
-                crate::tr!("{} 的大小校验失败。", "{} failed the size check.", task.label),
-            ));
-        }
+    verify_and_commit(task, partial, accounting)
+}
+
+pub(super) fn verify_and_commit(
+    task: &DownloadTask,
+    partial: &mut Partial,
+    accounting: &mut FileBytes<'_>,
+) -> AppResult<()> {
+    if let Some(expected_size) = task.size
+        && partial.len != expected_size
+    {
+        partial.restart(accounting);
+        return Err(AppError::new(
+            "download_size",
+            crate::tr!("{} 的大小校验失败。", "{} failed the size check.", task.label),
+        ));
     }
     if let Some(expected_hash) = &task.sha1 {
         let actual = hex::encode(partial.sha1.clone().finalize());
@@ -433,139 +519,26 @@ async fn attempt_download(
             ));
         }
     }
-    if let (Some(expected), Some(sha256)) = (&task.sha256, &partial.sha256) {
-        if !hex::encode(sha256.clone().finalize()).eq_ignore_ascii_case(expected) {
-            partial.restart(accounting);
-            return Err(AppError::new(
-                "download_hash",
-                crate::tr!("{} 的 SHA-256 校验失败。", "{} failed its SHA-256 check.", task.label),
-            ));
-        }
+    if let (Some(expected), Some(sha256)) = (&task.sha256, &partial.sha256)
+        && !hex::encode(sha256.clone().finalize()).eq_ignore_ascii_case(expected)
+    {
+        partial.restart(accounting);
+        return Err(AppError::new(
+            "download_hash",
+            crate::tr!("{} 的 SHA-256 校验失败。", "{} failed its SHA-256 check.", task.label),
+        ));
     }
     crate::core::util::replace_file(&partial.path, &task.dest)?;
     Ok(())
 }
 
-/// How long a source gets to show its speed each time `min_speed` judges it.
-const SLOW_WINDOW: Duration = if cfg!(test) { Duration::from_millis(300) } else { Duration::from_secs(10) };
-
-/// Bytes received in the current stretch of `SLOW_WINDOW`. A new stretch
-/// starts each time one is judged, so a source that slows down later is
-/// caught too.
-struct SpeedWindow {
-    started: Instant,
-    bytes: u64,
-}
-
-impl SpeedWindow {
-    fn new() -> Self {
-        Self { started: Instant::now(), bytes: 0 }
-    }
-
-    fn add(&mut self, bytes: u64) {
-        self.bytes += bytes;
-    }
-
-    fn below(&mut self, floor: u64) -> bool {
-        let elapsed = self.started.elapsed();
-        if elapsed < SLOW_WINDOW {
-            return false;
-        }
-        let slow = (self.bytes as f64) < floor as f64 * elapsed.as_secs_f64();
-        *self = Self::new();
-        slow
-    }
-}
-
-/// How much of the file the speed test reads from each source, at most.
-const PROBE_BYTES: u64 = 512 * 1024;
-const PROBE_TIME: Duration = if cfg!(test) { Duration::from_millis(500) } else { Duration::from_secs(5) };
-
-/// Orders the sources of one file by a speed test run on all of them at
-/// once, each reading the start of the file for a few seconds. Download
-/// mirrors come and go, and their speeds differ a hundredfold by network and
-/// by hour, so no fixed order stays right. Sources that fail, send nothing
-/// or offer a file of another size keep their given order at the end.
-pub async fn fastest_first(
-    client: &reqwest::Client,
-    urls: Vec<String>,
-    size: Option<u64>,
-    cancel: &CancellationToken,
-) -> Vec<String> {
-    let deadline = tokio::time::Instant::now() + PROBE_TIME;
-    let probes = futures::future::join_all(urls.iter().map(|url| probe(client, url, size, deadline)));
-    let speeds = tokio::select! {
-        _ = cancel.cancelled() => return urls,
-        speeds = probes => speeds,
-    };
-    let mut ranked: Vec<(f64, String)> = speeds.into_iter().zip(urls).collect();
-    // A stable sort: the failures (all 0) keep their order.
-    ranked.sort_by(|a, b| b.0.total_cmp(&a.0));
-    tracing::info!(
-        sources = ?ranked.iter().map(|(speed, url)| format!("{url} {:.0} KB/s", speed / 1024.0)).collect::<Vec<_>>(),
-        "download sources ranked"
-    );
-    ranked.into_iter().map(|(_, url)| url).collect()
-}
-
-/// Bytes per second a source delivered of the start of the file; 0 when it
-/// failed or offers a file of another size (an error page, say).
-async fn probe(client: &reqwest::Client, url: &str, size: Option<u64>, deadline: tokio::time::Instant) -> f64 {
-    let started = Instant::now();
-    let request = client
-        .get(url)
-        .header(reqwest::header::RANGE, format!("bytes=0-{}", PROBE_BYTES - 1));
-    let Ok(Ok(response)) = tokio::time::timeout_at(deadline, request.send()).await else {
-        return 0.0;
-    };
-    // A 206 gives the whole size after the slash; a 200 sends the whole file.
-    let total = match response.status() {
-        reqwest::StatusCode::PARTIAL_CONTENT => response
-            .headers()
-            .get(reqwest::header::CONTENT_RANGE)
-            .and_then(|value| value.to_str().ok())
-            .and_then(|value| value.rsplit('/').next())
-            .and_then(|total| total.parse::<u64>().ok()),
-        reqwest::StatusCode::OK => response.content_length(),
-        _ => return 0.0,
-    };
-    if size.zip(total).is_some_and(|(expected, offered)| expected != offered) {
-        return 0.0;
-    }
-    let mut stream = response.bytes_stream();
-    let mut received = 0u64;
-    while received < PROBE_BYTES {
-        match tokio::time::timeout_at(deadline, stream.next()).await {
-            Ok(Some(Ok(bytes))) => received += bytes.len() as u64,
-            _ => break,
-        }
-    }
-    received as f64 / started.elapsed().as_secs_f64().max(0.001)
-}
-
-/// Start offset of a `Content-Range: bytes <start>-<end>/<total>` header.
-fn content_range_start(response: &reqwest::Response) -> Option<u64> {
-    let value = response
-        .headers()
-        .get(reqwest::header::CONTENT_RANGE)?
-        .to_str()
-        .ok()?;
-    value
-        .strip_prefix("bytes ")?
-        .split('-')
-        .next()?
-        .trim()
-        .parse()
-        .ok()
-}
-
 /// The bytes of one file received so far, with the hashes of exactly those
 /// bytes, so a later attempt can append instead of downloading again.
-struct Partial {
-    path: PathBuf,
-    len: u64,
-    sha1: Sha1,
-    sha256: Option<Sha256>,
+pub(super) struct Partial {
+    pub(super) path: PathBuf,
+    pub(super) len: u64,
+    pub(super) sha1: Sha1,
+    pub(super) sha256: Option<Sha256>,
 }
 
 impl Partial {
@@ -591,7 +564,7 @@ impl Partial {
     }
 
     /// Forget the received bytes and take them back out of the progress.
-    fn restart(&mut self, accounting: &mut FileBytes<'_>) {
+    pub(super) fn restart(&mut self, accounting: &mut FileBytes<'_>) {
         accounting.remove(self.len);
         self.len = 0;
         self.sha1 = Sha1::new();
@@ -602,23 +575,24 @@ impl Partial {
     }
 }
 
-fn cancelled_error() -> AppError {
+pub(super) fn cancelled_error() -> AppError {
     AppError::new("cancelled", crate::core::i18n::pick("操作已取消。", "Cancelled."))
 }
 
 // Roll back on errors AND when another concurrent download fails and drops us.
-struct FileBytes<'a> {
-    progress: &'a DownloadProgress,
-    added: u64,
-    unknown: bool,
-    committed: bool,
+pub(super) struct FileBytes<'a> {
+    pub(super) progress: &'a DownloadProgress,
+    pub(super) added: u64,
+    pub(super) unknown: bool,
+    pub(super) committed: bool,
 }
+
 impl FileBytes<'_> {
     fn add(&mut self, bytes: u64) {
         self.progress.add_bytes(bytes, self.unknown);
         self.added += bytes;
     }
-    fn remove(&mut self, bytes: u64) {
+    pub(super) fn remove(&mut self, bytes: u64) {
         let bytes = bytes.min(self.added);
         self.progress
             .bytes_done
@@ -631,6 +605,7 @@ impl FileBytes<'_> {
         self.added -= bytes;
     }
 }
+
 impl Drop for FileBytes<'_> {
     fn drop(&mut self) {
         if !self.committed {
@@ -638,298 +613,10 @@ impl Drop for FileBytes<'_> {
         }
     }
 }
+
 struct PartialFile(PathBuf);
 impl Drop for PartialFile {
     fn drop(&mut self) {
         let _ = std::fs::remove_file(&self.0);
-    }
-}
-async fn hash_sha256(path: &Path) -> AppResult<String> {
-    let mut file = tokio::fs::File::open(path).await?;
-    let mut hasher = Sha256::new();
-    let mut buffer = vec![0; 64 * 1024];
-    loop {
-        let n = file.read(&mut buffer).await?;
-        if n == 0 {
-            break;
-        }
-        hasher.update(&buffer[..n]);
-    }
-    Ok(hex::encode(hasher.finalize()))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::io::{Read, Write};
-
-    /// These servers live on loopback; an HTTP proxy from the environment
-    /// must not intercept the test traffic.
-    fn loopback_client() -> reqwest::Client {
-        reqwest::Client::builder()
-            .no_proxy()
-            .build()
-            .expect("loopback client")
-    }
-
-    #[tokio::test]
-    async fn retries_hash_failure_without_double_counting_and_reuses_verified_file() {
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let address = listener.local_addr().unwrap();
-        let server = std::thread::spawn(move || {
-            for body in ["bad!", "good"] {
-                let (mut stream, _) = listener.accept().unwrap();
-                let mut request = [0; 4096];
-                let _ = stream.read(&mut request);
-                write!(
-                    stream,
-                    "HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\n{body}"
-                )
-                .unwrap();
-            }
-        });
-        let dir = tempfile::tempdir().unwrap();
-        let task = DownloadTask::new(
-            "test",
-            format!("http://{address}/file"),
-            vec![],
-            dir.path().join("file"),
-            Some(crate::core::util::sha1_hex(b"good")),
-            Some(4),
-        );
-        let tasks = vec![task.clone()];
-        let progress = Arc::new(DownloadProgress::new(&tasks));
-        download_all(
-            tasks,
-            loopback_client(),
-            1,
-            CancellationToken::new(),
-            progress.clone(),
-        )
-        .await
-        .unwrap();
-        server.join().unwrap();
-        assert_eq!(progress.snapshot().bytes_done, 4);
-        assert_eq!(progress.snapshot().files_done, 1);
-        assert!(verify_existing(&task).await);
-        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
-    }
-    #[tokio::test]
-    async fn broken_mirror_falls_back_once_and_is_skipped_after_repeated_failures() {
-        use std::sync::atomic::AtomicUsize;
-        // The mirror drops every connection; the official server answers.
-        let mirror = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let mirror_address = mirror.local_addr().unwrap();
-        let mirror_hits = Arc::new(AtomicUsize::new(0));
-        let hits = mirror_hits.clone();
-        std::thread::spawn(move || {
-            for stream in mirror.incoming() {
-                hits.fetch_add(1, Ordering::SeqCst);
-                drop(stream);
-            }
-        });
-        let official = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let official_address = official.local_addr().unwrap();
-        let files = MIRROR_FAILURE_LIMIT as usize + 4;
-        let server = std::thread::spawn(move || {
-            for _ in 0..files {
-                let (mut stream, _) = official.accept().unwrap();
-                let mut request = [0; 4096];
-                let _ = stream.read(&mut request);
-                write!(
-                    stream,
-                    "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok"
-                )
-                .unwrap();
-            }
-        });
-        let dir = tempfile::tempdir().unwrap();
-        let tasks: Vec<DownloadTask> = (0..files)
-            .map(|i| {
-                DownloadTask::new(
-                    format!("file {i}"),
-                    format!("http://{mirror_address}/m{i}"),
-                    vec![format!("http://{official_address}/o{i}")],
-                    dir.path().join(format!("f{i}")),
-                    Some(crate::core::util::sha1_hex(b"ok")),
-                    Some(2),
-                )
-            })
-            .collect();
-        let progress = Arc::new(DownloadProgress::new(&tasks));
-        let started = std::time::Instant::now();
-        download_all(
-            tasks,
-            loopback_client(),
-            1,
-            CancellationToken::new(),
-            progress.clone(),
-        )
-        .await
-        .unwrap();
-        server.join().unwrap();
-        assert_eq!(progress.snapshot().files_done, files as u64);
-        // One attempt per file until the breaker trips, then none at all.
-        assert_eq!(
-            mirror_hits.load(Ordering::SeqCst),
-            MIRROR_FAILURE_LIMIT as usize
-        );
-        // Mirror failures never wait for retry back-off.
-        assert!(started.elapsed() < std::time::Duration::from_secs(5));
-    }
-
-    #[tokio::test]
-    async fn dropped_connection_resumes_with_range_request() {
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let address = listener.local_addr().unwrap();
-        let server = std::thread::spawn(move || {
-            // First answer promises 8 bytes and hangs up after 4.
-            let (mut stream, _) = listener.accept().unwrap();
-            let mut request = [0; 4096];
-            let _ = stream.read(&mut request);
-            write!(stream, "HTTP/1.1 200 OK\r\nContent-Length: 8\r\n\r\nabcd").unwrap();
-            drop(stream);
-            let (mut stream, _) = listener.accept().unwrap();
-            let read = stream.read(&mut request).unwrap();
-            let head = String::from_utf8_lossy(&request[..read]).to_ascii_lowercase();
-            write!(
-                stream,
-                "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 4-7/8\r\nContent-Length: 4\r\nConnection: close\r\n\r\nefgh"
-            )
-            .unwrap();
-            head
-        });
-        let dir = tempfile::tempdir().unwrap();
-        let task = DownloadTask::new(
-            "test",
-            format!("http://{address}/file"),
-            vec![],
-            dir.path().join("file"),
-            Some(crate::core::util::sha1_hex(b"abcdefgh")),
-            Some(8),
-        );
-        let tasks = vec![task.clone()];
-        let progress = Arc::new(DownloadProgress::new(&tasks));
-        download_all(
-            tasks,
-            loopback_client(),
-            1,
-            CancellationToken::new(),
-            progress.clone(),
-        )
-        .await
-        .unwrap();
-        let second_request = server.join().unwrap();
-        assert!(second_request.contains("range: bytes=4-"), "{second_request}");
-        assert_eq!(std::fs::read(&task.dest).unwrap(), b"abcdefgh");
-        assert_eq!(progress.snapshot().bytes_done, 8);
-        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
-    }
-
-    #[tokio::test]
-    async fn slow_source_is_dropped_for_the_next_one_which_resumes() {
-        // The first source sends half the file, then stalls.
-        let slow = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let slow_address = slow.local_addr().unwrap();
-        std::thread::spawn(move || {
-            let (mut stream, _) = slow.accept().unwrap();
-            let mut request = [0; 4096];
-            let _ = stream.read(&mut request);
-            write!(stream, "HTTP/1.1 200 OK\r\nContent-Length: 8\r\n\r\nabcd").unwrap();
-            std::thread::sleep(Duration::from_secs(3));
-        });
-        let fast = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let fast_address = fast.local_addr().unwrap();
-        let server = std::thread::spawn(move || {
-            let (mut stream, _) = fast.accept().unwrap();
-            let mut request = [0; 4096];
-            let read = stream.read(&mut request).unwrap();
-            let head = String::from_utf8_lossy(&request[..read]).to_ascii_lowercase();
-            write!(
-                stream,
-                "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 4-7/8\r\nContent-Length: 4\r\nConnection: close\r\n\r\nefgh"
-            )
-            .unwrap();
-            head
-        });
-        let dir = tempfile::tempdir().unwrap();
-        let task = DownloadTask::new(
-            "test",
-            format!("http://{slow_address}/file"),
-            vec![format!("http://{fast_address}/file")],
-            dir.path().join("file"),
-            Some(crate::core::util::sha1_hex(b"abcdefgh")),
-            Some(8),
-        )
-        .with_min_speed(1024);
-        let tasks = vec![task.clone()];
-        let progress = Arc::new(DownloadProgress::new(&tasks));
-        let started = Instant::now();
-        download_all(
-            tasks,
-            loopback_client(),
-            1,
-            CancellationToken::new(),
-            progress.clone(),
-        )
-        .await
-        .unwrap();
-        assert!(started.elapsed() < Duration::from_secs(2), "{:?}", started.elapsed());
-        let second_request = server.join().unwrap();
-        assert!(second_request.contains("range: bytes=4-"), "{second_request}");
-        assert_eq!(std::fs::read(&task.dest).unwrap(), b"abcdefgh");
-        assert_eq!(progress.snapshot().bytes_done, 8);
-    }
-
-    #[tokio::test]
-    async fn sources_are_ranked_by_a_speed_test() {
-        fn serve(head: &'static str, body: Vec<u8>, stall: bool) -> String {
-            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-            let address = listener.local_addr().unwrap();
-            std::thread::spawn(move || {
-                let (mut stream, _) = listener.accept().unwrap();
-                let mut request = [0; 4096];
-                let _ = stream.read(&mut request);
-                let _ = stream.write_all(head.as_bytes());
-                let _ = stream.write_all(&body);
-                if stall {
-                    std::thread::sleep(Duration::from_secs(2));
-                }
-            });
-            format!("http://{address}/file")
-        }
-        let whole = "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 0-65535/65536\r\nContent-Length: 65536\r\nConnection: close\r\n\r\n";
-        let fast = serve(whole, vec![7; 65536], false);
-        let slow = serve(whole, vec![7; 16], true);
-        // An error page that answers 200 is not the file.
-        let wrong = serve("HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: close\r\n\r\n", b"nope!".to_vec(), false);
-        let dead = {
-            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-            format!("http://{}/file", listener.local_addr().unwrap())
-        };
-        let ranked = fastest_first(
-            &loopback_client(),
-            vec![dead.clone(), wrong.clone(), slow.clone(), fast.clone()],
-            Some(65536),
-            &CancellationToken::new(),
-        )
-        .await;
-        assert_eq!(ranked, vec![fast, slow, dead, wrong]);
-    }
-
-    #[test]
-    fn dropped_download_rolls_back_unknown_size_accounting() {
-        let progress = DownloadProgress::default();
-        {
-            let mut attempt = FileBytes {
-                progress: &progress,
-                added: 0,
-                unknown: true,
-                committed: false,
-            };
-            attempt.add(123);
-        }
-        assert_eq!(progress.snapshot().bytes_done, 0);
-        assert_eq!(progress.snapshot().bytes_total, 0);
     }
 }

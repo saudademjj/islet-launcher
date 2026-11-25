@@ -133,12 +133,12 @@ export function OptionsTab({ instance, busy }: { instance: Instance; busy: boole
       <div className="manage-scroll">
         {!saved.exists && (
           <Notice icon="info" title={t("这个世界还没有启动过", "This world hasn't been started yet")}>
-            {t("还没有 options.txt。保存后，第一次启动就会使用这里的设置", "There's no options.txt yet. Save, and the first start uses these settings")}{s.autoChinese ? t("；不保存也会自动使用简体中文", "; without saving, the game starts in Simplified Chinese") : ""}{t("。", ".")}
+            {t("保存后首次启动即应用这些设置", "Save to apply these settings on first launch")}{s.autoChinese ? t("，未保存时默认简体中文", "; defaults to Simplified Chinese if unsaved") : ""}{t("。", ".")}
           </Notice>
         )}
         <div className="opt-group">
           <div className="opt-group-title">{t("语言与界面", "Language & interface")}</div>
-          <Row label={t("游戏语言", "Game language")} hint={t("1.11 以前的版本会自动换成旧格式", "Versions before 1.11 get the old format automatically")}>
+          <Row label={t("游戏语言", "Game language")}>
             <Segmented value={form.lang} options={languages} disabled={busy} onChange={(lang) => set({ lang })} />
           </Row>
           <Row label={t("界面缩放", "GUI scale")} hint={t("自动：按窗口大小选择", "Auto: picked by window size")}>
@@ -159,7 +159,7 @@ export function OptionsTab({ instance, busy }: { instance: Instance; busy: boole
 
         <div className="opt-group">
           <div className="opt-group-title">{t("画面", "Video")}</div>
-          <Row label={t("渲染距离", "Render distance")} hint={t("越远越吃内存和显卡；低配电脑建议 8 以内", "Farther uses more memory and GPU; keep it at 8 or less on modest computers")} value={t(`${form.renderDistance} 区块`, `${form.renderDistance} chunks`)}>
+          <Row label={t("渲染距离", "Render distance")} hint={t("越远越吃性能，低配建议 8 以内", "Higher values use more resources; 8 or less for modest PCs")} value={t(`${form.renderDistance} 区块`, `${form.renderDistance} chunks`)}>
             <div className="row gap-16" style={{ width: "100%" }}>
               <Slider label={t("渲染距离", "Render distance")} min={2} max={32} value={form.renderDistance} disabled={busy} onChange={(renderDistance) => set({ renderDistance })} />
               <ChunkView distance={form.renderDistance} />
@@ -174,7 +174,7 @@ export function OptionsTab({ instance, busy }: { instance: Instance; busy: boole
           <Row label={t("全屏", "Fullscreen")} hint={t("也可以在游戏里按 F11 切换", "You can also press F11 in game")}>
             <Switch label={t("全屏", "Fullscreen")} checked={form.fullscreen} onChange={(fullscreen) => !busy && set({ fullscreen })} />
           </Row>
-          <Row label={t("垂直同步", "VSync")} hint={t("消除画面撕裂；开启后帧率不超过屏幕刷新率", "Stops tearing; the frame rate then stays at the screen's refresh rate")}>
+          <Row label={t("垂直同步", "VSync")} hint={t("消除画面撕裂，帧率与屏幕刷新率同步", "Prevents tearing by matching your screen's refresh rate")}>
             <Switch label={t("垂直同步", "VSync")} checked={form.vsync} onChange={(vsync) => !busy && set({ vsync })} />
           </Row>
         </div>
@@ -188,7 +188,7 @@ export function OptionsTab({ instance, busy }: { instance: Instance; busy: boole
       </div>
       <div className="modal-footer">
         <span className="muted" style={{ fontSize: "var(--text-xs)", marginRight: "auto" }}>
-          {t("写入游戏目录的 options.txt；其他游戏设置保持不变", "Written to options.txt in the game folder; other game settings stay as they are")}
+          {t("保存后下次启动游戏生效", "Applies on next launch")}
         </span>
         <Button variant="ghost" disabled={busy || same(form, base)} onClick={() => setForm(base)}>
           {t("还原", "Revert")}

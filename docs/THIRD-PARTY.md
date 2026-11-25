@@ -5,29 +5,37 @@
 
 Minecraft 是 Mojang Studios 的商标；本启动器与 Mojang 和 Microsoft 无关，不包含任何游戏文件。
 
-共 367 个组件。此文件由 `python3 scripts/third-party.py` 生成。
+共 435 个组件。此文件由 `python3 scripts/third-party.py` 生成。
 
 | 组件 | 版本 | 许可证 |
 |---|---|---|
 | adler2 | 2.0.1 | 0BSD OR MIT OR Apache-2.0 |
+| aead | 0.6.1 | MIT OR Apache-2.0 |
 | aes | 0.9.3 | MIT OR Apache-2.0 |
+| aes-gcm | 0.11.1 | Apache-2.0 OR MIT |
 | aho-corasick | 1.1.5 | Unlicense OR MIT |
 | alloc-no-stdlib | 3.0.0 | BSD-3-Clause |
 | alloc-stdlib | 0.3.0 | BSD-3-Clause |
 | anyhow | 1.0.104 | MIT OR Apache-2.0 |
+| argon2 | 0.6.0 | MIT OR Apache-2.0 |
 | ascii | 1.1.0 | Apache-2.0 OR MIT |
 | async-channel | 2.5.0 | Apache-2.0 OR MIT |
 | async-compression | 0.4.51 | MIT OR Apache-2.0 |
 | atomic-waker | 1.1.2 | Apache-2.0 OR MIT |
+| base16ct | 1.0.0 | Apache-2.0 OR MIT |
 | base64 | 0.22.1 | MIT OR Apache-2.0 |
 | base64 | 0.23.1 | MIT OR Apache-2.0 |
 | base64ct | 1.8.3 | Apache-2.0 OR MIT |
+| bcrypt-pbkdf | 0.11.0 | MIT OR Apache-2.0 |
 | bit-set | 0.8.0 | Apache-2.0 OR MIT |
 | bit-vec | 0.8.0 | Apache-2.0 OR MIT |
 | bitflags | 1.3.2 | MIT/Apache-2.0 |
 | bitflags | 2.13.2 | MIT OR Apache-2.0 |
+| blake2 | 0.11.0 | MIT OR Apache-2.0 |
 | block-buffer | 0.10.4 | MIT OR Apache-2.0 |
 | block-buffer | 0.12.1 | MIT OR Apache-2.0 |
+| block-padding | 0.4.2 | MIT OR Apache-2.0 |
+| blowfish | 0.10.0 | MIT OR Apache-2.0 |
 | brotli | 9.1.1 | BSD-3-Clause AND MIT |
 | brotli-decompressor | 6.2.0 | BSD-3-Clause/MIT |
 | bs58 | 0.5.1 | MIT/Apache-2.0 |
@@ -38,6 +46,7 @@ Minecraft 是 Mojang Studios 的商标；本启动器与 Mojang 和 Microsoft �
 | camino | 1.2.6 | MIT OR Apache-2.0 |
 | cargo-platform | 0.1.9 | MIT OR Apache-2.0 |
 | cargo_metadata | 0.19.2 | MIT |
+| cbc | 0.2.1 | MIT OR Apache-2.0 |
 | cfb | 0.14.0 | MIT |
 | cfg-if | 1.0.5 | MIT OR Apache-2.0 |
 | chacha20 | 0.10.2 | MIT OR Apache-2.0 |
@@ -58,23 +67,32 @@ Minecraft 是 Mojang Studios 的商标；本启动器与 Mojang 和 Microsoft �
 | crc32fast | 1.5.3 | MIT OR Apache-2.0 |
 | crossbeam-channel | 0.5.17 | MIT OR Apache-2.0 |
 | crossbeam-utils | 0.8.23 | MIT OR Apache-2.0 |
+| crypto-bigint | 0.7.10 | Apache-2.0 OR MIT |
 | crypto-common | 0.1.7 | MIT OR Apache-2.0 |
 | crypto-common | 0.2.2 | MIT OR Apache-2.0 |
+| crypto-primes | 0.7.2 | Apache-2.0 OR MIT |
 | cssparser | 0.37.0 | MPL-2.0 |
 | cssparser-macros | 0.7.1 | MPL-2.0 |
 | ctor | 1.0.13 | Apache-2.0 OR MIT |
+| ctr | 0.10.1 | MIT OR Apache-2.0 |
 | ctutils | 0.4.6 | Apache-2.0 OR MIT |
+| curve25519-dalek | 5.0.0 | BSD-3-Clause |
+| curve25519-dalek-derive | 0.1.1 | MIT/Apache-2.0 |
 | darling | 0.24.1 | MIT |
 | darling_core | 0.24.1 | MIT |
 | darling_macro | 0.24.1 | MIT |
+| data-encoding | 2.11.1 | MIT |
 | deflate64 | 0.1.12 | MIT |
 | defmt | 1.2.0 | MIT OR Apache-2.0 |
 | defmt-macros | 1.2.0 | MIT OR Apache-2.0 |
 | defmt-parser | 1.1.0 | MIT OR Apache-2.0 |
+| delegate | 0.13.5 | MIT OR Apache-2.0 |
 | der | 0.7.10 | Apache-2.0 OR MIT |
+| der | 0.8.3 | Apache-2.0 OR MIT |
 | deranged | 0.5.9 | MIT OR Apache-2.0 |
 | derive_more | 2.1.1 | MIT |
 | derive_more-impl | 2.1.1 | MIT |
+| des | 0.9.0 | MIT OR Apache-2.0 |
 | digest | 0.10.7 | MIT OR Apache-2.0 |
 | digest | 0.11.3 | MIT OR Apache-2.0 |
 | directories | 6.0.0 | MIT OR Apache-2.0 |
@@ -87,12 +105,18 @@ Minecraft 是 Mojang Studios 的商标；本启动器与 Mojang 和 Microsoft �
 | dtoa-short | 0.3.5 | MPL-2.0 |
 | dunce | 1.0.5 | CC0-1.0 OR MIT-0 OR Apache-2.0 |
 | dyn-clone | 1.0.20 | MIT OR Apache-2.0 |
+| ecdsa | 0.17.0 | Apache-2.0 OR MIT |
+| ed25519 | 3.0.0 | Apache-2.0 OR MIT |
+| ed25519-dalek | 3.0.0 | BSD-3-Clause |
+| elliptic-curve | 0.14.3 | Apache-2.0 OR MIT |
+| enum_dispatch | 0.3.13 | MIT OR Apache-2.0 |
 | equivalent | 1.0.3 | Apache-2.0 OR MIT |
 | erased-serde | 0.4.11 | MIT OR Apache-2.0 |
 | event-listener | 5.4.2 | Apache-2.0 OR MIT |
 | event-listener-strategy | 0.5.4 | Apache-2.0 OR MIT |
 | fastrand | 2.5.0 | Apache-2.0 OR MIT |
 | fdeflate | 0.3.7 | MIT OR Apache-2.0 |
+| ff | 0.14.0 | MIT/Apache-2.0 |
 | filetime | 0.2.29 | MIT/Apache-2.0 |
 | flate2 | 1.1.10 | MIT OR Apache-2.0 |
 | fnv | 1.0.7 | Apache-2.0 / MIT |
@@ -108,15 +132,20 @@ Minecraft 是 Mojang Studios 的商标；本启动器与 Mojang 和 Microsoft �
 | futures-task | 0.3.34 | MIT OR Apache-2.0 |
 | futures-util | 0.3.34 | MIT OR Apache-2.0 |
 | generic-array | 0.14.7 | MIT |
+| generic-array | 1.4.5 | MIT |
 | getrandom | 0.2.17 | MIT OR Apache-2.0 |
 | getrandom | 0.3.4 | MIT OR Apache-2.0 |
 | getrandom | 0.4.3 | MIT OR Apache-2.0 |
+| ghash | 0.6.0 | Apache-2.0 OR MIT |
 | glob | 0.3.4 | MIT OR Apache-2.0 |
+| group | 0.14.0 | MIT/Apache-2.0 |
 | h2 | 0.4.20 | MIT |
 | hashbrown | 0.12.3 | MIT OR Apache-2.0 |
 | hashbrown | 0.17.1 | MIT OR Apache-2.0 |
 | heck | 0.5.0 | MIT OR Apache-2.0 |
 | hex | 0.4.3 | MIT OR Apache-2.0 |
+| hex-literal | 1.1.0 | MIT OR Apache-2.0 |
+| hkdf | 0.13.0 | MIT OR Apache-2.0 |
 | hmac | 0.13.0 | MIT OR Apache-2.0 |
 | html5ever | 0.39.0 | MIT OR Apache-2.0 |
 | http | 1.5.0 | MIT OR Apache-2.0 |
@@ -151,6 +180,8 @@ Minecraft 是 Mojang Studios 的商标；本启动器与 Mojang 和 Microsoft �
 | jiff-tzdb-platform | 0.1.3 | Unlicense OR MIT |
 | json-patch | 4.2.0 | MIT/Apache-2.0 |
 | jsonptr | 0.7.1 | MIT OR Apache-2.0 |
+| keccak | 0.2.2 | Apache-2.0 OR MIT |
+| kem | 0.3.0 | Apache-2.0 OR MIT |
 | keyboard-types | 0.8.3 | MIT OR Apache-2.0 |
 | keyring | 3.6.3 | MIT OR Apache-2.0 |
 | lazy_static | 1.5.1 | MIT OR Apache-2.0 |
@@ -170,10 +201,13 @@ Minecraft 是 Mojang Studios 的商标；本启动器与 Mojang 和 Microsoft �
 | miniz_oxide | 0.8.9 | MIT OR Zlib OR Apache-2.0 |
 | miniz_oxide | 0.9.1 | MIT OR Zlib OR Apache-2.0 |
 | mio | 1.2.4 | MIT |
+| ml-kem | 0.3.3 | Apache-2.0 OR MIT |
+| module-lattice | 0.2.3 | Apache-2.0 OR MIT |
 | muda | 0.20.0 | Apache-2.0 OR MIT |
 | new_debug_unreachable | 1.0.6 | MIT |
 | notify-rust | 4.18.2 | MIT OR Apache-2.0 |
 | nu-ansi-term | 0.50.3 | MIT |
+| num-bigint | 0.5.1 | MIT OR Apache-2.0 |
 | num-bigint-dig | 0.8.6 | MIT/Apache-2.0 |
 | num-conv | 0.2.2 | MIT OR Apache-2.0 |
 | num-integer | 0.1.47 | MIT OR Apache-2.0 |
@@ -182,26 +216,40 @@ Minecraft 是 Mojang Studios 的商标；本启动器与 Mojang 和 Microsoft �
 | once_cell | 1.21.4 | MIT OR Apache-2.0 |
 | open | 5.4.5 | MIT |
 | option-ext | 0.2.0 | MPL-2.0 |
+| p256 | 0.14.0 | Apache-2.0 OR MIT |
+| p384 | 0.14.0 | Apache-2.0 OR MIT |
+| p521 | 0.14.0 | Apache-2.0 OR MIT |
+| pageant | 0.2.5 | Apache-2.0 |
 | parking | 2.2.1 | Apache-2.0 OR MIT |
 | parking_lot | 0.12.5 | MIT OR Apache-2.0 |
 | parking_lot_core | 0.9.12 | MIT OR Apache-2.0 |
+| password-hash | 0.6.1 | MIT OR Apache-2.0 |
 | pbkdf2 | 0.13.0 | MIT OR Apache-2.0 |
 | pem-rfc7468 | 0.7.0 | Apache-2.0 OR MIT |
+| pem-rfc7468 | 1.0.0 | Apache-2.0 OR MIT |
 | percent-encoding | 2.3.2 | MIT OR Apache-2.0 |
+| phc | 0.6.1 | Apache-2.0 OR MIT |
 | phf | 0.13.1 | MIT |
 | phf_generator | 0.13.1 | MIT |
 | phf_macros | 0.13.1 | MIT |
 | phf_shared | 0.13.1 | MIT |
 | pin-project-lite | 0.2.17 | Apache-2.0 OR MIT |
 | pkcs1 | 0.7.5 | Apache-2.0 OR MIT |
+| pkcs1 | 0.8.0-rc.4 | Apache-2.0 OR MIT |
+| pkcs5 | 0.8.1 | Apache-2.0 OR MIT |
 | pkcs8 | 0.10.2 | Apache-2.0 OR MIT |
+| pkcs8 | 0.11.0 | Apache-2.0 OR MIT |
 | plist | 1.10.3 | MIT |
 | png | 0.18.1 | MIT OR Apache-2.0 |
+| poly1305 | 0.9.1 | Apache-2.0 OR MIT |
+| polyval | 0.7.3 | Apache-2.0 OR MIT |
 | potential_utf | 0.1.6 | Unicode-3.0 |
 | powerfmt | 0.2.1 | MIT OR Apache-2.0 |
 | ppmd-rust | 1.5.2 | CC0-1.0 OR MIT-0 |
 | ppv-lite86 | 0.2.21 | MIT OR Apache-2.0 |
 | precomputed-hash | 0.1.1 | MIT |
+| primefield | 0.14.0 | Apache-2.0 OR MIT |
+| primeorder | 0.14.0 | Apache-2.0 OR MIT |
 | proc-macro2 | 1.0.107 | MIT OR Apache-2.0 |
 | quick-xml | 0.42.0 | MIT |
 | quinn | 0.11.12 | MIT OR Apache-2.0 |
@@ -221,15 +269,22 @@ Minecraft 是 Mojang Studios 的商标；本启动器与 Mojang 和 Microsoft �
 | regex-automata | 0.4.18 | MIT OR Apache-2.0 |
 | regex-syntax | 0.8.11 | MIT OR Apache-2.0 |
 | reqwest | 0.12.28 | MIT OR Apache-2.0 |
+| rfc6979 | 0.6.0 | Apache-2.0 OR MIT |
 | rfd | 0.16.1 | MIT |
 | ring | 0.17.14 | Apache-2.0 AND ISC |
+| rsa | 0.10.0-rc.18 | MIT OR Apache-2.0 |
 | rsa | 0.9.10 | MIT OR Apache-2.0 |
+| russh | 0.65.0 | Apache-2.0 |
+| russh-cryptovec | 0.62.0 | Apache-2.0 |
+| russh-util | 0.52.0 | Apache-2.0 |
 | rustc-hash | 2.1.3 | Apache-2.0 OR MIT |
 | rustls | 0.23.46 | Apache-2.0 OR ISC OR MIT |
 | rustls-native-certs | 0.8.5 | Apache-2.0 OR ISC OR MIT |
 | rustls-pki-types | 1.15.1 | MIT OR Apache-2.0 |
 | rustls-webpki | 0.103.16 | ISC |
+| rustversion | 1.0.23 | MIT OR Apache-2.0 |
 | ryu | 1.0.23 | Apache-2.0 OR BSL-1.0 |
+| salsa20 | 0.11.0 | MIT OR Apache-2.0 |
 | same-file | 1.0.6 | Unlicense/MIT |
 | schannel | 0.1.30 | MIT |
 | schemars | 0.8.22 | MIT |
@@ -237,6 +292,8 @@ Minecraft 是 Mojang Studios 的商标；本启动器与 Mojang 和 Microsoft �
 | schemars | 1.2.3 | MIT |
 | schemars_derive | 0.8.22 | MIT |
 | scopeguard | 1.2.0 | MIT OR Apache-2.0 |
+| scrypt | 0.12.0 | MIT OR Apache-2.0 |
+| sec1 | 0.8.1 | Apache-2.0 OR MIT |
 | selectors | 0.38.0 | MPL-2.0 |
 | semver | 1.0.28 | MIT OR Apache-2.0 |
 | serde | 1.0.229 | MIT OR Apache-2.0 |
@@ -250,6 +307,7 @@ Minecraft 是 Mojang Studios 的商标；本启动器与 Mojang 和 Microsoft �
 | serde_urlencoded | 0.7.1 | MIT/Apache-2.0 |
 | serde_with | 3.24.0 | MIT OR Apache-2.0 |
 | serde_with_macros | 3.24.0 | MIT OR Apache-2.0 |
+| serdect | 0.4.3 | Apache-2.0 OR MIT |
 | serialize-to-javascript | 0.1.2 | MIT OR Apache-2.0 |
 | serialize-to-javascript-impl | 0.1.2 | MIT OR Apache-2.0 |
 | servo_arc | 0.4.3 | MIT OR Apache-2.0 |
@@ -257,8 +315,11 @@ Minecraft 是 Mojang Studios 的商标；本启动器与 Mojang 和 Microsoft �
 | sha1 | 0.11.0 | MIT OR Apache-2.0 |
 | sha2 | 0.10.9 | MIT OR Apache-2.0 |
 | sha2 | 0.11.1 | MIT OR Apache-2.0 |
+| sha3 | 0.12.0 | MIT OR Apache-2.0 |
+| shake | 0.1.0 | MIT OR Apache-2.0 |
 | sharded-slab | 0.1.7 | MIT |
 | signature | 2.2.0 | Apache-2.0 OR MIT |
+| signature | 3.0.0 | Apache-2.0 OR MIT |
 | simd-adler32 | 0.3.10 | MIT |
 | siphasher | 1.0.4 | MIT OR Apache-2.0 |
 | slab | 0.4.12 | MIT |
@@ -267,6 +328,11 @@ Minecraft 是 Mojang Studios 的商标；本启动器与 Mojang 和 Microsoft �
 | softbuffer | 0.4.8 | MIT OR Apache-2.0 |
 | spin | 0.9.9 | MIT |
 | spki | 0.7.3 | Apache-2.0 OR MIT |
+| spki | 0.8.1 | Apache-2.0 OR MIT |
+| sponge-cursor | 0.1.0 | MIT OR Apache-2.0 |
+| ssh-cipher | 0.3.0 | Apache-2.0 OR MIT |
+| ssh-encoding | 0.3.0 | Apache-2.0 OR MIT |
+| ssh-key | 0.7.0-rc.11 | Apache-2.0 OR MIT |
 | stable_deref_trait | 1.2.1 | MIT OR Apache-2.0 |
 | string_cache | 0.9.0 | MIT OR Apache-2.0 |
 | strsim | 0.11.1 | MIT |
@@ -325,6 +391,7 @@ Minecraft 是 Mojang Studios 的商标；本启动器与 Mojang 和 Microsoft �
 | typenum | 1.20.1 | MIT OR Apache-2.0 |
 | unicode-ident | 1.0.27 | (MIT OR Apache-2.0) AND Unicode-3.0 |
 | unicode-segmentation | 1.13.3 | MIT OR Apache-2.0 |
+| universal-hash | 0.6.1 | MIT OR Apache-2.0 |
 | untrusted | 0.9.0 | ISC |
 | url | 2.5.8 | MIT OR Apache-2.0 |
 | urlpattern | 0.6.0 | MIT |
@@ -357,6 +424,7 @@ Minecraft 是 Mojang Studios 的商标；本启动器与 Mojang 和 Microsoft �
 | windows-version | 0.1.7 | MIT OR Apache-2.0 |
 | windows_x86_64_msvc | 0.53.1 | MIT OR Apache-2.0 |
 | winnow | 1.0.4 | MIT |
+| wnaf | 0.14.1 | Apache-2.0 OR MIT |
 | writeable | 0.6.4 | Unicode-3.0 |
 | wry | 0.57.1 | Apache-2.0 OR MIT |
 | yoke | 0.8.4 | Unicode-3.0 |

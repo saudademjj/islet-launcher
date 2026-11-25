@@ -26,7 +26,7 @@ const VERSION_TYPE: Record<string, string> = { beta: t("测试版", "Beta"), alp
 const packSize = (version: ModVersion) => (version.files.find((file) => file.primary) ?? version.files[0])?.size ?? 0;
 
 export function ModpackBrowser() {
-  const s = usePick((s) => ({ close: s.closeModal, busy: s.fileBusy, task: s.operationTask, install: s.fileOperation, key: s.settings.curseforgeKey }));
+  const s = usePick((s) => ({ close: s.closeModal, busy: s.fileBusy, task: s.operationTask, install: s.fileOperation, configured: Boolean(s.settings.curseforgeKey.trim() || s.appInfo.curseforgeConfigured) }));
   const [source, setSource] = useState<"modrinth" | "curseforge">("modrinth");
   const [query, setQuery] = useState("");
   const [game, setGame] = useState("");
@@ -43,7 +43,7 @@ export function ModpackBrowser() {
   const request = useRef(0);
   // Bumped by "Try again" to repeat the same request.
   const [attempt, setAttempt] = useState(0);
-  const needsKey = source === "curseforge" && !s.key;
+  const needsKey = source === "curseforge" && !s.configured;
   const loader = choice.loader || "";
 
   useEffect(() => {
@@ -138,7 +138,7 @@ export function ModpackBrowser() {
         </div>
         {needsKey && (
           <Notice title={t("CurseForge 需要 API Key", "CurseForge needs an API key")}>
-            {t("在「设置 → 下载」里填写 CurseForge API Key 后即可搜索；Modrinth 不需要。", "Add a CurseForge API key under Settings → Downloads to search it; Modrinth needs none.")}
+            {t("在「设置 → 下载」填写 API Key 后可用，Modrinth 无需配置。", "Add an API key in Settings → Download; Modrinth needs none.")}
           </Notice>
         )}
         {error && (
@@ -194,8 +194,8 @@ export function ModpackBrowser() {
               {result && hits.length === 0 && !loading && (
                 <div className="list-row faint" style={{ fontSize: "var(--text-sm)" }}>
                   {game.trim()
-                    ? t(`没有找到适配 ${game.trim()} 的整合包；换个关键词或清空版本试试。`, `No modpacks found for ${game.trim()}; try other words or clear the version.`)
-                    : t("没有匹配的整合包；换个关键词试试。", "No matching modpacks; try other words.")}
+                    ? t(`没有找到适配 ${game.trim()} 的整合包`, `No modpacks found for ${game.trim()}`)
+                    : t("没有匹配的整合包", "No matching modpacks")}
                 </div>
               )}
               {result && !(loading && hits.length === 0) && (
@@ -258,7 +258,7 @@ export function ModpackBrowser() {
                       ))
                     )}
                     <span className="faint" style={{ fontSize: "var(--text-xs)", padding: "6px 10px" }}>
-                      {t("导入为一个新世界，原有世界不受影响。整合包文件只含清单和配置，模组在安装时另外下载。", "Imports as a new world; your other worlds stay as they are. The pack file holds only the list and configs; mods download during the install.")}
+                      {t("会导入为独立的新世界，不影响现有世界。", "Imports as a new world without affecting existing ones.")}
                     </span>
                   </div>
                 </motion.div>

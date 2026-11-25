@@ -29,7 +29,7 @@ export function worldMenu(instance: Instance, state: InstanceState, active?: boo
     { label: t("设为当前世界", "Make current"), icon: "home", disabled: active, run: () => store.setActiveInstance(instance.id) },
     "-",
     { label: t("管理", "Manage"), icon: "settings", run: () => store.openManage(instance.id) },
-    { label: t("存档", "Saves"), icon: "box", run: () => store.openManage(instance.id, "data") },
+    { label: t("存档", "Saves"), icon: "box", run: () => store.openManage(instance.id, "saves") },
     { label: instance.group ? t(`分组：${instance.group}`, `Group: ${instance.group}`) : t("分组…", "Group…"), icon: "tag", run: () => store.openModal({ kind: "group", id: instance.id }) },
     { label: t("打开游戏目录", "Open game folder"), icon: "folder", run: () => void store.open({ kind: "gameDir", id: instance.id }) },
     { label: t("查看日志", "Show log"), icon: "log", run: () => void store.openLogs(instance.id) },
@@ -43,7 +43,7 @@ export function worldMenu(instance: Instance, state: InstanceState, active?: boo
     },
     "-",
     { label: t("复制世界", "Duplicate world"), icon: "copy", disabled: busy || !instance.installed, run: () => void store.fileOperation(instance.id, { kind: "duplicate" }) },
-    { label: t("移到回收站", "Move to recycle bin"), icon: "trash", danger: true, disabled: busy, run: () => store.openModal({ kind: "deleteInstance", instance }) },
+    { label: t("移入回收站", "Move to recycle bin"), icon: "trash", danger: true, disabled: busy, run: () => store.openModal({ kind: "deleteInstance", instance }) },
   ];
 }
 

@@ -102,7 +102,7 @@ export function InstancesPage() {
                 </>
               }
             >
-              {t("世界是一套独立的游戏配置，拥有自己的版本、存档、模组和内存设置。", "A world is its own game setup, with its own version, saves, mods and memory.")}
+              {t("每个世界都有独立的版本、存档和模组。", "Each world keeps its own version, saves, and mods.")}
             </Empty>
           ) : (
             <>
@@ -160,7 +160,7 @@ export function InstancesPage() {
                         ]}
                       />
                       {s.instances.length > 3 && (
-                        <div style={{ width: 220 }}>
+                        <div className="world-search">
                           <Input icon="search" placeholder={t("搜索名称或版本", "Search name or version")} value={query} onChange={(e) => setQuery(e.target.value)} />
                         </div>
                       )}
@@ -295,7 +295,7 @@ function InstanceCard({ instance, active }: { instance: Instance; active: boolea
             size="sm"
             variant="ghost"
             icon="signal"
-            title={t("开一个 P2P 房间，让好友加入这个世界", "Open a P2P room for friends to join this world")}
+            title={t("开启联机房间，让好友加入", "Host a room for friends to join")}
             onClick={() => {
               if (!active) s.setActiveInstance(instance.id);
               useP2p.getState().focus("host");

@@ -583,9 +583,8 @@ pub async fn install(
             ]
             .iter()
             .any(|p| p.exists())
-                && !manifest
-                    .get(&version.project_id)
-                    .is_some_and(|m| m.filename == filename)
+                && manifest
+                    .get(&version.project_id).is_none_or(|m| m.filename != filename)
             {
                 return Err(AppError::new(
                     "modrinth",
@@ -845,6 +844,20 @@ pub async fn files_by_hash(client: &reqwest::Client, hashes: &[String]) -> AppRe
         .collect())
 }
 
+/// Fetches `/projects?ids=...` in chunks so large modpacks do not exceed URL
+/// length limits on Modrinth's CDN.
+async fn fetch_projects_chunked<T: serde::de::DeserializeOwned>(
+    client: &reqwest::Client,
+    ids: &[&str],
+) -> AppResult<Vec<T>> {
+    let mut out = Vec::with_capacity(ids.len());
+    for chunk in ids.chunks(100) {
+        let batch: Vec<T> = get(client, "/projects", &[("ids", serde_json::json!(chunk).to_string())]).await?;
+        out.extend(batch);
+    }
+    Ok(out)
+}
+
 /// Whether each file's project runs on a server ("required", "optional",
 /// "unsupported" or "unknown"), by the file's SHA-1. Files Modrinth doesn't
 /// know are left out.
@@ -865,10 +878,11 @@ pub async fn server_sides(client: &reqwest::Client, hashes: &[String]) -> AppRes
         #[serde(default)]
         server_side: String,
     }
-    let projects: Vec<Sides> = get(client, "/projects", &[("ids", serde_json::json!(ids).to_string())]).await?;
+    let projects: Vec<Sides> = fetch_projects_chunked(client, &ids).await?;
+    let by_id: HashMap<&str, &str> = projects.iter().map(|p| (p.id.as_str(), p.server_side.as_str())).collect();
     Ok(found
         .into_iter()
-        .filter_map(|(hash, version)| projects.iter().find(|p| p.id == version.project_id).map(|p| (hash, p.server_side.clone())))
+        .filter_map(|(hash, version)| by_id.get(version.project_id.as_str()).map(|side| (hash, (*side).to_string())))
         .collect())
 }
 
@@ -973,7 +987,7 @@ pub async fn inspect(
     let mut ids: Vec<&str> = current.values().map(|v| v.project_id.as_str()).collect();
     ids.sort_unstable();
     ids.dedup();
-    let projects: Vec<ProjectInfo> = get(client, "/projects", &[("ids", serde_json::json!(ids).to_string())])
+    let projects: Vec<ProjectInfo> = fetch_projects_chunked(client, &ids)
         .await
         .unwrap_or_else(|error| {
             tracing::warn!(%error, "mod project lookup failed");
@@ -1012,17 +1026,18 @@ pub async fn inspect_packs(client: &reqwest::Client, paths: &AppPaths, instance:
     let mut ids: Vec<&str> = current.values().map(|v| v.project_id.as_str()).collect();
     ids.sort_unstable();
     ids.dedup();
-    let projects: Vec<ProjectInfo> = get(client, "/projects", &[("ids", serde_json::json!(ids).to_string())])
+    let projects: Vec<ProjectInfo> = fetch_projects_chunked(client, &ids)
         .await
         .unwrap_or_else(|error| {
             tracing::warn!(%error, "pack project lookup failed");
             Vec::new()
         });
+    let by_id: HashMap<&str, &ProjectInfo> = projects.iter().map(|p| (p.id.as_str(), p)).collect();
     Ok(hashes
         .iter()
         .filter_map(|(kind, file, hash)| {
             let version = current.get(hash)?;
-            let project = projects.iter().find(|p| p.id == version.project_id);
+            let project = by_id.get(version.project_id.as_str()).copied();
             Some(PackInsight {
                 kind: *kind,
                 file: file.clone(),
@@ -1042,11 +1057,12 @@ fn assemble(
     latest: &HashMap<String, ModVersion>,
     projects: &[ProjectInfo],
 ) -> Vec<ModInsight> {
+    let by_id: HashMap<&str, &ProjectInfo> = projects.iter().map(|p| (p.id.as_str(), p)).collect();
     hashes
         .iter()
         .filter_map(|(file, hash)| {
             let version = current.get(hash)?;
-            let project = projects.iter().find(|p| p.id == version.project_id);
+            let project = by_id.get(version.project_id.as_str()).copied();
             let update = latest
                 .get(hash)
                 .filter(|newer| {
@@ -1075,6 +1091,12 @@ fn assemble(
             })
         })
         .collect()
+}
+
+pub async fn changelog(client: &reqwest::Client, version: &str) -> AppResult<String> {
+    identifier(version)?;
+    let value: serde_json::Value = get(client, &format!("/version/{version}"), &[]).await?;
+    Ok(value["changelog"].as_str().unwrap_or("").to_string())
 }
 
 #[cfg(test)]
@@ -1347,10 +1369,4 @@ mod tests {
         assert_eq!(hit.categories, ["iris", "optifine"]);
         assert!(hit.icon_url.is_some());
     }
-}
-
-pub async fn changelog(client: &reqwest::Client, version: &str) -> AppResult<String> {
-    identifier(version)?;
-    let value: serde_json::Value = get(client, &format!("/version/{version}"), &[]).await?;
-    Ok(value["changelog"].as_str().unwrap_or("").to_string())
 }

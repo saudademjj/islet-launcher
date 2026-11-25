@@ -27,7 +27,7 @@ pub fn find_all_in(roots: &[PathBuf], explicit: &[PathBuf]) -> Vec<JavaInstallat
     }
     candidates.extend(explicit.iter().map(|p| resolve_binary(p)));
     let mut seen = HashSet::new();
-    let mut result = Vec::new();
+    let mut unique = Vec::new();
     for candidate in candidates {
         let Ok(canonical) = std::fs::canonicalize(&candidate) else {
             continue;
@@ -39,11 +39,34 @@ pub fn find_all_in(roots: &[PathBuf], explicit: &[PathBuf]) -> Vec<JavaInstallat
                 || canonical.clone(),
                 |p| PathBuf::from(simplify_verbatim(p)),
             );
-            if let Some(java) = inspect(&path) {
-                result.push(java);
-            }
+            unique.push(path);
         }
     }
+    let mut result = if unique.len() <= 1 {
+        unique.iter().filter_map(|p| inspect(p)).collect()
+    } else {
+        use std::sync::{
+            Mutex,
+            atomic::{AtomicUsize, Ordering},
+        };
+        let next = AtomicUsize::new(0);
+        let found = Mutex::new(Vec::with_capacity(unique.len()));
+        let workers = unique.len().min(6);
+        std::thread::scope(|scope| {
+            for _ in 0..workers {
+                scope.spawn(|| loop {
+                    let idx = next.fetch_add(1, Ordering::Relaxed);
+                    let Some(path) = unique.get(idx) else {
+                        break;
+                    };
+                    if let Some(java) = inspect(path) {
+                        found.lock().unwrap_or_else(|e| e.into_inner()).push(java);
+                    }
+                });
+            }
+        });
+        found.into_inner().unwrap_or_else(|e| e.into_inner())
+    };
     result.sort_by(|a, b| a.major.cmp(&b.major).then_with(|| a.path.cmp(&b.path)));
     result
 }
@@ -125,9 +148,21 @@ pub fn inspect(java_binary: &Path) -> Option<JavaInstallation> {
 }
 
 fn drain(mut stream: impl std::io::Read + Send + 'static) -> std::thread::JoinHandle<Vec<u8>> {
+    const MAX_CAPTURE: usize = 2 * 1024 * 1024;
     std::thread::spawn(move || {
         let mut bytes = Vec::new();
-        let _ = stream.read_to_end(&mut bytes);
+        let mut buf = [0u8; 8192];
+        loop {
+            match stream.read(&mut buf) {
+                Ok(0) | Err(_) => break,
+                Ok(n) => {
+                    let room = MAX_CAPTURE.saturating_sub(bytes.len());
+                    if room > 0 {
+                        bytes.extend_from_slice(&buf[..n.min(room)]);
+                    }
+                }
+            }
+        }
         bytes
     })
 }
@@ -166,8 +201,21 @@ fn scan_jvms(root: &Path, depth: usize, candidates: &mut Vec<PathBuf>) {
     if depth == 0 {
         return;
     }
-    candidates.push(root.join("bin").join(java_executable()));
-    candidates.push(root.join("Contents/Home/bin").join(java_executable()));
+    let bin = root.join("bin").join(java_executable());
+    let bundle = root.join("Contents/Home/bin").join(java_executable());
+    let found_bin = bin.is_file();
+    let found_bundle = bundle.is_file();
+    if found_bin {
+        candidates.push(bin);
+    }
+    if found_bundle {
+        candidates.push(bundle);
+    }
+    // Once a directory is already a JDK/JRE home, skip recursing into its
+    // lib/, jmods/, legal/, include/, and conf/ trees.
+    if found_bin || found_bundle {
+        return;
+    }
     if let Ok(entries) = std::fs::read_dir(root) {
         for entry in entries.flatten() {
             if entry.file_type().is_ok_and(|ty| ty.is_dir()) {
@@ -230,10 +278,10 @@ fn candidate_paths() -> Vec<PathBuf> {
         ] {
             if let Ok(output) = quiet_command("reg.exe").args(["query", key, "/s"]).output() {
                 for line in String::from_utf8_lossy(&output.stdout).lines() {
-                    if line.trim_start().starts_with("JavaHome") {
-                        if let Some((_, value)) = line.split_once("REG_SZ") {
-                            candidates.push(PathBuf::from(value.trim()).join("bin/java.exe"));
-                        }
+                    if line.trim_start().starts_with("JavaHome")
+                        && let Some((_, value)) = line.split_once("REG_SZ")
+                    {
+                        candidates.push(PathBuf::from(value.trim()).join("bin/java.exe"));
                     }
                 }
             }
@@ -247,11 +295,10 @@ fn candidate_paths() -> Vec<PathBuf> {
             &mut candidates,
         );
         if let Some(home) = std::env::var_os("HOME") {
-            scan_jvms(
-                &PathBuf::from(home).join("Library/Java/JavaVirtualMachines"),
-                3,
-                &mut candidates,
-            );
+            let home = PathBuf::from(home);
+            scan_jvms(&home.join("Library/Java/JavaVirtualMachines"), 3, &mut candidates);
+            scan_jvms(&home.join(".jdks"), 3, &mut candidates);
+            scan_jvms(&home.join(".sdkman/candidates/java"), 3, &mut candidates);
         }
         for root in ["/opt/homebrew/opt", "/usr/local/opt"] {
             if let Ok(entries) = std::fs::read_dir(root) {
@@ -265,7 +312,15 @@ fn candidate_paths() -> Vec<PathBuf> {
         }
     }
     #[cfg(target_os = "linux")]
-    scan_jvms(Path::new("/usr/lib/jvm"), 3, &mut candidates);
+    {
+        scan_jvms(Path::new("/usr/lib/jvm"), 3, &mut candidates);
+        scan_jvms(Path::new("/usr/lib64/jvm"), 3, &mut candidates);
+        if let Some(home) = std::env::var_os("HOME") {
+            let home = PathBuf::from(home);
+            scan_jvms(&home.join(".jdks"), 3, &mut candidates);
+            scan_jvms(&home.join(".sdkman/candidates/java"), 3, &mut candidates);
+        }
+    }
     candidates
 }
 

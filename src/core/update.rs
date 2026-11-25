@@ -50,11 +50,7 @@ pub fn source() -> Option<&'static str> {
 
 /// The manifest keys for this computer, most specific first.
 fn platform_keys() -> Vec<String> {
-    let os = match std::env::consts::OS {
-        "macos" => "macos",
-        "windows" => "windows",
-        other => other,
-    };
+    let os = std::env::consts::OS;
     let mut keys = vec![format!("{os}-{}", std::env::consts::ARCH)];
     if os == "macos" {
         keys.push("macos-universal".into());

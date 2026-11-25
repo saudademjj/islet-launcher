@@ -31,7 +31,10 @@ if [ -n "${MC_LAUNCHER_UPDATE_URL:-}" ]; then
 else
   echo "==> warning: MC_LAUNCHER_UPDATE_URL is not set; this build won't check for updates"
 fi
-export MC_LAUNCHER_CLIENT_ID="${MC_LAUNCHER_CLIENT_ID:-}" MC_LAUNCHER_UPDATE_URL="${MC_LAUNCHER_UPDATE_URL:-}"
+export MC_LAUNCHER_CLIENT_ID="${MC_LAUNCHER_CLIENT_ID:-}" \
+       MC_LAUNCHER_CURSEFORGE_KEY="${MC_LAUNCHER_CURSEFORGE_KEY:-}" \
+       MC_LAUNCHER_CURSEFORGE_URL="${MC_LAUNCHER_CURSEFORGE_URL:-}" \
+       MC_LAUNCHER_UPDATE_URL="${MC_LAUNCHER_UPDATE_URL:-}"
 
 # Keep this machine's paths (user name, cargo registry, checkout) out of the
 # binary's panic messages. RUSTFLAGS splits on spaces, so a path with one is
@@ -46,7 +49,10 @@ export RUSTFLAGS
 
 echo "==> building web UI and release app (jobs: $JOBS)"
 [ -d node_modules ] || npm install
-npm test
+if [ "${SKIP_TESTS:-0}" != "1" ]; then
+  CARGO_BUILD_JOBS="$JOBS" cargo test --locked -p islet --all-targets
+  npm test
+fi
 CARGO_BUILD_JOBS="$JOBS" npm run tauri build -- --bundles app
 
 echo "==> copying to $APP"

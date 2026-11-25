@@ -8,6 +8,7 @@ import { SkinModel } from "../components/SkinModel";
 import { Button, Field, Input, Segmented } from "../components/ui";
 import { usePick, useStore } from "../store";
 import { t } from "../lib/i18n";
+import { cssBackgroundUrl } from "../lib/sanitize";
 
 /** Well-known servers, so most players need not look up an address. */
 const SERVERS = [
@@ -37,7 +38,7 @@ export function AddYggdrasil() {
   const locked = busy || profiles != null;
 
   const login = async (profile?: string) => {
-    if (!server || !username.trim() || !password) return;
+    if (busy || !server || !username.trim() || !password) return;
     setBusy(true);
     setError(null);
     try {
@@ -63,7 +64,7 @@ export function AddYggdrasil() {
   return (
     <Modal
       title={t("外置登录", "Third-party sign-in")}
-      subtitle={nide8 ? t("统一通行证（Nide8）服务器的账号；游戏通过 nide8auth 使用它的皮肤和验证", "Accounts on 统一通行证 (Nide8) servers; the game uses their skins and verification through nide8auth") : t("LittleSkin 等皮肤站的账号；游戏通过 authlib-injector 使用它们的皮肤和正版验证", "Accounts on skin sites like LittleSkin; the game uses their skins and verification through authlib-injector")}
+      subtitle={nide8 ? t("统一通行证账号，支持对应服务器的皮肤与验证", "Nide8 accounts with server skins and verification") : t("LittleSkin 等皮肤站账号，支持皮肤与服务器验证", "Skin-site accounts like LittleSkin with skins and verification")}
       onClose={s.closeModal}
       footer={
         <>
@@ -103,7 +104,7 @@ export function AddYggdrasil() {
         {nide8 ? (
           <Field
             label={t("服务器 ID", "Server ID")}
-            hint={serverId.trim() && !idValid ? t("服务器 ID 是 32 位的数字和字母，请对照服务器给的再检查一下", "A server ID is 32 letters and digits; check it against the one the server gave you") : t("服务器的公告、官网或群里会给出，32 位数字和字母", "The server's announcement, website or group gives it: 32 letters and digits")}
+            hint={serverId.trim() && !idValid ? t("服务器 ID 应为 32 位数字和字母，请检查后重试", "Server ID should be 32 letters and digits") : t("可在服务器公告或官网获取（32 位数字和字母）", "32 letters and digits from the server's site or notice")}
           >
             <Input mono value={serverId} disabled={locked} placeholder="aa9441c0487a11e88feb525400b59b6a" onChange={(e) => setServerId(e.target.value)} />
           </Field>
@@ -124,7 +125,7 @@ export function AddYggdrasil() {
         <Field label={t("邮箱或用户名", "Email or username")}>
           <Input autoFocus value={username} disabled={locked} autoComplete="username" onChange={(e) => setUsername(e.target.value)} />
         </Field>
-        <Field label={t("密码", "Password")} hint={t("只发给这个认证服务器，启动器不保存密码，只保存登录凭据", "Sent only to this server; the launcher keeps the sign-in token, never the password")}>
+        <Field label={t("密码", "Password")} hint={t("仅发给当前认证服务器，启动器不保存密码", "Sent only to this auth server; never saved by the launcher")}>
           <Input type="password" value={password} disabled={locked} autoComplete="current-password" onChange={(e) => setPassword(e.target.value)} />
         </Field>
         {/* Submitting with Enter. */}
@@ -170,7 +171,14 @@ export function SkinDialog({ accountId }: { accountId: string }) {
 
   useEffect(() => {
     if (!microsoft) return;
-    call<Cape[]>("account_capes", { id: accountId }).then(setCapes, () => setCapes([]));
+    let live = true;
+    call<Cape[]>("account_capes", { id: accountId }).then(
+      (list) => live && setCapes(list),
+      () => live && setCapes([]),
+    );
+    return () => {
+      live = false;
+    };
   }, [accountId, microsoft]);
 
   if (!s.account) return null;
@@ -197,7 +205,7 @@ export function SkinDialog({ accountId }: { accountId: string }) {
       <div className="skin-dialog">
         <div className="skin-preview">{s.account.skinUrl ? <SkinModel skinUrl={s.account.skinUrl} slim={slim} capeUrl={capes?.find((c) => c.state === "ACTIVE")?.url} /> : <PlayerFace account={s.account} size={80} />}</div>
         <div className="col gap-16 fill">
-          <Field label={t("手臂粗细", "Arm width")} hint={t("Alex 式的细手臂是 3 像素，Steve 式是 4 像素；要和皮肤图一致", "Alex-style slim arms are 3 pixels, Steve-style are 4; match your skin image")}>
+          <Field label={t("手臂粗细", "Arm width")} hint={t("细手臂（Alex，3 像素）或标准（Steve，4 像素）", "Slim (Alex, 3 px) or Classic (Steve, 4 px) — match your skin")}>
             <div>
               <Segmented
                 value={slim ? "slim" : "classic"}
@@ -243,7 +251,7 @@ export function SkinDialog({ accountId }: { accountId: string }) {
                   </button>
                   {capes.map((cape) => (
                     <button key={cape.id} type="button" className="cape" aria-pressed={cape.state === "ACTIVE"} disabled={busy != null} onClick={() => void setCape(cape.id)}>
-                      <span className="cape-art" style={{ backgroundImage: `url(${cape.url.replace(/^http:/, "https:")})` }} />
+                      <span className="cape-art" style={{ backgroundImage: cssBackgroundUrl(cape.url, true) }} />
                       {cape.alias || t("披风", "Cape")}
                     </button>
                   ))}

@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::copy;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::core::auth::MinecraftSession;
 use crate::core::error::{AppError, AppResult};
@@ -99,6 +99,7 @@ fn offers_argument(game: &[Argument], flag: &str) -> bool {
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn build_spec(
     paths: &AppPaths,
     instance: &Instance,
@@ -219,19 +220,28 @@ pub fn build_spec(
         .logging
         .as_ref()
         .and_then(|logging| logging.client.as_ref())
+        && log_config.is_some()
     {
-        if log_config.is_some() {
-            let argument = fill_placeholders(&logging.argument, &placeholders);
-            if !jvm_args.iter().any(|existing| existing == &argument) {
-                jvm_args.push(argument);
-            }
+        let argument = fill_placeholders(&logging.argument, &placeholders);
+        if !jvm_args.iter().any(|existing| existing == &argument) {
+            jvm_args.push(argument);
         }
+    }
+
+    // Large Forge/NeoForge modpacks can exceed Windows's 32,767-character
+    // CreateProcess limit when -cp is passed inline; Java 9+ reads @argfiles.
+    // On Windows, Java's native launcher reads @argfiles in the ANSI code page
+    // rather than UTF-8, so only offload early when paths are pure ASCII, and
+    // keep non-ASCII paths inline via UTF-16 CreateProcessW until necessary.
+    if java.major >= 9 {
+        offload_classpath_argfile(&mut jvm_args, &natives_dir, cfg!(windows))?;
     }
 
     let mut args = vec![
         format!("-Xmx{memory_mb}M"),
         format!("-Xms{}M", memory_mb.min(1024)),
     ];
+    args.extend(default_jvm_flags(java.major, memory_mb, &jvm_args, &options.jvm_args));
     args.extend(jvm_args);
     // The player's own JVM arguments come last, so an -Xmx of theirs wins.
     args.extend(options.jvm_args.iter().cloned());
@@ -305,14 +315,128 @@ fn fill_placeholders(value: &str, placeholders: &HashMap<&str, String>) -> Strin
 fn adapt_client_ignore_list(args: &mut [String], version: &str) {
     let vanilla = format!("{version}.jar");
     for arg in args {
-        if let Some(list) = arg.strip_prefix("-DignoreList=") {
-            if list.split(',').any(|name| name == vanilla)
-                && !list.split(',').any(|name| name == "client.jar")
-            {
-                arg.push_str(",client.jar");
-            }
+        if let Some(list) = arg.strip_prefix("-DignoreList=")
+            && list.split(',').any(|name| name == vanilla)
+            && !list.split(',').any(|name| name == "client.jar")
+        {
+            arg.push_str(",client.jar");
         }
     }
+}
+
+/// Safe JVM defaults (Mojang's G1GC pause tuning, UTF-8 stream encoding and
+/// Log4j2 lookup hardening), skipped individually whenever the profile or the
+/// player already sets a competing flag.
+fn default_jvm_flags(
+    java_major: u32,
+    memory_mb: u32,
+    profile_args: &[String],
+    user_args: &[String],
+) -> Vec<String> {
+    let has = |pred: &dyn Fn(&str) -> bool| {
+        profile_args.iter().chain(user_args.iter()).any(|arg| pred(arg))
+    };
+    let mut flags = Vec::new();
+    if memory_mb >= 2048
+        && !has(&|a| {
+            (a.starts_with("-XX:+Use") || a.starts_with("-XX:-Use")) && a.ends_with("GC")
+        })
+    {
+        let region_size = if memory_mb >= 4096 {
+            "-XX:G1HeapRegionSize=32M"
+        } else {
+            "-XX:G1HeapRegionSize=16M"
+        };
+        flags.extend(
+            [
+                "-XX:+UnlockExperimentalVMOptions",
+                "-XX:+UseG1GC",
+                "-XX:G1NewSizePercent=20",
+                "-XX:G1ReservePercent=20",
+                "-XX:MaxGCPauseMillis=50",
+                region_size,
+            ]
+            .into_iter()
+            .map(String::from),
+        );
+    }
+    if !has(&|a| a.contains("DisableExplicitGC")) {
+        flags.push("-XX:+DisableExplicitGC".to_string());
+    }
+    if !has(&|a| a.starts_with("-Dfile.encoding=")) {
+        flags.push("-Dfile.encoding=UTF-8".to_string());
+    }
+    if java_major >= 19 {
+        if !has(&|a| a.starts_with("-Dstdout.encoding=")) {
+            flags.push("-Dstdout.encoding=UTF-8".to_string());
+        }
+        if !has(&|a| a.starts_with("-Dstderr.encoding=")) {
+            flags.push("-Dstderr.encoding=UTF-8".to_string());
+        }
+    } else if java_major >= 17 {
+        if !has(&|a| a.starts_with("-Dsun.stdout.encoding=")) {
+            flags.push("-Dsun.stdout.encoding=UTF-8".to_string());
+        }
+        if !has(&|a| a.starts_with("-Dsun.stderr.encoding=")) {
+            flags.push("-Dsun.stderr.encoding=UTF-8".to_string());
+        }
+    }
+    if !has(&|a| a.starts_with("-Dlog4j2.formatMsgNoLookups=")) {
+        flags.push("-Dlog4j2.formatMsgNoLookups=true".to_string());
+    }
+    flags
+}
+
+/// Quotes one token for a JDK 9+ `@argfile`, where `\` inside `"..."` is an
+/// escape character (so Windows path separators must be doubled).
+fn format_argfile_token(token: &str) -> String {
+    let mut out = String::with_capacity(token.len() + 8);
+    out.push('"');
+    for ch in token.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            other => out.push(other),
+        }
+    }
+    out.push('"');
+    out
+}
+
+fn offload_classpath_argfile(
+    jvm_args: &mut Vec<String>,
+    natives_dir: &Path,
+    windows: bool,
+) -> AppResult<bool> {
+    let Some(pos) = jvm_args
+        .iter()
+        .position(|arg| arg == "-cp" || arg == "-classpath" || arg == "--class-path")
+    else {
+        return Ok(false);
+    };
+    let Some(cp) = jvm_args.get(pos + 1) else {
+        return Ok(false);
+    };
+    let min_len = if windows {
+        if cp.is_ascii() && natives_dir.to_string_lossy().is_ascii() {
+            4096
+        } else {
+            24_000
+        }
+    } else {
+        16_384
+    };
+    if cp.len() <= min_len {
+        return Ok(false);
+    }
+    let argfile = natives_dir.join("classpath.args");
+    let content = format!("-cp {}\n", format_argfile_token(cp));
+    crate::core::util::atomic_write(&argfile, content.as_bytes())?;
+    jvm_args.splice(pos..=pos + 1, [format!("@{}", argfile.to_string_lossy())]);
+    Ok(true)
 }
 
 fn classpath(paths: &AppPaths, instance: &Instance, version: &VersionJson, env: RuleEnv) -> Vec<String> {
@@ -344,16 +468,16 @@ fn validate_files(paths: &AppPaths, instance: &Instance, version: &VersionJson, 
         if !rules_allow_in(&library.rules, env) {
             continue;
         }
-        if let Some(relative) = classpath_artifact(library) {
-            if !paths.library_path(&relative).exists() {
-                return Err(not_ready());
-            }
-        }
-    }
-    if let Some(index) = &version.asset_index {
-        if !paths.asset_index(&index.id).exists() {
+        if let Some(relative) = classpath_artifact(library)
+            && !paths.library_path(&relative).exists()
+        {
             return Err(not_ready());
         }
+    }
+    if let Some(index) = &version.asset_index
+        && !paths.asset_index(&index.id).exists()
+    {
+        return Err(not_ready());
     }
     Ok(())
 }
@@ -416,7 +540,7 @@ fn prepare_natives(paths: &AppPaths, instance_id: &str, version: &VersionJson, e
     Ok(())
 }
 
-fn extract_native_jar(jar: &PathBuf, natives_dir: &PathBuf, exclude: &[String]) -> AppResult<()> {
+fn extract_native_jar(jar: &Path, natives_dir: &Path, exclude: &[String]) -> AppResult<()> {
     let file = fs::File::open(jar).map_err(|err| {
         AppError::detail(
             "natives",
@@ -579,5 +703,47 @@ mod tests {
         assert!(resources.join("sound/step/grass1.ogg").is_file());
 
         assert_eq!(legacy_assets(&paths, &game, "17").unwrap(), paths.assets);
+    }
+
+    #[test]
+    fn default_jvm_flags_respect_explicit_user_gc_and_encoding() {
+        let defaults = default_jvm_flags(21, 4096, &[], &[]);
+        assert!(defaults.iter().any(|f| f == "-XX:+UseG1GC"));
+        assert!(defaults.iter().any(|f| f == "-XX:G1HeapRegionSize=32M"));
+        assert!(defaults.iter().any(|f| f == "-Dfile.encoding=UTF-8"));
+        assert!(defaults.iter().any(|f| f == "-Dstdout.encoding=UTF-8"));
+        assert!(defaults.iter().any(|f| f == "-Dlog4j2.formatMsgNoLookups=true"));
+
+        let java17_2g = default_jvm_flags(17, 2048, &[], &[]);
+        assert!(java17_2g.iter().any(|f| f == "-XX:G1HeapRegionSize=16M"));
+        assert!(java17_2g.iter().any(|f| f == "-Dsun.stdout.encoding=UTF-8"));
+
+        let custom_gc = default_jvm_flags(
+            21,
+            4096,
+            &[],
+            &["-XX:+UseZGC".to_string(), "-Dfile.encoding=GBK".to_string()],
+        );
+        assert!(!custom_gc.iter().any(|f| f == "-XX:+UseG1GC"));
+        assert!(!custom_gc.iter().any(|f| f.starts_with("-Dfile.encoding=")));
+    }
+
+    #[test]
+    fn long_classpath_moves_to_escaped_argfile() {
+        let dir = tempfile::tempdir().unwrap();
+        let cp = r#"C:\Users\Player\AppData\Roaming\Islet\libraries\net\fabricmc\loader.jar;C:\more\jars.jar"#;
+        let mut args = vec!["-Dfoo=1".into(), "-cp".into(), cp.repeat(80)];
+        assert!(offload_classpath_argfile(&mut args, dir.path(), true).unwrap());
+        assert_eq!(args.len(), 2);
+        assert!(args[1].starts_with('@'));
+        let written = fs::read_to_string(dir.path().join("classpath.args")).unwrap();
+        assert!(written.starts_with("-cp \"C:\\\\Users\\\\Player\\\\"));
+        assert!(written.ends_with("\"\n"));
+
+        // Non-ASCII Windows classpaths stay inline below 24 KB to avoid ANSI codepage garbling.
+        let cn_cp = r#"C:\Users\小明\AppData\Roaming\Islet\libraries\a.jar;"#.repeat(120);
+        let mut cn_args = vec!["-cp".into(), cn_cp];
+        assert!(!offload_classpath_argfile(&mut cn_args, dir.path(), true).unwrap());
+        assert_eq!(cn_args.len(), 2);
     }
 }

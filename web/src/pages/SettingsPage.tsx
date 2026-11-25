@@ -1,20 +1,24 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { call, toError } from "../api/backend";
-import type { Cleanup, DownloadSource, LaunchConfig, Settings, StorageUsage, Theme } from "../api/types";
-import { Icon, type IconName } from "../components/Icon";
-import { Button, CardHeader, Field, Input, Segmented, Switch } from "../components/ui";
+import type { DownloadSource, LaunchConfig, Settings, Theme } from "../api/types";
+import { Icon } from "../components/Icon";
+import { Button, Field, Input, Segmented, Switch } from "../components/ui";
 import { JavaPicker } from "../components/JavaPicker";
-import { LaunchOptions, launchProblem } from "../components/LaunchOptions";
-import { rememberLanguage, t, type Language } from "../lib/i18n";
-import { formatBytes, validGuid } from "../lib/format";
-import { glide, item, normal, stagger } from "../lib/motion";
+import { LaunchOptionsFields, launchProblem } from "../components/LaunchOptions";
+import { t } from "../lib/i18n";
+import { validGuid } from "../lib/format";
+import { glide, normal, stagger } from "../lib/motion";
 import { MOD_KEY } from "../lib/platform";
 import { usePrefs } from "../lib/prefs";
 import { matchItem, queryWords } from "../lib/search";
 import { Toolbar } from "../layout/Shell";
 import { usePick, useStore } from "../store";
+import { LanguageRow, LeaveQuestion, Presets, REPOSITORY, SECTIONS, Section, THEMES, ThemePreview } from "./settings/shared";
+import { StorageSection } from "./settings/StorageSection";
+import { UpdateRows } from "./settings/UpdateRows";
+
+export { LeaveQuestion } from "./settings/shared";
 
 const AZURE_PORTAL = "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade";
 
@@ -23,6 +27,7 @@ interface Form {
   memoryAuto: boolean;
   concurrency: string;
   clientId: string;
+  discordApplicationId: string;
   javaPath: string;
   downloadSource: DownloadSource;
   curseforgeKey: string;
@@ -36,6 +41,7 @@ const toForm = (s: Settings): Form => ({
   memoryAuto: s.memoryAuto,
   concurrency: String(s.maxConcurrentDownloads),
   clientId: s.clientId,
+  discordApplicationId: s.discordApplicationId ?? "",
   javaPath: s.javaPath ?? "",
   downloadSource: s.downloadSource,
   curseforgeKey: s.curseforgeKey,
@@ -109,11 +115,45 @@ export function SettingsPage() {
   // so every setting can be found without keeping a second list in step.
   // A match stays and is marked; the rest of the page steps out of the way.
   const [query, setQuery] = useState("");
+  const searching = query.trim() !== "";
+  const prefs = usePrefs();
+
+  const memory = Number(form.memory.trim());
+  const memoryOk = Number.isInteger(memory) && memory >= 512 && memory <= 32768;
+  const concurrency = Number(form.concurrency.trim());
+  const concurrencyOk = Number.isInteger(concurrency) && concurrency >= 1 && concurrency <= 64;
+  const clientId = form.clientId.trim();
+  const clientOk = clientId === "" || validGuid(clientId);
+  const discordId = form.discordApplicationId.trim();
+  const discordOk = discordId === "" || /^\d{17,22}$/.test(discordId);
+  const proxyOk = form.proxyMode !== "custom" || validProxy(form.proxyUrl.trim());
+  const launchUsed = Object.values(form.launch).some((v) => v != null && v !== "");
+  const launchInvalid = !discordOk || launchProblem(form.launch) !== null;
+
+  // Low-frequency disclosures stay folded until opened, unless initialized
+  // with custom values, searching, or displaying a validation error.
+  const [javaOpen, setJavaOpen] = useState(Boolean(s.settings.javaPath));
+  const javaShown = javaOpen || searching;
+
+  const [advLaunchOpen, setAdvLaunchOpen] = useState(launchUsed || Boolean(s.settings.discordApplicationId));
+  const advLaunchShown = advLaunchOpen || searching || launchInvalid;
+
+  const builtInCurseforge = Boolean(s.appInfo.curseforgeConfigured);
+  const dlCustom = concurrency !== 32 || (builtInCurseforge && form.curseforgeKey.trim() !== "");
+  const [advDownloadOpen, setAdvDownloadOpen] = useState(
+    s.settings.maxConcurrentDownloads !== 32 || (builtInCurseforge && s.settings.curseforgeKey.trim() !== ""),
+  );
+  const advDownloadShown = advDownloadOpen || searching || !concurrencyOk;
+
+  const lookCustom = !prefs.intro || prefs.devInfo;
+  const [lookDetailsOpen, setLookDetailsOpen] = useState(lookCustom);
+  const lookDetailsShown = lookDetailsOpen || searching;
+
   // A release with Microsoft sign-in built in keeps the Azure setup out of
   // the way; players only need it to use an app of their own.
   const builtInLogin = s.loginConfigured && s.settings.clientId === "";
   const [ownApp, setOwnApp] = useState(false);
-  const ownAppShown = !builtInLogin || ownApp || query.trim() !== "";
+  const ownAppShown = !builtInLogin || ownApp || searching || !clientOk || s.showAzureHelp;
   const [hits, setHits] = useState<Record<string, number> | null>(null);
   useEffect(() => {
     const root = scroller.current;
@@ -134,6 +174,11 @@ export function SettingsPage() {
       const whole = matchItem(title, [], words) !== null;
       let count = 0;
       for (const row of section.querySelectorAll<HTMLElement>(":scope > .card-body > *")) {
+        if (row.classList.contains("launch-options-toggle")) {
+          row.classList.remove("search-hit");
+          row.classList.toggle("search-miss", !whole);
+          continue;
+        }
         const label = row.querySelector(".field-label, .setting-name")?.textContent ?? "";
         const hit = matchItem(label, [row.textContent ?? ""], words) !== null;
         row.classList.toggle("search-hit", hit);
@@ -147,8 +192,8 @@ export function SettingsPage() {
     root.scrollTop = 0;
     const first = SECTIONS.find((sec) => counts[sec.id] > 0);
     if (first) setCurrent(first.id);
-    // The rows change with the form; their text is what is searched.
-  }, [query, form, s.settings]);
+    // The rows change with the form and folded groups; their text is what is searched.
+  }, [query, form, s.settings, javaShown, advLaunchShown, advDownloadShown, lookDetailsShown, ownAppShown]);
   const found = hits ? Object.values(hits).reduce((a, b) => a + b, 0) : 0;
 
   // The command palette can ask for a section; go there once the page is up.
@@ -162,14 +207,6 @@ export function SettingsPage() {
     return () => clearTimeout(timer);
   }, [focus]);
 
-  const memory = Number(form.memory.trim());
-  const memoryOk = Number.isInteger(memory) && memory >= 512 && memory <= 32768;
-  const concurrency = Number(form.concurrency.trim());
-  const concurrencyOk = Number.isInteger(concurrency) && concurrency >= 1 && concurrency <= 64;
-  const clientId = form.clientId.trim();
-  const clientOk = clientId === "" || validGuid(clientId);
-  const proxyOk = form.proxyMode !== "custom" || validProxy(form.proxyUrl.trim());
-
   const fail = (message: string) => {
     s.toast(message, "error");
     return false;
@@ -177,8 +214,9 @@ export function SettingsPage() {
   /** Saves every field on the page; false when something is invalid or the save failed. */
   const save = async (): Promise<boolean> => {
     if (!form.memoryAuto && !memoryOk) return fail(t("内存需要是 512–32768 之间的整数（MB）", "Memory must be a whole number from 512 to 32768 (MB)"));
-    if (!concurrencyOk) return fail(t("下载并发数需要在 1–64 之间", "Download concurrency must be between 1 and 64"));
-    if (!clientOk) return fail(t("Client ID 格式不正确，应为 GUID", "The Client ID must be a GUID"));
+    if (!concurrencyOk) return fail(t("同时下载数需要在 1–64 之间", "Parallel downloads must be between 1 and 64"));
+    if (!clientOk) return fail(t("Client ID 格式不正确", "Invalid Client ID format"));
+    if (!discordOk) return fail(t("Discord 应用 ID 格式不正确，应为 17–22 位数字", "Discord application ID must be 17 to 22 digits"));
     if (!proxyOk) return fail(t("代理地址应类似 http://127.0.0.1:7890 或 socks5://127.0.0.1:7891", "The proxy should look like http://127.0.0.1:7890 or socks5://127.0.0.1:7891"));
     const problem = launchProblem(form.launch);
     if (problem) return fail(problem);
@@ -190,6 +228,7 @@ export function SettingsPage() {
       memoryAuto: form.memoryAuto,
       maxConcurrentDownloads: concurrency,
       clientId,
+      discordApplicationId: discordId,
       javaPath: form.javaPath.trim() || null,
       downloadSource: form.downloadSource,
       curseforgeKey: form.curseforgeKey.trim(),
@@ -213,7 +252,6 @@ export function SettingsPage() {
   const leaving = useStore((state) => state.leavingPage);
 
   const setTheme = (theme: Theme) => void s.mutate("update_settings", { settings: { ...s.settings, theme } });
-  const prefs = usePrefs();
 
   // ⌘S saves while there is something to save.
   useEffect(() => {
@@ -231,7 +269,7 @@ export function SettingsPage() {
 
   return (
     <>
-      <Toolbar title={t("设置", "Settings")} meta={dirty ? <span className="tone-warn">{t("有未保存的更改", "Unsaved changes")}</span> : t("开关和外观立即生效；其余改动在底部一起保存", "Switches and appearance apply at once; other edits are saved together at the bottom")}>
+      <Toolbar title={t("设置", "Settings")} meta={dirty ? <span className="tone-warn">{t("有未保存的更改", "Unsaved changes")}</span> : undefined}>
         <div className="settings-search">
           <Input
             icon="search"
@@ -313,9 +351,9 @@ export function SettingsPage() {
               label={t("默认游戏内存", "Default game memory")}
               hint={
                 form.memoryAuto
-                  ? t("按本机物理内存和模组数量分配；世界单独设置的内存仍然优先", "Set from this computer's memory and the mod count; a world's own setting still wins")
+                  ? t("按电脑内存和模组数量自动分配", "Sized automatically from your memory and mods")
                   : memoryOk
-                    ? t("世界可以单独覆盖；建议不超过本机内存的一半", "Worlds can override it; keep it under half of this computer's memory")
+                    ? t("建议不超过电脑内存的一半", "Keep under half of your computer's memory")
                     : t("需要是 512–32768 之间的整数（MB）", "Must be a whole number from 512 to 32768 (MB)")
               }
               tone={form.memoryAuto || memoryOk ? undefined : "bad"}
@@ -350,7 +388,7 @@ export function SettingsPage() {
             <div className="setting-row">
               <div className="col">
                 <span className="setting-name">{t("新世界使用启动器的语言", "New worlds use the launcher's language")}</span>
-                <span className="field-hint">{t("第一次启动前把游戏语言设成和启动器一样；已有的游戏设置不受影响", "Sets the game language to match the launcher before the first launch; existing game settings are left alone")}</span>
+                <span className="field-hint">{t("首次启动时自动设为启动器语言", "Matches the launcher language on first start")}</span>
               </div>
               <Switch
                 label={t("新世界使用启动器的语言", "New worlds use the launcher's language")}
@@ -363,8 +401,8 @@ export function SettingsPage() {
                 <span className="setting-name">{t("游戏退出后自动备份存档", "Back up saves after playing")}</span>
                 <span className="field-hint">
                   {t(
-                    `只备份这次玩过的存档，不用等；每个存档保留最近 ${s.settings.autoBackupKeep} 份自动备份，手动备份不会被删`,
-                    `Only the saves you just played, in the background. The newest ${s.settings.autoBackupKeep} automatic backups of each save are kept; ones you make yourself never go`,
+                    `退出后自动备份刚玩过的存档，保留最近 ${s.settings.autoBackupKeep} 份`,
+                    `Backs up played saves on exit, keeping the latest ${s.settings.autoBackupKeep}`,
                   )}
                 </span>
               </div>
@@ -388,8 +426,8 @@ export function SettingsPage() {
                   <span className="setting-name">{t("用独立显卡运行游戏", "Play on the discrete GPU")}</span>
                   <span className="field-hint">
                     {s.appInfo.platform === "windows"
-                      ? t("有两块显卡的笔记本上，让 Java 用性能更好的那块，帧数通常高得多；只有一块显卡时没有影响", "On laptops with two GPUs, Java runs on the faster one, usually for far more frames; no effect with a single GPU")
-                      : t("检测到两块显卡时设置 DRI_PRIME=1；NVIDIA 专有驱动请在启动选项里用 prime-run", "Sets DRI_PRIME=1 when two GPUs are found; with NVIDIA's own driver, use prime-run as the wrapper in launch options")}
+                      ? t("双显卡设备优先使用独立显卡，提升帧率", "Use the faster GPU on dual-GPU laptops")
+                      : t("双显卡设备自动启用独立显卡（NVIDIA 请在启动选项使用 prime-run）", "Use the discrete GPU on dual-GPU systems (NVIDIA: use prime-run)")}
                   </span>
                 </div>
                 <Switch
@@ -402,7 +440,7 @@ export function SettingsPage() {
             <div className="setting-row">
               <div className="col">
                 <span className="setting-name">{t("游戏启动后隐藏启动器", "Hide the launcher while playing")}</span>
-                <span className="field-hint">{t("游戏窗口出现后才收起，游戏退出后自动回来", "Steps aside once the game's window is up and returns when the game exits")}</span>
+                <span className="field-hint">{t("进入游戏后收起，退出后恢复", "Hides once the game opens, returns on exit")}</span>
               </div>
               <Switch
                 label={t("游戏启动后隐藏启动器", "Hide the launcher while playing")}
@@ -413,31 +451,81 @@ export function SettingsPage() {
             <div className="setting-row">
               <div className="col">
                 <span className="setting-name">{t("关闭窗口后驻留托盘", "Keep running in the tray when closed")}</span>
-                <span className="field-hint">{t("关闭按钮只收起窗口，游戏和下载继续；从托盘菜单退出", "Closing only hides the window; games and downloads continue. Quit from the tray menu")}</span>
+                <span className="field-hint">{t("仅收起窗口，游戏和下载在后台继续", "Keeps games and downloads running in the background")}</span>
               </div>
               <Switch label={t("关闭窗口后驻留托盘", "Keep running in the tray when closed")} checked={s.settings.closeToTray !== false}
                 onChange={(closeToTray) => void s.mutate("update_settings", { settings: { ...s.settings, closeToTray } }, closeToTray ? t("关闭窗口后会留在托盘", "Closing keeps the launcher in the tray") : t("关闭窗口时会退出；任务进行中会先询问", "Closing exits the launcher, with confirmation while work is in progress"))} />
             </div>
-            <Field label="Java" hint={t("留空时自动使用匹配的 Java，缺少时下载 Temurin JRE", "Leave empty to use a matching Java; Temurin JRE is downloaded if missing")}>
-              <div className="row">
-                <Input mono placeholder={t("留空自动匹配", "Empty for automatic")} value={form.javaPath} onChange={(e) => set({ javaPath: e.target.value })} />
-                <Button
-                  icon="folder"
-                  onClick={async () => {
-                    const [path] = await s.chooseFiles("java");
-                    if (path) set({ javaPath: path });
-                  }}
-                >
-                  {t("选择文件", "Choose file")}
-                </Button>
+            <div className="setting-row">
+              <div className="col">
+                <span className="setting-name">{t("系统通知", "System notifications")}</span>
+                <span className="field-hint">{t("安装、部署或导出完成后提醒", "Notify when installs, deploys, or exports finish")}</span>
               </div>
-              <JavaPicker value={form.javaPath.trim()} onChange={(javaPath) => set({ javaPath })} />
-            </Field>
-            <GlobalLaunchOptions value={form.launch} onChange={(launch) => set({ launch })} changed={fieldChanged(form, saved, "launch")} />
+              <Switch
+                label={t("系统通知", "System notifications")}
+                checked={s.settings.systemNotifications !== false}
+                onChange={(systemNotifications) => void s.mutate("update_settings", { settings: { ...s.settings, systemNotifications } })}
+              />
+            </div>
+            <button type="button" className="launch-options-toggle" aria-expanded={javaShown} onClick={() => setJavaOpen(!javaShown)}>
+              <Icon name={javaShown ? "chevronDown" : "chevronRight"} />
+              Java
+              {!javaShown && <span className="chip">{form.javaPath.trim() ? t("指定", "Custom") : t("自动", "Auto")}</span>}
+            </button>
+            {javaShown && (
+              <Field label="Java" hint={t("留空自动匹配，缺少时自动下载", "Auto-matched when empty; downloaded if missing")}>
+                <div className="row">
+                  <Input mono placeholder={t("留空自动匹配", "Empty for automatic")} value={form.javaPath} onChange={(e) => set({ javaPath: e.target.value })} />
+                  <Button
+                    icon="folder"
+                    onClick={async () => {
+                      const [path] = await s.chooseFiles("java");
+                      if (path) set({ javaPath: path });
+                    }}
+                  >
+                    {t("选择文件", "Choose file")}
+                  </Button>
+                </div>
+                <JavaPicker value={form.javaPath.trim()} onChange={(javaPath) => set({ javaPath })} />
+              </Field>
+            )}
+            <button type="button" className="launch-options-toggle" aria-expanded={advLaunchShown} onClick={() => setAdvLaunchOpen(!advLaunchShown)}>
+              <Icon name={advLaunchShown ? "chevronDown" : "chevronRight"} />
+              {t("高级启动与联动", "Advanced launch & integrations")}
+              {!advLaunchShown && (launchUsed || discordId !== "") && <span className="chip">{t("已设置", "Set")}</span>}
+            </button>
+            {advLaunchShown && (
+              <>
+                <Field
+                  label={t("Discord 应用 ID（留空关闭）", "Discord application ID (empty disables)")}
+                  tone={discordId === "" ? undefined : discordOk ? "ok" : "bad"}
+                  hint={
+                    discordOk
+                      ? t("在 Discord 展示当前游玩的世界与版本", "Show your current world and version on Discord")
+                      : t("格式不正确，应为 17–22 位数字", "Wrong format; it should be 17 to 22 digits")
+                  }
+                >
+                  <Input
+                    mono
+                    inputMode="numeric"
+                    value={form.discordApplicationId}
+                    invalid={!discordOk}
+                    placeholder="1234567890123456789"
+                    onChange={(e) => set({ discordApplicationId: e.target.value })}
+                  />
+                </Field>
+                <LaunchOptionsFields value={form.launch} onChange={(launch) => set({ launch })} />
+                {fieldChanged(form, saved, "launch") && (
+                  <span className="field-hint">
+                    {t("对所有世界生效，可在单个世界中覆盖", "Applies to all worlds; can be overridden per world")}
+                  </span>
+                )}
+              </>
+            )}
           </Section>
 
           <Section id="download" icon="download" title={t("下载", "Download")}>
-            <Field label={t("下载源", "Download source")} hint={t("镜像在国内更快，失败时自动改用官方源；文件都会用官方校验值核对", "The mirror is faster in mainland China and falls back to the official source; every file is checked against official hashes")}>
+            <Field label={t("下载源", "Download source")} hint={t("国内推荐镜像源，失败时自动切换官方源", "Mirror is faster in mainland China, with official fallback")}>
               <div>
                 <Segmented
                   value={form.downloadSource}
@@ -450,27 +538,15 @@ export function SettingsPage() {
               </div>
             </Field>
             <Field
-              label={t("同时下载数", "Parallel downloads")}
-              hint={concurrencyOk ? t("默认 32；网络或镜像不稳定时调低", "Default 32; lower it if the network or mirror is unstable") : t("需要在 1–64 之间", "Must be between 1 and 64")}
-              tone={concurrencyOk ? undefined : "bad"}
-            >
-              <div className="row">
-                <Input mono value={form.concurrency} invalid={!concurrencyOk} onChange={(e) => set({ concurrency: e.target.value })} style={{ width: 120 }} />
-                <span className="muted">{t("个文件", " files")}</span>
-                <div className="spacer" />
-                <Presets values={[8, 16, 32, 64]} current={concurrency} label={(n) => String(n)} onPick={(n) => set({ concurrency: String(n) })} />
-              </div>
-            </Field>
-            <Field
               label={t("网络代理", "Network proxy")}
               hint={
                 !proxyOk
                   ? t("例如 http://127.0.0.1:7890 或 socks5://127.0.0.1:7891", "For example http://127.0.0.1:7890 or socks5://127.0.0.1:7891")
                   : form.proxyMode === "system"
-                    ? t("使用系统设置里的代理（例如 Clash 的「系统代理」）；没有设置时直接连接", "Uses the proxy from the system settings (such as Clash's system proxy); connects directly when there is none")
+                    ? t("跟随系统代理设置", "Follow system proxy settings")
                     : form.proxyMode === "none"
-                      ? t("所有下载和登录都直接连接，不经过代理", "Every download and sign-in connects directly, without a proxy")
-                      : t("下载、登录和搜索都经过这个代理；游戏本身不受影响", "Downloads, sign-in and search go through this proxy; the game itself is not affected")
+                      ? t("不经过代理，直接连接", "Connect directly without a proxy")
+                      : t("仅用于下载、登录和搜索，不影响游戏", "Applies to downloads, sign-in, and search only")
               }
               tone={proxyOk ? undefined : "bad"}
             >
@@ -489,19 +565,28 @@ export function SettingsPage() {
                 )}
               </div>
             </Field>
-            <Field
-              label="CurseForge API Key"
-              hint={t("用于搜索、安装和导入 CurseForge 内容；只保存在本机", "For searching, installing and importing CurseForge content; stored on this computer only")}
-              action={
-                <button type="button" className="link" onClick={() => void s.openUrl("https://console.curseforge.com/")}>
-                  {t("申请 API Key", "Get an API key")}
-                </button>
-              }
-            >
-              <Input mono type="password" autoComplete="off" value={form.curseforgeKey} placeholder="$2a$10$…" onChange={(e) => set({ curseforgeKey: e.target.value })} />
-            </Field>
-            <Field label={t("下载与游戏数据目录", "Downloads and game data folder")} hint={t("迁移需选择空文件夹：游戏、Java、模组和缓存会复制过去，原目录保留为备份。", "Moving needs an empty folder: games, Java, mods and caches are copied over and the old folder stays as a backup.")}>
-              <div className="row">
+            {!builtInCurseforge && (
+              <Field
+                label="CurseForge API Key"
+                hint={t("用于搜索和安装 CurseForge 内容", "Needed to browse and install CurseForge content")}
+                action={
+                  <button type="button" className="link" onClick={() => void s.openUrl("https://console.curseforge.com/")}>
+                    {t("申请 API Key", "Get an API key")}
+                  </button>
+                }
+              >
+                <Input
+                  mono
+                  type="password"
+                  autoComplete="off"
+                  value={form.curseforgeKey}
+                  placeholder="$2a$10$…"
+                  onChange={(e) => set({ curseforgeKey: e.target.value })}
+                />
+              </Field>
+            )}
+            <Field label={t("下载与游戏数据目录", "Downloads and game data folder")} hint={t("选择空文件夹迁移，原目录保留备份", "Pick an empty folder to move data; the old folder is kept as backup")}>
+              <div className="row wrap">
                 <div className="path-box mono selectable truncate">{s.appInfo.dataDir}</div>
                 <Button icon="folder" onClick={() => void s.open({ kind: "dataDir" })}>
                   {t("打开", "Open")}
@@ -511,6 +596,47 @@ export function SettingsPage() {
                 </Button>
               </div>
             </Field>
+            <button type="button" className="launch-options-toggle" aria-expanded={advDownloadShown} onClick={() => setAdvDownloadOpen(!advDownloadShown)}>
+              <Icon name={advDownloadShown ? "chevronDown" : "chevronRight"} />
+              {t("高级下载设置", "Advanced download settings")}
+              {!advDownloadShown && dlCustom && <span className="chip">{t("已自定义", "Custom")}</span>}
+            </button>
+            {advDownloadShown && (
+              <>
+                <Field
+                  label={t("同时下载数", "Parallel downloads")}
+                  hint={concurrencyOk ? t("默认 32，网络不稳定时可调低", "Default 32; lower on unstable networks") : t("需要在 1–64 之间", "Must be between 1 and 64")}
+                  tone={concurrencyOk ? undefined : "bad"}
+                >
+                  <div className="row">
+                    <Input mono value={form.concurrency} invalid={!concurrencyOk} onChange={(e) => set({ concurrency: e.target.value })} style={{ width: 120 }} />
+                    <span className="muted">{t("个文件", " files")}</span>
+                    <div className="spacer" />
+                    <Presets values={[8, 16, 32, 64]} current={concurrency} label={(n) => String(n)} onPick={(n) => set({ concurrency: String(n) })} />
+                  </div>
+                </Field>
+                {builtInCurseforge && (
+                  <Field
+                    label="CurseForge API Key"
+                    hint={t("已内置可用，留空即可，也可填自己的 Key", "Built in and ready; leave blank or enter your own key")}
+                    action={
+                      <button type="button" className="link" onClick={() => void s.openUrl("https://console.curseforge.com/")}>
+                        {t("申请 API Key", "Get an API key")}
+                      </button>
+                    }
+                  >
+                    <Input
+                      mono
+                      type="password"
+                      autoComplete="off"
+                      value={form.curseforgeKey}
+                      placeholder={t("已内置（留空使用默认）", "Built in (leave blank)")}
+                      onChange={(e) => set({ curseforgeKey: e.target.value })}
+                    />
+                  </Field>
+                )}
+              </>
+            )}
           </Section>
 
           <StorageSection />
@@ -542,20 +668,29 @@ export function SettingsPage() {
               </div>
               <Switch label={t("减少动效", "Reduce motion")} checked={s.reduceMotion} onChange={s.setReduceMotion} />
             </div>
-            <div className="setting-row">
-              <div className="col">
-                <span className="setting-name">{t("启动动画", "Intro animation")}</span>
-                <span className="field-hint">{t("开启「减少动效」时不播放", "Skipped while Reduce motion is on")}</span>
-              </div>
-              <Switch label={t("启动动画", "Intro animation")} checked={prefs.intro} onChange={prefs.setIntro} />
-            </div>
-            <div className="setting-row">
-              <div className="col">
-                <span className="setting-name">{t("状态栏显示技术信息", "Technical details in the status bar")}</span>
-                <span className="field-hint">{t("下载源、并发数、Java、内存和平台；关闭时只在悬停版本号时显示", "Download source, parallel downloads, Java, memory and platform; when off, they show on hovering the version")}</span>
-              </div>
-              <Switch label={t("状态栏显示技术信息", "Technical details in the status bar")} checked={prefs.devInfo} onChange={prefs.setDevInfo} />
-            </div>
+            <button type="button" className="launch-options-toggle" aria-expanded={lookDetailsShown} onClick={() => setLookDetailsOpen(!lookDetailsShown)}>
+              <Icon name={lookDetailsShown ? "chevronDown" : "chevronRight"} />
+              {t("界面细节", "Interface details")}
+              {!lookDetailsShown && lookCustom && <span className="chip">{t("已自定义", "Custom")}</span>}
+            </button>
+            {lookDetailsShown && (
+              <>
+                <div className="setting-row">
+                  <div className="col">
+                    <span className="setting-name">{t("启动动画", "Intro animation")}</span>
+                    <span className="field-hint">{t("开启「减少动效」时不播放", "Skipped while Reduce motion is on")}</span>
+                  </div>
+                  <Switch label={t("启动动画", "Intro animation")} checked={prefs.intro} onChange={prefs.setIntro} />
+                </div>
+                <div className="setting-row">
+                  <div className="col">
+                    <span className="setting-name">{t("状态栏显示技术信息", "Technical details in the status bar")}</span>
+                    <span className="field-hint">{t("在状态栏显示下载源、Java、内存和平台信息", "Show download source, Java, memory, and platform in the status bar")}</span>
+                  </div>
+                  <Switch label={t("状态栏显示技术信息", "Technical details in the status bar")} checked={prefs.devInfo} onChange={prefs.setDevInfo} />
+                </div>
+              </>
+            )}
           </Section>
 
           <Section
@@ -564,10 +699,10 @@ export function SettingsPage() {
             title={t("微软登录", "Microsoft sign-in")}
             text={
               builtInLogin
-                ? t("这个版本已内置，可以直接用微软账号登录", "Built into this release; sign in with a Microsoft account directly")
+                ? t("已内置，可直接登录", "Built in and ready to sign in")
                 : s.settings.clientId
-                  ? t("正在使用你填写的 Azure 应用", "Using the Azure app you entered")
-                  : t("这个版本没有内置，需要填写一个 Azure 应用的 Client ID", "Not built into this release; it needs an Azure app's Client ID")
+                  ? t("已配置自定义 Azure 应用", "Using your custom Azure app")
+                  : t("未内置，需填写 Azure 应用 ID", "Needs an Azure Client ID")
             }
           >
             {builtInLogin && (
@@ -594,11 +729,11 @@ export function SettingsPage() {
                   hint={
                     clientId === ""
                       ? s.loginConfigured
-                        ? t("已使用发行版内置的 Client ID；填写后将改用你自己的应用", "Using the Client ID built into this release; fill one in to use your own app")
-                        : t("填写 Azure 应用的 Application (client) ID，不需要 client secret", "The Azure app's Application (client) ID; no client secret needed")
+                        ? t("已使用内置配置，填写后可改为自己的应用", "Using built-in config; fill in to override")
+                        : t("填写 Azure 应用 ID，无需密钥", "Enter your Azure Application (client) ID")
                       : clientOk
                         ? t("格式正确", "Looks right")
-                        : t("格式不正确，应为 8-4-4-4-12 位的 GUID", "Wrong format; it should be a GUID like 8-4-4-4-12")
+                        : t("格式不正确，请检查是否复制完整", "Invalid format; check that the full ID was copied")
                   }
                   action={
                     <button type="button" className="link" onClick={() => useStore.setState({ showAzureHelp: !s.showAzureHelp })}>
@@ -638,15 +773,12 @@ export function SettingsPage() {
                   {t("草岛 ", "Islet ")}{s.appInfo.version} · {s.appInfo.platform} {s.appInfo.arch}
                 </span>
               </div>
-              <span className="faint" style={{ fontSize: "var(--text-xs)" }}>
-                {t("不收集任何遥测数据", "No telemetry is collected")}
-              </span>
             </div>
             <div className="setting-row">
               <div className="col">
                 <span className="setting-name">{t("开源许可", "License")}</span>
                 <span className="field-hint">
-                  {t("GPL-3.0 开源。非 Mojang 或 Microsoft 官方产品，与其无关；Minecraft 是 Mojang Studios 的商标。", "Open source under GPL-3.0. Not an official Minecraft product and not affiliated with Mojang or Microsoft; Minecraft is a trademark of Mojang Studios.")}
+                  {t("GPL-3.0 开源。非 Mojang 或 Microsoft 官方产品。", "Open source under GPL-3.0. Not an official Mojang or Microsoft product.")}
                 </span>
               </div>
               <Button size="sm" variant="ghost" icon="external" onClick={() => void useStore.getState().openUrl(REPOSITORY)}>
@@ -659,381 +791,5 @@ export function SettingsPage() {
         </div>
       </div>
     </>
-  );
-}
-
-const REPOSITORY = "https://github.com/saudademjj/islet-launcher";
-
-const SECTIONS: { id: string; title: string; icon: IconName }[] = [
-  { id: "game", title: t("游戏", "Game"), icon: "cpu" },
-  { id: "download", title: t("下载", "Download"), icon: "download" },
-  { id: "storage", title: t("存储", "Storage"), icon: "disk" },
-  { id: "look", title: t("外观", "Appearance"), icon: "palette" },
-  { id: "login", title: t("微软登录", "Microsoft sign-in"), icon: "shield" },
-  { id: "about", title: t("关于", "About"), icon: "info" },
-];
-
-const THEMES: { value: Theme; label: string }[] = [
-  { value: "system", label: t("跟随系统", "System") },
-  { value: "light", label: t("浅色", "Light") },
-  { value: "dark", label: t("深色", "Dark") },
-];
-
-/** The launcher in miniature, in the theme's own colours: forest sidebar,
-    the home stage cut down to the stone, the start button, three facts. */
-function ThemePreview() {
-  return (
-    <span className="tp">
-      <span className="tp-side">
-        <span className="tp-nav on" />
-        <span className="tp-nav" />
-        <span className="tp-nav" />
-      </span>
-      <span className="tp-main">
-        <span className="tp-hero">
-          <span className="tp-title" />
-          <span className="tp-button" />
-          <span className="tp-ground">
-            <i className="g" />
-            <i className="d" />
-            <i className="s" />
-          </span>
-        </span>
-        <span className="tp-facts">
-          <i />
-          <i />
-          <i />
-        </span>
-      </span>
-    </span>
-  );
-}
-
-function Presets({ values, current, label, onPick }: { values: number[]; current: number; label: (v: number) => string; onPick: (v: number) => void }) {
-  return (
-    <div className="presets">
-      {values.map((v) => (
-        <button key={v} type="button" className="preset mono" aria-pressed={current === v} onClick={() => onPick(v)}>
-          {label(v)}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/** Checking for a newer launcher. Off entirely when the build has no
-    update source. */
-function UpdateRows() {
-  const s = usePick((s) => ({ settings: s.settings, update: s.update, mutate: s.mutate, checkUpdate: s.checkUpdate, openUrl: s.openUrl, toast: s.toast }));
-  const [available, setAvailable] = useState<boolean | null>(null);
-  const [checking, setChecking] = useState(false);
-  const [installing, setInstalling] = useState(false);
-  useEffect(() => {
-    call<boolean>("update_source").then(setAvailable, () => setAvailable(false));
-  }, []);
-  if (available === false) {
-    return <span className="field-hint">{t("这个版本没有配置更新地址，请到发布页查看新版本。", "This build has no update source; check the release page for new versions.")}</span>;
-  }
-  return (
-    <>
-      <div className="setting-row">
-        <div className="col">
-          <span className="setting-name">{t("启动时检查更新", "Check for updates at start")}</span>
-          <span className="field-hint">{t("只读取一个版本信息文件；有新版本时在状态栏提示，由你决定是否下载。下载的安装包会先核对校验值再打开", "Reads one version file; a new version shows in the status bar and downloading is up to you. A downloaded package is checked against its hash before it opens")}</span>
-        </div>
-        <Switch label={t("系统通知", "System notifications")} checked={s.settings.systemNotifications !== false} onChange={systemNotifications => void s.mutate("update_settings", { settings: { ...s.settings, systemNotifications } })} />
-        <Field label={t("Discord 应用 ID（留空关闭）", "Discord application ID (empty disables)")} hint={t("填写你在 Discord Developer Portal 创建的应用 ID，游戏启动时展示世界与版本。", "Use an application ID from Discord Developer Portal to show the world and game version while playing.")}>
-          <Input defaultValue={s.settings.discordApplicationId ?? ""} inputMode="numeric" onBlur={e => { const discordApplicationId = e.target.value.trim(); if (/^\d{17,22}$/.test(discordApplicationId) || !discordApplicationId) void s.mutate("update_settings", { settings: { ...s.settings, discordApplicationId } }); }} />
-        </Field>
-        <Switch
-          label={t("启动时检查更新", "Check for updates at start")}
-          checked={s.settings.checkUpdates}
-          onChange={(checkUpdates) => void s.mutate("update_settings", { settings: { ...s.settings, checkUpdates } })}
-        />
-      </div>
-      <div className="row">
-        {s.update ? (
-          <>
-            <span style={{ flex: 1 }}>
-              {t("新版本 ", "New version ")}<span className="mono">{s.update.version}</span>
-              {s.update.notes ? ` · ${s.update.notes}` : ""}
-            </span>
-            {s.update.package ? (
-              <>
-                <Button variant="ghost" icon="external" onClick={() => void s.openUrl(s.update!.url)}>
-                  {t("更新说明", "Release notes")}
-                </Button>
-                <Button
-                  variant="primary"
-                  icon="download"
-                  busy={installing}
-                  onClick={async () => {
-                    setInstalling(true);
-                    try {
-                      const message = await call<string>("install_update");
-                      if (message) s.toast(message, "success");
-                    } catch (error) {
-                      s.toast(toError(error).message, "error");
-                    }
-                    setInstalling(false);
-                  }}
-                >
-                  {installing ? t("正在下载并校验…", "Downloading and checking…") : t("下载并安装", "Download and install")}
-                </Button>
-              </>
-            ) : (
-              <Button variant="primary" icon="external" onClick={() => void s.openUrl(s.update!.url)}>
-                {t("去下载", "Download")}
-              </Button>
-            )}
-          </>
-        ) : (
-          <>
-            <span className="muted" style={{ flex: 1 }}>
-              {t("没有发现新版本", "You're up to date")}
-            </span>
-            <Button
-              icon="refresh"
-              busy={checking}
-              onClick={async () => {
-                setChecking(true);
-                await s.checkUpdate();
-                setChecking(false);
-              }}
-            >
-              {t("检查更新", "Check for updates")}
-            </Button>
-          </>
-        )}
-      </div>
-    </>
-  );
-}
-
-/** Interface language. Switching saves it and reloads the page, so every
-    string (also those built when modules load) changes together. */
-function LanguageRow() {
-  const s = usePick((s) => ({ settings: s.settings, busy: s.runningIds.length > 0 || s.install != null || s.fileBusy, toast: s.toast }));
-  const choose = async (language: Language) => {
-    if (language === s.settings.language) return;
-    if (s.busy) return s.toast(t("请先关闭游戏、等安装或文件操作结束，再切换语言", "Close the game and wait for installs or file work to finish before switching the language"), "error");
-    const saved = await useStore.getState().mutate("update_settings", { settings: { ...useStore.getState().settings, language } });
-    if (!saved) return;
-    rememberLanguage(language);
-    window.location.reload();
-  };
-  return (
-    <div className="setting-row">
-      <div className="col">
-        {/* Both names, so it can be found in either language. */}
-        <span className="setting-name">{t("语言 · Language", "Language · 语言")}</span>
-        <span className="field-hint">{t("切换后启动器会刷新一次", "The launcher refreshes once after switching")}</span>
-      </div>
-      <Segmented
-        value={s.settings.language}
-        onChange={(language) => void choose(language)}
-        options={[
-          { value: "system", label: t("跟随系统", "System") },
-          { value: "zh", label: t("简体中文", "简体中文") },
-          { value: "en", label: "English" },
-        ]}
-      />
-    </div>
-  );
-}
-
-/** Launch options every world starts from; saved on their own button so
-    they do not wait for the rest of the form. */
-/** Launch options for every world; saved with the rest of the page. */
-function GlobalLaunchOptions({ value, onChange, changed }: { value: LaunchConfig; onChange: (next: LaunchConfig) => void; changed: boolean }) {
-  return (
-    <div className="col gap-12">
-      <LaunchOptions value={value} onChange={onChange} />
-      {changed && (
-        <span className="field-hint">
-          {t("对所有世界生效；世界自己的设置会叠加或覆盖它们。", "Applies to every world; a world's own options add to or override them.")}
-        </span>
-      )}
-    </div>
-  );
-}
-
-/** Shown in the save bar when the player tried to switch pages, or to quit
-    the launcher, with edits unsaved. */
-export function LeaveQuestion({ count }: { count: number }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const leavePage = useStore((s) => s.leavePage);
-  const quitting = useStore((s) => s.leavingPage === "quit");
-  // Enter saves, the way the bar's own button would.
-  useEffect(() => ref.current?.querySelector<HTMLButtonElement>(".btn-primary")?.focus(), []);
-  return (
-    <div ref={ref} className="save-bar-question" role="alertdialog" aria-label={quitting ? t("退出前保存更改？", "Save changes before quitting?") : t("切换页面前保存更改？", "Save changes before leaving?")}>
-      <span className="save-bar-mark" />
-      <span className="save-bar-text">
-        {quitting
-          ? t(`退出前保存这 ${count} 项更改？`, `Save ${count} ${count === 1 ? "change" : "changes"} before quitting?`)
-          : t(`离开前保存这 ${count} 项更改？`, `Save ${count} ${count === 1 ? "change" : "changes"} before leaving?`)}
-      </span>
-      <div className="spacer" />
-      <Button variant="hero" size="sm" onClick={() => useStore.setState({ leavingPage: null })}>
-        {quitting ? t("取消退出", "Don't quit") : t("继续编辑", "Keep editing")}
-      </Button>
-      <Button variant="hero" size="sm" onClick={() => void leavePage(false)}>
-        {quitting ? t("放弃并退出", "Discard and quit") : t("放弃修改", "Discard")}
-      </Button>
-      <Button variant="primary" size="sm" icon="check" onClick={() => void leavePage(true)}>
-        {quitting ? t("保存并退出", "Save and quit") : t("保存", "Save")}
-      </Button>
-    </div>
-  );
-}
-
-/** What the launcher keeps on disk, and what can go: everything cleaned
-    here is downloaded or rebuilt again when needed. */
-function StorageSection() {
-  const s = usePick((s) => ({ fileBusy: s.fileBusy, filesChanged: s.filesChanged, fileOperation: s.fileOperation, openModal: s.openModal, open: s.open, openRecycle: s.openRecycle }));
-  const [usage, setUsage] = useState<StorageUsage | null>(null);
-  const [measuring, setMeasuring] = useState(false);
-  const measure = () => {
-    setMeasuring(true);
-    call<StorageUsage>("storage_usage")
-      .then(setUsage)
-      .catch(() => setUsage(null))
-      .finally(() => setMeasuring(false));
-  };
-  // Measuring walks every file, so it waits to be asked; after a cleanup it
-  // measures again by itself.
-  useEffect(() => {
-    if (usage) measure();
-  }, [s.filesChanged]);
-  const clean = (target: Cleanup) => void s.fileOperation(null, { kind: "clean", target });
-  const rows: { label: string; bytes: number; hint: string; action?: React.ReactNode }[] = usage
-    ? [
-        { label: t("世界", "Worlds"), bytes: usage.worlds, hint: t("存档、模组、配置和截图", "Saves, mods, configs and screenshots") },
-        { label: t("游戏资源文件", "Game assets"), bytes: usage.assets, hint: t("声音、语言和材质；所有世界共用", "Sounds, languages and textures; shared by all worlds") },
-        { label: t("运行库", "Libraries"), bytes: usage.libraries, hint: t("游戏和加载器的库；所有世界共用", "Game and loader libraries; shared by all worlds") },
-        {
-          label: t("版本文件", "Version files"),
-          bytes: usage.versions,
-          hint: usage.unusedVersions.length ? t(`${usage.unusedVersions.length} 个版本已经没有世界在用：${usage.unusedVersions.slice(0, 4).join("、")}${usage.unusedVersions.length > 4 ? " …" : ""}`, `${usage.unusedVersions.length} versions no world uses: ${usage.unusedVersions.slice(0, 4).join(", ")}${usage.unusedVersions.length > 4 ? " …" : ""}`) : t("都有世界在用", "All in use"),
-          action: usage.unusedVersions.length > 0 && (
-            <Button size="sm" disabled={s.fileBusy} onClick={() => clean({ kind: "unusedVersions" })}>
-              {t("清理 ", "Free ")}{formatBytes(usage.unusedVersionsBytes)}
-            </Button>
-          ),
-        },
-        {
-          label: t("回收站", "Recycle bin"),
-          bytes: usage.recycle,
-          hint: t("删除的世界、模组、存档和截图", "Deleted worlds, mods, saves and screenshots"),
-          action: (
-            <Button size="sm" disabled={usage.recycle === 0} onClick={() => void s.openRecycle()}>
-              {t("查看", "View")}
-            </Button>
-          ),
-        },
-        {
-          label: t("备份", "Backups"),
-          bytes: usage.backups,
-          hint: t("世界和存档的备份 .zip，不会自动删除", "Backup .zip files of worlds and saves; never removed automatically"),
-          action: (
-            <Button size="sm" icon="folder" onClick={() => void s.open({ kind: "dataDir" })}>
-              {t("打开", "Open")}
-            </Button>
-          ),
-        },
-        {
-          label: t("截图缩略图", "Screenshot thumbnails"),
-          bytes: usage.thumbnails,
-          hint: t("需要时会重新生成", "Made again when needed"),
-          action: usage.thumbnails > 0 && (
-            <Button size="sm" disabled={s.fileBusy} onClick={() => clean({ kind: "thumbnails" })}>
-              {t("清理", "Clean")}
-            </Button>
-          ),
-        },
-        {
-          label: t("启动器日志", "Launcher logs"),
-          bytes: usage.logs,
-          hint: t("清理一周以前的日志", "Removes logs older than a week"),
-          action: (
-            <Button size="sm" disabled={s.fileBusy} onClick={() => clean({ kind: "oldLogs" })}>
-              {t("清理", "Clean")}
-            </Button>
-          ),
-        },
-      ]
-    : [];
-  const total = usage ? usage.worlds + usage.assets + usage.libraries + usage.versions + usage.recycle + usage.backups + usage.thumbnails + usage.logs + usage.java.reduce((sum, j) => sum + j.bytes, 0) : 0;
-  return (
-    <Section id="storage" icon="disk" title={t("存储", "Storage")} text={t("清理的内容需要时会重新下载或生成", "Anything cleaned here is downloaded or rebuilt when needed")}>
-      {!usage ? (
-        <div className="row">
-          <span className="muted" style={{ flex: 1 }}>
-            {t("统计需要遍历所有文件，资源文件多时要几秒钟。", "Measuring reads every file and can take a few seconds.")}
-          </span>
-          <Button icon="disk" busy={measuring} onClick={measure}>
-            {t("统计占用", "Measure")}
-          </Button>
-        </div>
-      ) : (
-        <>
-          <div className="storage-total">
-            <span className="fact-number">{formatBytes(total)}</span>
-            <span className="muted">{t("共占用", "in total")}</span>
-            <span className="spacer" />
-            <Button size="sm" variant="ghost" icon="refresh" busy={measuring} onClick={measure}>
-              {t("重新统计", "Measure again")}
-            </Button>
-          </div>
-          <div className="storage-bar" aria-hidden>
-            {rows.map((row) => (
-              <span key={row.label} style={{ flexGrow: Math.max(row.bytes, 1) }} title={`${row.label} ${formatBytes(row.bytes)}`} />
-            ))}
-          </div>
-          <div className="list">
-            {rows.map((row) => (
-              <div key={row.label} className="list-row storage-row">
-                <div className="col fill gap-2">
-                  <span style={{ fontWeight: 600 }}>{row.label}</span>
-                  <span className="faint truncate" style={{ fontSize: "var(--text-xs)" }}>
-                    {row.hint}
-                  </span>
-                </div>
-                <span className="mono">{formatBytes(row.bytes)}</span>
-                {row.action}
-              </div>
-            ))}
-            {usage.java.map((java) => (
-              <div key={java.path} className="list-row storage-row">
-                <div className="col fill gap-2">
-                  <span style={{ fontWeight: 600 }}>Java {java.major}</span>
-                  <span className="faint truncate" style={{ fontSize: "var(--text-xs)" }} title={java.path}>
-                    {java.unused ? t("已安装的世界都不需要它，删除后需要时会重新下载", "No installed world needs it; it downloads again if needed") : t("有世界正在用", "In use")}
-                  </span>
-                </div>
-                <span className="mono">{formatBytes(java.bytes)}</span>
-                {java.unused && (
-                  <Button size="sm" disabled={s.fileBusy} onClick={() => clean({ kind: "java", path: java.path })}>
-                    {t("删除", "Delete")}
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-    </Section>
-  );
-}
-
-function Section({ id, icon, title, text, children }: { id: string; icon: IconName; title: string; text?: string; children: React.ReactNode }) {
-  return (
-    <motion.section id={`set-${id}`} className="card settings-section" variants={item}>
-      <CardHeader icon={icon} title={title} text={text} />
-      <div className="card-body col gap-20">
-        {children}
-      </div>
-    </motion.section>
   );
 }

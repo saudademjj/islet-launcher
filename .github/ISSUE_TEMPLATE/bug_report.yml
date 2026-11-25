@@ -27,7 +27,7 @@ body:
     attributes:
       label: 启动器版本 / Launcher version
       description: 窗口右下角或「设置 → 关于」/ Bottom-right corner or Settings → About
-      placeholder: "0.4.0"
+      placeholder: "0.5.0"
     validations:
       required: true
   - type: dropdown

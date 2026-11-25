@@ -15,7 +15,7 @@ export function ExportPack({ id }: { id: string }) {
     openModal: s.openModal,
     chooseSavePath: s.chooseSavePath,
     fileOperation: s.fileOperation,
-    curseforgeKey: s.settings.curseforgeKey,
+    curseforgeConfigured: Boolean(s.settings.curseforgeKey.trim() || s.appInfo.curseforgeConfigured),
   }));
   const [options, setOptions] = useState<ExportOptions>({
     name: s.instance?.name ?? "",
@@ -28,14 +28,14 @@ export function ExportPack({ id }: { id: string }) {
   });
   if (!s.instance) return null;
   const set = (patch: Partial<ExportOptions>) => setOptions({ ...options, ...patch });
-  const back = () => s.openModal({ kind: "manage", id, tab: "data" });
+  const back = () => s.openModal({ kind: "manage", id, tab: "tools" });
   const cf = options.format === "curseforge";
   const extension = cf ? "zip" : "mrpack";
   const notInstalled = s.instance.loader !== "vanilla" && !s.instance.loaderVersion;
   const toggles: { key: "options" | "servers" | "saves"; label: string; hint: string }[] = [
-    { key: "options", label: t("游戏设置", "Game settings"), hint: t("options.txt：按键、画质、语言等", "options.txt: keys, graphics, language and more") },
-    { key: "servers", label: t("服务器列表", "Server list"), hint: "servers.dat" },
-    { key: "saves", label: t("存档", "Saves"), hint: t("整包会变大；分享地图时才需要", "Makes the pack bigger; only for sharing maps") },
+    { key: "options", label: t("游戏设置", "Game settings"), hint: t("按键、画质、语言等游戏设置", "Keybinds, graphics, language, and other settings") },
+    { key: "servers", label: t("服务器列表", "Server list"), hint: t("已保存的多人服务器列表", "Saved multiplayer server list") },
+    { key: "saves", label: t("存档", "Saves"), hint: t("文件会变大，仅分享地图时开启", "Increases file size; enable only when sharing maps") },
   ];
   return (
     <Modal
@@ -70,10 +70,10 @@ export function ExportPack({ id }: { id: string }) {
           label={t("格式", "Format")}
           hint={
             cf
-              ? s.curseforgeKey
-                ? t("CurseForge 上有的模组只写链接，其余直接打包。", "Mods hosted on CurseForge are linked; the rest are packed in.")
-                : t("没有填写 CurseForge API Key，所有模组都会直接打包，文件会更大。", "No CurseForge API key set, so every mod is packed in and the file is bigger.")
-              : t("Modrinth 上有的模组只写链接，其余直接打包。", "Mods hosted on Modrinth are linked; the rest are packed in.")
+              ? s.curseforgeConfigured
+                ? t("CurseForge 模组仅记录链接，其余直接打包", "CurseForge mods are linked; others are bundled")
+                : t("未配置 CurseForge Key，所有模组将直接打包（文件较大）", "No CurseForge key set; all mods will be bundled")
+              : t("Modrinth 模组仅记录链接，其余直接打包", "Modrinth mods are linked; others are bundled")
           }
         >
           <Segmented value={options.format} onChange={(format) => set({ format })} options={[{ value: "mrpack" as const, label: "Modrinth .mrpack" }, { value: "curseforge" as const, label: "CurseForge .zip" }]} />
@@ -91,7 +91,7 @@ export function ExportPack({ id }: { id: string }) {
         </Field>
         <div className="col gap-12">
           <span className="field-label">{t("一起打包", "Also include")}</span>
-          <span className="field-hint">{t("模组、资源包、光影和 config 等配置文件夹总是包含在内。", "Mods, resource packs, shaders and config folders are always included.")}</span>
+          <span className="field-hint">{t("模组、资源包、光影和配置文件会默认包含。", "Mods, resource packs, shaders, and configs are always included.")}</span>
           {toggles.map((toggle) => (
             <div key={toggle.key} className="setting-row">
               <div className="col">

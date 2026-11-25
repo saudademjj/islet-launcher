@@ -61,9 +61,8 @@ impl Flavor {
 
     fn meta_urls(self, path: &str, source: DownloadSource) -> Vec<String> {
         let mut urls = Vec::new();
-        if source == DownloadSource::Bmclapi {
-            if let Some(base) = self.mirror_meta() { urls.push(format!("{base}/{path}")); }
-        }
+        if source == DownloadSource::Bmclapi
+            && let Some(base) = self.mirror_meta() { urls.push(format!("{base}/{path}")); }
         urls.push(format!("{}/{path}", self.meta()));
         urls
     }
@@ -255,8 +254,8 @@ pub(crate) async fn loader_entries<T: serde::de::DeserializeOwned>(
 }
 
 fn library_urls(url: &str, source: DownloadSource) -> (String, Vec<String>) {
-    if source == DownloadSource::Bmclapi {
-        if let Ok(parsed) = url::Url::parse(url) {
+    if source == DownloadSource::Bmclapi
+        && let Ok(parsed) = url::Url::parse(url) {
             let path = match parsed.host_str() {
                 Some("maven.fabricmc.net") => Some(parsed.path()),
                 Some("maven.quiltmc.org") => parsed.path().strip_prefix("/repository/release"),
@@ -266,7 +265,6 @@ fn library_urls(url: &str, source: DownloadSource) -> (String, Vec<String>) {
                 return (format!("https://bmclapi2.bangbang93.com/maven{path}"), vec![url.to_string()]);
             }
         }
-    }
     (url.into(), vec![])
 }
 

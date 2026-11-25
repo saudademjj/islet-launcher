@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { call, toError } from "../api/backend";
 import type { ConfigFile } from "../api/types";
@@ -26,9 +26,34 @@ export function ConfigDialog({ id, initial }: { id: string; initial?: string }) 
   const [saving, setSaving] = useState(false);
   // Where to go once unsaved changes are dealt with: a file, or "" to close.
   const [pending, setPending] = useState<string | null>(null);
+  const readSeq = useRef(0);
+  const mounted = useRef(true);
+  const pathRef = useRef(path);
+  pathRef.current = path;
   const dirty = text != null && text !== saved;
   const leave = () => s.openModal({ kind: "manage", id, tab: "mods" });
   const back = () => (dirty ? setPending("") : leave());
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  // Intercept Esc while edits are unsaved so the global shortcut cannot drop them.
+  useEffect(() => {
+    if (!dirty && pending == null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.isComposing || e.keyCode === 229) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (pending != null) setPending(null);
+      else setPending("");
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [dirty, pending]);
 
   useEffect(() => {
     let live = true;
@@ -48,6 +73,7 @@ export function ConfigDialog({ id, initial }: { id: string; initial?: string }) 
   const open = (next: string, discard = false) => {
     if (next === path) return;
     if (dirty && !discard) return setPending(next);
+    const seq = ++readSeq.current;
     setPending(null);
     setPath(next);
     setText(null);
@@ -55,23 +81,29 @@ export function ConfigDialog({ id, initial }: { id: string; initial?: string }) 
     setError(null);
     call<string>("read_config", { id, path: next })
       .then((value) => {
+        if (!mounted.current || readSeq.current !== seq) return;
         setText(value);
         setSaved(value);
       })
-      .catch((e) => setError(toError(e).message));
+      .catch((e) => {
+        if (!mounted.current || readSeq.current !== seq) return;
+        setError(toError(e).message);
+      });
   };
 
   const save = async () => {
-    if (!path || text == null) return;
+    if (saving || !path || text == null) return;
+    const targetPath = path;
+    const targetText = text;
     setSaving(true);
     try {
-      await call("write_config", { id, path, text });
-      setSaved(text);
-      s.toast(t("已保存，原来的内容留了一份备份", "Saved; the previous version was backed up"), "success");
+      await call("write_config", { id, path: targetPath, text: targetText });
+      if (mounted.current && pathRef.current === targetPath) setSaved(targetText);
+      s.toast(t("已保存（已自动备份原文件）", "Saved (previous file backed up)"), "success");
     } catch (e) {
       s.toast(toError(e).message, "error");
     } finally {
-      setSaving(false);
+      if (mounted.current) setSaving(false);
     }
   };
 
@@ -104,7 +136,7 @@ export function ConfigDialog({ id, initial }: { id: string; initial?: string }) 
           <div className="config-list" role="listbox" aria-label={t("配置文件", "Config files")}>
             {files == null ? null : shown.length === 0 ? (
               <div className="faint" style={{ fontSize: "var(--text-sm)", padding: 8 }}>
-                {files.length === 0 ? t("还没有配置文件。模组一般在第一次进游戏后才生成。", "No config files yet. Mods usually write them on the first game start.") : t("没有匹配的文件。", "No matching files.")}
+                {files.length === 0 ? t("暂无配置文件，启动一次游戏后生成。", "No config files yet; generated on first launch.") : t("没有匹配的文件。", "No matching files.")}
               </div>
             ) : (
               shown.map((f) => (
@@ -130,7 +162,7 @@ export function ConfigDialog({ id, initial }: { id: string; initial?: string }) 
               </Button>
             </div>
           )}
-          {s.running && <div className="faint" style={{ fontSize: "var(--text-xs)" }}>{t("游戏正在运行：很多模组只在启动时读配置，退出时还可能把它写回去。改完重启游戏最稳妥。", "The game is running: many mods read configs only at start and may write them back on exit. Restart the game after editing.")}</div>}
+          {s.running && <div className="faint" style={{ fontSize: "var(--text-xs)" }}>{t("游戏运行中修改配置可能被覆盖，建议改完重启游戏。", "Edits while playing may be overwritten; restart the game after saving.")}</div>}
           {path == null ? (
             <div className="faint config-empty">{t("从左边选一个文件。", "Pick a file on the left.")}</div>
           ) : error ? (

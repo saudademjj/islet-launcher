@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { Account } from "../api/types";
 import { hashSeed, random } from "../lib/pixel";
+import { cssBackgroundUrl, safeHttpsUrl } from "../lib/sanitize";
 
 // A player is shown by their face, the 8×8 front of the head on their skin,
 // as the game and every launcher show them. Microsoft accounts use their
@@ -10,7 +11,7 @@ import { hashSeed, random } from "../lib/pixel";
 // already shows while the name is typed.
 
 /** Mojang serves textures over plain http; the window only loads https. */
-export const secure = (url: string) => url.replace(/^http:\/\//, "https://");
+export const secure = (url: string) => safeHttpsUrl(url, true) ?? "";
 
 export interface Skin {
   url: string;
@@ -26,8 +27,9 @@ export function useSkin(url: string | null | undefined): Skin | null {
   useEffect(() => {
     setSkin(null);
     if (!url) return;
-    let live = true;
     const src = secure(url);
+    if (!src) return;
+    let live = true;
     const image = new Image();
     image.onload = () => {
       if (image.naturalWidth !== 64 || (image.naturalHeight !== 64 && image.naturalHeight !== 32)) return;
@@ -75,7 +77,7 @@ function legacyHatShows(src: string): Promise<boolean> {
 /** One rectangle of a skin texture, scaled by `px`, as a CSS background. */
 function crop(url: string, px: number, x: number, y: number, legacy = false) {
   return {
-    backgroundImage: `url("${url}")`,
+    backgroundImage: cssBackgroundUrl(url),
     backgroundSize: `${64 * px}px ${(legacy ? 32 : 64) * px}px`,
     backgroundPosition: `${-x * px}px ${-y * px}px`,
   };

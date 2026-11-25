@@ -140,12 +140,13 @@ fn read_index(zip: &mut zip::ZipArchive<fs::File>) -> AppResult<Index> {
 /// Copies a pack's override folders into `dest`; later prefixes win, so
 /// client overrides beat common ones regardless of ZIP entry order.
 fn extract_overrides(zip: &mut zip::ZipArchive<fs::File>, dest_root: &Path, prefixes: &[String]) -> AppResult<()> {
+    const MAX_OVERRIDE_BYTES: u64 = 8 * 1024 * 1024 * 1024;
     fs::create_dir_all(dest_root)?;
     let mut total = 0u64;
     for prefix in prefixes {
         let prefix = format!("{}/", prefix.trim_end_matches('/'));
         for i in 0..zip.len() {
-            let mut entry = zip.by_index(i).map_err(zip_error)?;
+            let entry = zip.by_index(i).map_err(zip_error)?;
             let entry_name = entry.name().map_err(zip_error)?;
             let Some(relative) = entry_name.strip_prefix(prefix.as_str()) else {
                 continue;
@@ -154,8 +155,9 @@ fn extract_overrides(zip: &mut zip::ZipArchive<fs::File>, dest_root: &Path, pref
                 continue;
             }
             let relative = safe_archive_path(relative)?;
-            total = total.saturating_add(entry.size());
-            if total > 8 * 1024 * 1024 * 1024 || entry.unix_mode().is_some_and(|m| m & 0o170000 == 0o120000) {
+            if entry.size() > MAX_OVERRIDE_BYTES.saturating_sub(total)
+                || entry.unix_mode().is_some_and(|m| m & 0o170000 == 0o120000)
+            {
                 return Err(AppError::new("modpack", crate::core::i18n::pick("整合包覆盖文件超出 8 GB 或包含符号链接。", "The modpack overrides exceed 8 GB or contain symbolic links.")));
             }
             let dest = dest_root.join(relative);
@@ -165,7 +167,14 @@ fn extract_overrides(zip: &mut zip::ZipArchive<fs::File>, dest_root: &Path, pref
                 if let Some(parent) = dest.parent() {
                     fs::create_dir_all(parent)?;
                 }
-                std::io::copy(&mut entry, &mut fs::File::create(dest)?)?;
+                let remaining = MAX_OVERRIDE_BYTES.saturating_sub(total);
+                let mut limited = entry.take(remaining.saturating_add(1));
+                let copied = std::io::copy(&mut limited, &mut fs::File::create(&dest)?)?;
+                total = total.saturating_add(copied);
+                if total > MAX_OVERRIDE_BYTES {
+                    let _ = fs::remove_file(&dest);
+                    return Err(AppError::new("modpack", crate::core::i18n::pick("整合包覆盖文件超出 8 GB 或包含符号链接。", "The modpack overrides exceed 8 GB or contain symbolic links.")));
+                }
             }
         }
     }
@@ -262,7 +271,7 @@ pub fn import_curseforge(
 ) -> AppResult<Instance> {
     let index = curseforge_index(manifest, files)?;
     let mut zip = zip::ZipArchive::new(fs::File::open(source)?).map_err(zip_error)?;
-    import_index(paths, store, &mut zip, index, &[manifest.overrides.clone()])
+    import_index(paths, store, &mut zip, index, std::slice::from_ref(&manifest.overrides))
 }
 
 /// A CurseForge pack in the same shape as a Modrinth one, so installing,
@@ -518,7 +527,12 @@ pub fn export(
         }
     };
     let game = paths.instance_game_dir(&instance.id);
-    let temporary = destination.with_extension("part");
+    let temp_name = format!(
+        ".{}.part-{}",
+        destination.file_name().unwrap_or_default().to_string_lossy(),
+        uuid::Uuid::new_v4().simple()
+    );
+    let temporary = destination.with_file_name(temp_name);
     let result = (|| -> AppResult<()> {
         let mut zip = zip::ZipWriter::new(fs::File::create(&temporary)?);
         let deflate = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
@@ -560,7 +574,7 @@ pub fn export(
     })();
     match result {
         Ok(()) => {
-            fs::rename(&temporary, destination)?;
+            crate::core::util::replace_file(&temporary, destination)?;
             Ok((linked, bundled.len()))
         }
         Err(error) => {
@@ -739,6 +753,32 @@ pub fn downloads(paths: &AppPaths, instance: &Instance) -> AppResult<Vec<Downloa
 }
 fn zip_error(error: zip::result::ZipError) -> AppError {
     AppError::detail("modpack", crate::core::i18n::pick("无法读取 mrpack 文件。", "Couldn't read the mrpack file."), error.to_string())
+}
+
+/// Apply overrides after downloads, once. Repair must preserve user-edited config.
+pub fn apply_overrides(paths: &AppPaths, instance: &Instance) -> AppResult<()> {
+    let root = paths.instance_dir(&instance.id);
+    let source = root.join("modpack-overrides");
+    let marker = root.join(".overrides-applied");
+    if !source.is_dir() || marker.exists() {
+        return Ok(());
+    }
+    fn copy(source: &Path, dest: &Path) -> AppResult<()> {
+        fs::create_dir_all(dest)?;
+        for entry in fs::read_dir(source)? {
+            let entry = entry?;
+            if entry.file_type()?.is_dir() {
+                copy(&entry.path(), &dest.join(entry.file_name()))?;
+            } else if entry.file_type()?.is_file() {
+                fs::copy(entry.path(), dest.join(entry.file_name()))?;
+            } else {
+                return Err(AppError::new("modpack_path", crate::core::i18n::pick("覆盖目录包含非普通文件。", "The overrides folder contains a non-regular file.")));
+            }
+        }
+        Ok(())
+    }
+    copy(&source, &paths.instance_game_dir(&instance.id))?;
+    atomic_write(&marker, b"1")
 }
 
 #[cfg(test)]
@@ -944,30 +984,4 @@ mod tests {
         record_replaced(&paths, "plain", &["mods/a.jar".into()], &[]).unwrap();
         assert!(!paths.instance_dir("plain").join(REPLACED_FILE).exists());
     }
-}
-
-/// Apply overrides after downloads, once. Repair must preserve user-edited config.
-pub fn apply_overrides(paths: &AppPaths, instance: &Instance) -> AppResult<()> {
-    let root = paths.instance_dir(&instance.id);
-    let source = root.join("modpack-overrides");
-    let marker = root.join(".overrides-applied");
-    if !source.is_dir() || marker.exists() {
-        return Ok(());
-    }
-    fn copy(source: &Path, dest: &Path) -> AppResult<()> {
-        fs::create_dir_all(dest)?;
-        for entry in fs::read_dir(source)? {
-            let entry = entry?;
-            if entry.file_type()?.is_dir() {
-                copy(&entry.path(), &dest.join(entry.file_name()))?;
-            } else if entry.file_type()?.is_file() {
-                fs::copy(entry.path(), dest.join(entry.file_name()))?;
-            } else {
-                return Err(AppError::new("modpack_path", "覆盖目录包含非普通文件。"));
-            }
-        }
-        Ok(())
-    }
-    copy(&source, &paths.instance_game_dir(&instance.id))?;
-    atomic_write(&marker, b"1")
 }

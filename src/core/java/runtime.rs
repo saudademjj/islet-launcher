@@ -28,6 +28,7 @@ pub async fn ensure_java(
     ensure_java_with_source(client, paths, major, override_path, arch, cancel, report, DownloadSource::Bmclapi).await
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn ensure_java_with_source(
     client: &reqwest::Client,
     paths: &AppPaths,
@@ -40,10 +41,18 @@ pub async fn ensure_java_with_source(
 ) -> AppResult<JavaInstallation> {
     check_cancel(cancel)?;
     if !platform::can_run_arch(arch) {
-        return Err(AppError::new(
-            "rosetta",
-            crate::core::i18n::pick("这个版本的游戏只有 Intel 版的本地库，需要用 Rosetta 2 运行。请在「终端」里运行 softwareupdate --install-rosetta 安装后再试。", "This game version has Intel-only native libraries and needs Rosetta 2. Run softwareupdate --install-rosetta in Terminal, then try again."),
-        ));
+        let message = if cfg!(target_os = "macos") {
+            crate::core::i18n::pick(
+                "这个版本的游戏只有 Intel 版的本地库，需要用 Rosetta 2 运行。请在「终端」里运行 softwareupdate --install-rosetta 安装后再试。",
+                "This game version has Intel-only native libraries and needs Rosetta 2. Run softwareupdate --install-rosetta in Terminal, then try again.",
+            )
+        } else {
+            crate::core::i18n::pick(
+                "当前版本的 Minecraft 官方 Linux 本地库仅提供 x86_64 版本，当前 ARM64 系统未检测到 box64 或 qemu-user-binfmt 转译环境，请安装后重试。",
+                "Official Minecraft Linux native libraries only ship for x86_64, and no x86_64 translator (box64 or qemu-user-binfmt) was detected on this ARM64 system. Install one and try again.",
+            )
+        };
+        return Err(AppError::new("rosetta", message));
     }
     let arch = platform::normalize_arch(arch).to_string();
     if let Some(path) = override_path.filter(|p| *p != "auto") {
@@ -64,8 +73,8 @@ pub async fn ensure_java_with_source(
         return Ok(java);
     }
     let root = paths.java_dir("adoptium", major, platform::adoptium_arch_for(&arch));
-    if root.join(".complete").is_file() {
-        if let Some(binary) = find_java_binary(&root) {
+    if root.join(".complete").is_file()
+        && let Some(binary) = find_java_binary(&root) {
             let java = tokio::task::spawn_blocking(move || detect::inspect(&binary))
                 .await
                 .ok()
@@ -74,7 +83,6 @@ pub async fn ensure_java_with_source(
                 return Ok(java);
             }
         }
-    }
     let wanted = arch.clone();
     let detected = tokio::task::spawn_blocking(move || detect::find_for_major(major, &wanted))
         .await
@@ -136,12 +144,11 @@ pub async fn ensure_java_with_source(
     };
     let previous = root.with_file_name(format!(".previous-{}", uuid::Uuid::new_v4()));
     let had_previous = root.exists();
-    if had_previous {
-        if let Err(error) = std::fs::rename(&root, &previous) {
+    if had_previous
+        && let Err(error) = std::fs::rename(&root, &previous) {
             let _ = std::fs::remove_dir_all(&stage);
             return Err(error.into());
         }
-    }
     if let Err(error) = std::fs::rename(&stage, &root) {
         if had_previous {
             let _ = std::fs::rename(&previous, &root);
@@ -186,6 +193,7 @@ pub async fn download_linux_runtime(client: &reqwest::Client, paths: &AppPaths, 
     Ok(archive)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn download_package(
     client: &reqwest::Client,
     paths: &AppPaths,
@@ -262,7 +270,13 @@ pub fn validate_explicit_for(java: &JavaInstallation, required: u32, arch: &str)
 fn validate_arch(java: &JavaInstallation, arch: &str) -> AppResult<()> {
     if !detect::same_arch(&java.arch, arch) {
         let hint = if platform::normalize_arch(arch) == "x86_64" && platform::normalize_arch(std::env::consts::ARCH) == "aarch64" {
-            crate::core::i18n::pick("这个版本要用 Intel（x86_64）版 Java 经 Rosetta 2 运行，请清空 Java 路径让启动器自动下载。", "This version runs with an Intel (x86_64) Java under Rosetta 2; clear the Java path so the launcher downloads one.")
+            if cfg!(target_os = "macos") {
+                crate::core::i18n::pick("这个版本要用 Intel（x86_64）版 Java 经 Rosetta 2 运行，请清空 Java 路径让启动器自动下载。", "This version runs with an Intel (x86_64) Java under Rosetta 2; clear the Java path so the launcher downloads one.")
+            } else if cfg!(target_os = "windows") {
+                crate::core::i18n::pick("这个版本要用 x86_64 版 Java 经 Windows x64 模拟运行，请清空 Java 路径让启动器自动下载。", "This version runs with an x86_64 Java under Windows x64 emulation; clear the Java path so the launcher downloads one.")
+            } else {
+                crate::core::i18n::pick("这个版本要用 x86_64 版 Java 经转译环境运行，请清空 Java 路径让启动器自动下载。", "This version runs with an x86_64 Java under x86_64 emulation; clear the Java path so the launcher downloads one.")
+            }
         } else {
             crate::core::i18n::pick("请选择相同架构的 Java，或清空路径让启动器自动选择。", "Choose a Java of the same architecture, or clear the path to choose automatically.")
         };

@@ -110,6 +110,16 @@ pub fn file_stem_safe(name: &str) -> String {
     if trimmed.is_empty() { "world".to_string() } else { trimmed.to_string() }
 }
 
+/// Whether `url` is safe to pass to the OS web browser: HTTPS with a host, or
+/// plain HTTP strictly on localhost / 127.0.0.1.
+pub fn is_safe_web_url(url: &str) -> bool {
+    url::Url::parse(url).is_ok_and(|parsed| match parsed.scheme() {
+        "https" => parsed.host_str().is_some_and(|h| !h.is_empty()),
+        "http" => matches!(parsed.host_str(), Some("localhost" | "127.0.0.1")),
+        _ => false,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -120,5 +130,16 @@ mod tests {
         atomic_write(&path, b"old").unwrap();
         atomic_write(&path, b"new").unwrap();
         assert_eq!(fs::read(path).unwrap(), b"new");
+    }
+
+    #[test]
+    fn safe_web_url_rejects_prefix_spoofs_and_local_files() {
+        assert!(is_safe_web_url("https://modrinth.com/mod/sodium"));
+        assert!(is_safe_web_url("http://localhost:5173/"));
+        assert!(is_safe_web_url("http://127.0.0.1:8080/callback"));
+        assert!(!is_safe_web_url("http://localhost.evil.com/phish"));
+        assert!(!is_safe_web_url("http://example.com/"));
+        assert!(!is_safe_web_url("file:///etc/hosts"));
+        assert!(!is_safe_web_url("javascript:alert(1)"));
     }
 }

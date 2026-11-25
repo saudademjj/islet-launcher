@@ -10,7 +10,7 @@ use crate::core::settings::{ProxyMode, Settings};
 enum Route {
     System,
     Direct,
-    Via(reqwest::Proxy),
+    Via(Box<reqwest::Proxy>),
 }
 
 static ROUTE: RwLock<Route> = RwLock::new(Route::System);
@@ -19,7 +19,7 @@ fn route(settings: &Settings) -> AppResult<Route> {
     Ok(match settings.proxy_mode {
         ProxyMode::System => Route::System,
         ProxyMode::None => Route::Direct,
-        ProxyMode::Custom => Route::Via(parse(&settings.proxy_url)?),
+        ProxyMode::Custom => Route::Via(Box::new(parse(&settings.proxy_url)?)),
     })
 }
 
@@ -41,7 +41,7 @@ pub fn builder() -> reqwest::ClientBuilder {
     match ROUTE.read().unwrap_or_else(|poisoned| poisoned.into_inner()).clone() {
         Route::System => builder,
         Route::Direct => builder.no_proxy(),
-        Route::Via(proxy) => builder.proxy(proxy),
+        Route::Via(proxy) => builder.proxy(*proxy),
     }
 }
 

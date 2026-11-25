@@ -112,6 +112,7 @@ impl AppServices {
         for arch in ["x86_64", "aarch64"] {
             match runtime.block_on(crate::core::java::runtime::linux_runtime(&http, java_major, arch, source, cancel)) {
                 Ok(java) => std::fs::write(destination.join(".islet").join(format!("java-{arch}")), format!("{}\n{}\n", java.sha256, java.urls.join("\n")))?,
+                Err(error) if error.code() == "cancelled" => return Err(error),
                 // `islet.sh setup` then asks for a Java on that kind of host.
                 Err(error) => tracing::warn!(%error, arch, "no Java listed for the server kit"),
             }

@@ -14,11 +14,11 @@
    - **Supported account types**：选择 **Personal Microsoft accounts only**
    - **Redirect URI**：
      - 平台选择 **Mobile and desktop applications**
-     - 填写 `http://localhost`
+     - 填写 `http://localhost/callback`
 4. 点击 **Register**。
 5. 在应用概览页复制 **Application (client) ID**（一个 GUID，形如 `00000000-0000-0000-0000-000000000000`）。
 6. 进入 **Authentication**：
-   - 确认 Redirect URI 中有 `http://localhost`
+   - 确认 Redirect URI 中有 `http://localhost/callback`
    - 将 **Allow public client flows** 设为 **Yes**
    - 保存
 7. 不需要创建 client secret，也不需要预配 API permissions。登录时启动器会请求 `XboxLive.signin offline_access` 权限。
@@ -31,7 +31,7 @@ Mojang 只允许审核通过的 Azure 应用调用 Minecraft 登录接口（`log
 
 1. 打开 [aka.ms/mce-reviewappid](https://aka.ms/mce-reviewappid)，填写申请表：Client ID、Tenant ID（应用概览页的 Directory (tenant) ID）、启动器名称和网站、用途说明。
 2. 审核通常需要几天到几周，结果会发到申请邮箱。
-3. 通过前登录会在「换取 Minecraft 令牌」这一步失败；外置登录不受影响；离线账号要等有拥有 Java 版的微软账号登录后才能添加。
+3. 通过前登录会在「换取 Minecraft 令牌」这一步失败；离线账号与外置登录均要求先登录拥有 Java 版的微软账号后才能添加和启动。
 
 被拒绝时邮件不一定说明原因，可能的原因有：
 
@@ -41,9 +41,9 @@ Mojang 只允许审核通过的 Azure 应用调用 Minecraft 登录接口（`log
 
 改正后可以再次申请。项目主页写清楚「非 Mojang / Microsoft 官方产品」会有帮助。
 
-## 为什么重定向地址只填 `http://localhost`
+## 为什么重定向地址只填 `http://localhost/callback`
 
-启动器登录时会在 `127.0.0.1` 上启动一个临时回调服务，端口随机。微软对桌面应用的 loopback 重定向允许使用任意端口，所以注册 `http://localhost` 即可，不需要固定端口。
+启动器登录时会在 `127.0.0.1` 上启动一个临时回调服务，端口随机（回调路径固定为 `/callback`）。微软对桌面应用的 loopback 重定向允许使用任意端口，所以注册 `http://localhost/callback` 即可，不需要固定端口。
 
 如果本机防火墙拦截了回环回调，可以在登录时改用「设备代码登录」：启动器会显示一个代码和登录链接，不需要本机监听端口。
 
@@ -52,11 +52,11 @@ Mojang 只允许审核通过的 Azure 应用调用 Minecraft 登录接口（`log
 | 错误 | 原因 | 处理 |
 |---|---|---|
 | `Azure Client ID 无效，或应用没有启用公开客户端` | Client ID 填错，或没有开启 public client flows | 检查 GUID，回到 Authentication 开启 Allow public client flows |
-| `redirect_uri` 不匹配 | Redirect URI 没有配置 `http://localhost` | 在 Authentication 中添加 Mobile and desktop applications 平台和 `http://localhost` |
+| `redirect_uri` 不匹配 | Redirect URI 没有配置 `http://localhost/callback` | 在 Authentication 中添加 Mobile and desktop applications 平台和 `http://localhost/callback` |
 | `该微软账号未拥有 Minecraft Java 版` | 账号没有 Java 版拥有记录 | 换用拥有 Java 版的账号；离线账号不能用于正版在线服务器 |
 | `该微软账号还没有 Xbox 档案` | 微软账号未创建 Xbox 档案 | 先在 xbox.com 登录并创建档案 |
 | `儿童账号需要加入 Microsoft 家庭组` | 账号是儿童账号 | 由家庭组织者加入家庭组后再登录 |
-| 浏览器授权成功，但最后提示无法登录 Minecraft | Azure 应用还没有通过 Mojang AppID 审核 | 按上文申请审核；通过前只能用外置登录 |
+| 浏览器授权成功，但最后提示无法登录 Minecraft | Azure 应用还没有通过 Mojang AppID 审核 | 按上文申请审核，等待审核通过后即可使用 |
 | 浏览器登录完成后启动器没有反应 | 回环回调被拦截/超时 | 重新登录并改用设备代码登录 |
 
 ## 安全说明

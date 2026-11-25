@@ -59,7 +59,7 @@ pub fn known_dirs() -> Vec<(String, String)> {
 pub fn scan(root: &Path) -> Vec<ImportCandidate> {
     let mut found = Vec::new();
     scan_into(root, &mut found, 2);
-    found.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    found.sort_by_key(|a| a.name.to_lowercase());
     found.dedup_by(|a, b| a.source == b.source);
     found
 }
@@ -131,6 +131,8 @@ fn prism(dir: &Path) -> Option<ImportCandidate> {
             "org.quiltmc.quilt-loader" => loader = ("quilt".into(), version),
             "net.minecraftforge" => loader = ("forge".into(), version),
             "net.neoforged" => loader = ("neoforge".into(), version),
+            "com.mumfrey.liteloader" => loader = ("liteloader".into(), version),
+            "com.cleanroommc.cleanroom" => loader = ("cleanroom".into(), version),
             _ => {}
         }
     }
@@ -215,6 +217,8 @@ fn detect_loader(json: &serde_json::Value) -> (String, Option<String>) {
             ("net.fabricmc", "fabric-loader") => return ("fabric".into(), Some(version)),
             ("org.quiltmc", "quilt-loader") => return ("quilt".into(), Some(version)),
             ("net.neoforged", "neoforge") => return ("neoforge".into(), Some(version)),
+            ("com.mumfrey", "liteloader") => return ("liteloader".into(), Some(version)),
+            ("com.cleanroommc", "cleanroom") => return ("cleanroom".into(), Some(version)),
             ("net.minecraftforge", "forge" | "fmlloader") => {
                 // "1.20.1-47.2.0" → "47.2.0"; older ones keep their suffix.
                 let own = version.strip_prefix(&format!("{mc}-")).map(str::to_string);
@@ -232,6 +236,8 @@ fn detect_loader(json: &serde_json::Value) -> (String, Option<String>) {
             "quilt" => return ("quilt".into(), version),
             "forge" => return ("forge".into(), version),
             "neoforge" => return ("neoforge".into(), version),
+            "liteloader" => return ("liteloader".into(), version),
+            "cleanroom" => return ("cleanroom".into(), version),
             _ => {}
         }
     }

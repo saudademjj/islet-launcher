@@ -153,13 +153,11 @@ fn handle(app: &AppHandle, aside: &mut Aside, event: UiEvent) {
         UiEvent::LaunchExit { success: false, .. } => Some(islet::core::i18n::pick("游戏异常退出，打开启动器查看崩溃分析", "The game crashed. Open the launcher for the crash analysis.").to_string()),
         _ => None,
     };
-    if settings.system_notifications {
-        if let Some(body) = notification {
-            if let Err(error) = app.notification().builder().title("Islet").body(body).show() {
+    if settings.system_notifications
+        && let Some(body) = notification
+            && let Err(error) = app.notification().builder().title("Islet").body(body).show() {
                 tracing::warn!(%error, "system notification failed");
             }
-        }
-    }
     if matches!(&event, UiEvent::LaunchStarted { .. } | UiEvent::LaunchExit { .. }) {
         let services = app.state::<LauncherState>().services();
         let playing = services.running_instance_ids().first().and_then(|id| services.instances.get(id).ok());

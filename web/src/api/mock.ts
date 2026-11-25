@@ -40,6 +40,8 @@ const settings: Settings = {
   launch: { jvmArgs: "", gameArgs: "", windowWidth: null, windowHeight: null, env: "", wrapper: "", preLaunch: "", postExit: "" },
   curseforgeKey: "",
   checkUpdates: true,
+  systemNotifications: true,
+  discordApplicationId: "",
   // The demo keeps the language across reloads, as the real settings file does.
   language: ((): Settings["language"] => {
     const saved = typeof localStorage === "undefined" ? null : localStorage.getItem("mc-launcher.language");
@@ -192,7 +194,7 @@ function snapshot(): Snapshot {
     accounts: [...accounts],
     instances: [...instances],
     // ?platform=windows previews the title bar the Windows build draws.
-    appInfo: { version: "0.4.0", dataDir: "~/Library/Application Support/com.saudade.mclauncher", platform: new URLSearchParams(location.search).get("platform") ?? "macos", arch: "aarch64" },
+    appInfo: { version: "0.5.0", dataDir: "~/Library/Application Support/com.saudade.mclauncher", platform: new URLSearchParams(location.search).get("platform") ?? "macos", arch: "aarch64", curseforgeConfigured: false },
   };
 }
 
@@ -315,6 +317,7 @@ let remoteBackups: [string, number][] = [
   ["backups/world-20261031-051700.tar.gz", 184_320_000],
   ["backups/world-20261030-051700.tar.gz", 183_910_000],
 ];
+let mockTunnel: { running: boolean; address: string; detail: string } | null = null;
 let p2pInstalled = false;
 let p2pPrepStart: number | null = null;
 let p2pRoom: { role: "host" | "guest"; code: string; started: number; port: number; local: number; name: string } | null = null;
@@ -387,8 +390,8 @@ function p2pStatus() {
     world: p2pRoom.role === "guest" && !(e >= 3 && !/^(U\/)?ZZZZ/.test(p2pRoom.code)) ? null : world,
     members: p2pRoom.code.startsWith("U/") && (p2pRoom.role === "host" || e >= 3)
       ? [
-          { name: p2pRoom.role === "host" ? p2pRoom.name : "Steve", vendor: p2pRoom.role === "host" ? "Islet 0.4.0" : "HMCL 3.6.12", host: true, me: p2pRoom.role === "host" },
-          ...players.filter((p) => !p.host).map((p, i) => ({ name: p.name, vendor: i ? "PCL CE 2.10" : "Islet 0.4.0", host: false, me: false })),
+          { name: p2pRoom.role === "host" ? p2pRoom.name : "Steve", vendor: p2pRoom.role === "host" ? "Islet 0.5.0" : "HMCL 3.6.12", host: true, me: p2pRoom.role === "host" },
+          ...players.filter((p) => !p.host).map((p, i) => ({ name: p.name, vendor: i ? "PCL CE 2.10" : "Islet 0.5.0", host: false, me: false })),
         ]
       : [],
     notice: p2pRoom.role === "guest" && p2pRoom.code.startsWith("U/ZZZZ") && e >= 8 ? "连不上房主的房间服务。" : null,
@@ -421,7 +424,7 @@ const commands: Record<string, (args: any) => unknown> = {
   login_configured: () => settings.clientId !== "",
   update_settings: ({ settings: next }) => (Object.assign(settings, next), snapshot()),
   add_offline_account: ({ username }) => {
-    if (!accounts.some((a) => a.provider === "microsoft" && a.ownership === true)) return fail("离线账号需要先登录一个拥有 Minecraft Java 版的微软账号。", "owner_required");
+    if (!accounts.some((a) => a.provider === "microsoft" && a.ownership === true)) return fail("需要先登录一个拥有 Minecraft Java 版的微软账号。", "owner_required");
     if (!/^\S{1,16}$/.test(username)) return fail("用户名不能超过 16 个字符，也不能包含空格");
     const id = `offline:${username.toLowerCase()}`;
     accounts = [...accounts.filter((a) => a.id !== id), account(id, "offline", username, crypto.randomUUID())];
@@ -752,9 +755,13 @@ const commands: Record<string, (args: any) => unknown> = {
   ],
   change_skin: () => snapshot(),
   set_cape: () => undefined,
-  login_yggdrasil: ({ username }) => ({ profiles: username === "multi" ? [{ id: "a", name: "Alex_Skin" }, { id: "b", name: "Builder" }] : null, snapshot: snapshot() }),
+  login_yggdrasil: ({ username }) => {
+    if (!accounts.some((a) => a.provider === "microsoft" && a.ownership === true)) return fail("需要先登录一个拥有 Minecraft Java 版的微软账号。", "owner_required");
+    return { profiles: username === "multi" ? [{ id: "a", name: "Alex_Skin" }, { id: "b", name: "Builder" }] : null, snapshot: snapshot() };
+  },
   check_update: () => null,
   update_source: () => false,
+  install_update: () => "更新包已下载并校验，已在文件夹中显示。",
   patch_notes: () => [
     { title: "Minecraft Java Edition 26.3", version: "26.3", kind: "release", date: "2026-09-18T09:00:00Z", summary: "新的生物群系和铜质工具，村民交易再平衡。" },
     { title: "Minecraft Snapshot 26w18a", version: "26w18a", kind: "snapshot", date: "2026-10-22T13:00:00Z", summary: "试验性特性：新的下界结构。" },
@@ -764,7 +771,14 @@ const commands: Record<string, (args: any) => unknown> = {
   mod_changelog: () => "### Changes\nImproved compatibility and performance.",
   search_modpacks: ({ query }) => ({ hits: [{ project_id: "demo-pack", title: "Demo Adventure Pack", description: "Preview modpack for testing the browser and version picker.", downloads: 123456, icon_url: null }].filter(p => !query || p.title.toLowerCase().includes(String(query).toLowerCase())), total_hits: 1 }),
   modpack_versions: () => [{ id: "demo-pack-v1", project_id: "demo-pack", name: "Demo 1.0", version_number: "1.0", game_versions: ["1.20.1"], loaders: ["fabric"], files: [], dependencies: [], version_type: "release" }],
-  tunnel_status: () => ({ running: false, address: "", detail: "" }),
+  tunnel_status: () => mockTunnel ?? { running: false, address: "", detail: "" },
+  start_tunnel: ({ host, remotePort }) => {
+    mockTunnel = { running: true, address: `${host}:${remotePort}`, detail: "Demo SSH tunnel connected." };
+    return mockTunnel;
+  },
+  stop_tunnel: () => {
+    mockTunnel = null;
+  },
   p2p_defaults: () => ({
     nodes: ["tcp://225284.xyz:11010", "tcp://easytier.weiai.org.cn:11010", "tcp://183.230.36.171:11010", "udp://et.basd1.de:11010", "wss://et.chinokou.cn", "txt://net.qicwken.top"],
     downloadSize: p2pInstalled ? null : P2P_SIZE,
@@ -842,6 +856,7 @@ const commands: Record<string, (args: any) => unknown> = {
       setMods: operation.enabled ? `已启用 ${operation.names?.length} 个模组。` : `已禁用 ${operation.names?.length} 个模组。`,
       recycleMods: `${operation.names?.length} 个模组已移到回收站。`,
       importPack: "整合包已导入，首次开始游戏时安装。",
+      installModpack: "整合包已安装，首次开始游戏时启动。",
       recycle: `「${operation.name}」已移到回收站。`,
       addPacks: "已添加 1 个资源包。",
       addDatapacks: "已添加 1 个数据包，下次进入存档时生效。",
@@ -908,8 +923,9 @@ const commands: Record<string, (args: any) => unknown> = {
       // `localStorage.mockSignIn = "auth_offline"` (or "auth_expired") in the
       // console tries the sign-in failures out.
       const player = accounts.find((a) => a.id === (instances.find((i) => i.id === id)?.accountId ?? settings.activeAccountId));
-      if (player?.provider === "offline" && !accounts.some((a) => a.provider === "microsoft" && a.ownership === true)) {
-        emit({ type: "launchError", data: { instanceId: id, error: { code: "owner_required", message: "离线账号需要先登录一个拥有 Minecraft Java 版的微软账号。", detail: null } } });
+      const hasOwner = accounts.some((a) => a.provider === "microsoft" && a.ownership === true);
+      if (!hasOwner || (player?.provider === "microsoft" && player.ownership !== true)) {
+        emit({ type: "launchError", data: { instanceId: id, error: { code: "owner_required", message: "需要先登录一个拥有 Minecraft Java 版的微软账号。", detail: null } } });
         return;
       }
       const failure = offline ? null : localStorage.getItem("mockSignIn");

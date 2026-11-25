@@ -46,8 +46,8 @@ export function ServerModsDialog({ id, address, check, offline }: { id: string; 
       <div className="col gap-16">
         <span className="field-hint">
           {t(
-            `这台服务器有 ${check.missing.length} 个模组你还没有${check.outdated.length ? `，另有 ${check.outdated.length} 个是旧版本` : ""}。缺模组时服务器通常会拒绝进入。`,
-            `The server runs ${check.missing.length} mod(s) you don't have${check.outdated.length ? `, and ${check.outdated.length} of yours are older versions` : ""}. Servers usually turn players away over missing mods.`,
+            `你缺少服务器的 ${check.missing.length} 个模组${check.outdated.length ? `，另有 ${check.outdated.length} 个版本过旧` : ""}。`,
+            `You're missing ${check.missing.length} server mod(s)${check.outdated.length ? `, with ${check.outdated.length} outdated` : ""}.`,
           )}
         </span>
         <div className="list" style={{ maxHeight: 240, overflowY: "auto" }}>
@@ -63,12 +63,12 @@ export function ServerModsDialog({ id, address, check, offline }: { id: string; 
         </div>
         {check.outdated.length > 0 && (
           <span className="field-hint">
-            {t(`补齐时，旧版本（${check.outdated.join("、")}）会移到回收站。`, `Getting them moves the old versions (${check.outdated.join(", ")}) to the recycle bin.`)}
+            {t(`补齐时，旧版本（${check.outdated.join("、")}）会移入回收站。`, `Getting them moves the old versions (${check.outdated.join(", ")}) to the recycle bin.`)}
           </span>
         )}
         {!check.fixable && (
           <Notice tone="warn" title={t("有的模组没法自动下载", "Some mods can't be downloaded")}>
-            {t("向服主要最新的整合包，在世界管理的「数据」页用「更新整合包」装上。", "Ask the host for the latest pack and install it with \"Update modpack\" on the world's Data tab.")}
+            {t("请向服主获取最新整合包，在「管理 → 工具」中更新。", "Ask the host for the latest modpack and update it under Manage → Tools.")}
           </Notice>
         )}
       </div>

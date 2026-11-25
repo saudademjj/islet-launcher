@@ -70,6 +70,9 @@ export function CrashDialog({
     } else if (fix.kind === "openMods") {
       setState(index, "opened");
       s.openManage(instanceId, "mods");
+    } else if (fix.kind === "openTools") {
+      setState(index, "opened");
+      s.openManage(instanceId, "tools");
     } else if (fix.kind === "repair") {
       // installInstance clears the previous outcome before returning; only
       // then may the dialog start watching for the new result.
@@ -223,6 +226,8 @@ function fixLabel(fix: CrashFix): string {
       return t(`下载 ${fix.query}`, `Download ${fix.query}`);
     case "openMods":
       return t("管理模组", "Manage mods");
+    case "openTools":
+      return t("打开工具", "Open tools");
     case "repair":
       return t("校验并修复", "Verify and repair");
     default:

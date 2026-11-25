@@ -1,0 +1,1229 @@
+/* ---------- overlays ---------- */
+
+.overlay-root {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+}
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+}
+
+.modal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100%);
+  max-height: 100%;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  box-shadow: 0 5px 0 var(--hero-edge);
+  overflow: hidden;
+}
+
+.modal.wide {
+  width: min(880px, 100%);
+  height: min(820px, 100%);
+}
+
+.modal-body {
+  padding: 4px 24px 20px;
+  overflow: auto;
+  min-height: 0;
+  line-height: 1.6;
+}
+
+/* A wide dialog's body takes the room above its footer. */
+.modal-body.fill {
+  flex: 1;
+}
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.toasts {
+  position: fixed;
+  right: 20px;
+  bottom: calc(var(--status-h) + 16px);
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 440px;
+  padding: 12px 8px 12px 16px;
+  border-radius: var(--radius-lg);
+  background: var(--frame);
+  color: var(--on-dark);
+  box-shadow: 0 3px 0 var(--hero-edge);
+  pointer-events: auto;
+  font-size: var(--text-sm);
+}
+
+/* The same signpost as a notice, smaller; a failure is told by its mark
+   alone, on the same forest panel as every other toast. */
+.toast > .sign {
+  margin-top: -2px;
+}
+
+.toast-text {
+  flex: 1;
+  min-width: 0;
+  max-height: 126px;
+  overflow: auto;
+  line-height: 21px;
+  overflow-wrap: anywhere;
+}
+
+.toast-act,
+.toast-close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 21px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--on-dark-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+
+.toast-act {
+  padding: 0 6px;
+  box-shadow: inset 0 0 0 1px var(--frame-line);
+}
+
+.toast-close {
+  width: 21px;
+}
+
+.toast-act:hover,
+.toast-close:hover {
+  background: var(--frame-3);
+  color: var(--on-dark);
+}
+
+/* Every title shows as this instead of the system's box (components/
+   Tooltips.tsx): a small forest panel with a solid edge, above the
+   context menu. */
+.tooltip {
+  position: fixed;
+  z-index: 95;
+  max-width: 280px;
+  padding: 6px 8px;
+  border: 1px solid var(--frame-line);
+  border-radius: var(--radius);
+  background: var(--frame);
+  color: var(--on-dark);
+  box-shadow: 0 2px 0 var(--hero-edge);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  animation: tooltip-in var(--dur-fast) var(--ease-out);
+}
+
+@keyframes tooltip-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Folded text (log excerpts, details, changelogs): a stepped pixel arrow
+   instead of the system triangle, turning down when open. */
+summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  cursor: pointer;
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}
+
+summary::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 10px;
+  background: currentColor;
+  clip-path: polygon(0 0, 2px 0, 2px 2px, 4px 2px, 4px 4px, 6px 4px, 6px 6px, 4px 6px, 4px 8px, 2px 8px, 2px 10px, 0 10px);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.console {
+  background: var(--console-bg);
+  color: var(--console-text);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 18px;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+.console-line {
+  height: 18px;
+  padding: 0 16px;
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.console-line .ln {
+  display: inline-block;
+  width: 44px;
+  color: var(--console-dim);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.console-line.err {
+  color: var(--on-dark-danger);
+}
+
+.console-line.warn {
+  color: var(--on-dark-warn);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  transition-duration: 0.01ms !important;
+}
+
+/* ---------- crash analysis ---------- */
+
+.crash-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 24px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.crash-strip .dot {
+  background: currentColor;
+  opacity: 0.6;
+}
+
+.crash-card-index {
+  flex: none;
+  width: 26px;
+  padding-top: 1px;
+  font-size: var(--text-md);
+  font-weight: 800;
+  color: var(--danger-text);
+}
+
+.crash-card.done {
+  border-color: var(--accent);
+}
+
+.crash-card.done .crash-card-index {
+  color: var(--accent-text, var(--accent));
+}
+
+.crash-excerpt {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface-2);
+}
+
+.crash-excerpt summary {
+  padding: 12px 16px;
+  font-size: var(--text-sm);
+  font-weight: 650;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.crash-excerpt pre {
+  max-height: 180px;
+  margin: 0;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  overflow: auto;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  white-space: pre;
+  background: var(--surface);
+}
+
+.crash-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.crash-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface-2);
+}
+
+.crash-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.crash-card-title {
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.crash-card-detail {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
+.crash-actions {
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+
+.crash-progress {
+  padding: 8px 4px 0;
+  font-size: var(--text-sm);
+}
+
+.crash-report-note {
+  margin-right: auto;
+  color: var(--faint);
+  font-size: var(--text-xs);
+}
+
+/* ---------- scene header: a dialog that opens onto its world ---------- */
+
+.scene-head {
+  flex-shrink: 0;
+  background: var(--hero);
+  color: var(--on-dark);
+}
+
+.scene-head-view {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  height: 148px;
+  padding: 24px 20px 0 24px;
+  overflow: hidden;
+  transition: height var(--dur-slow) var(--ease-out), padding var(--dur-slow) var(--ease-out);
+}
+
+/* Compact: the land sinks to a low strip behind the title, so a list below
+   gets the height. The ground stays in view; the sky goes. */
+.scene-head.compact .scene-head-view {
+  align-items: center;
+  height: 76px;
+  padding-top: 0;
+}
+
+.scene-head.compact .scene-head-eyebrow,
+.scene-head.compact .scene-head-meta {
+  display: none;
+}
+
+/* The land sinks with it: only the hills and the top of the ground show,
+   so the title stays on the dark hills, clear of the grass line. */
+.scene-head .landscape {
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+
+.scene-head.compact .landscape {
+  transform: translateY(27px);
+}
+
+/* Dialogs with no world of their own (import, the recycle bin, sign-in):
+   the same window onto a world, low, with the subtitle kept. The land
+   sinks so only its top shows, under the text rather than behind it. */
+.scene-head.plain .scene-head-view {
+  align-items: center;
+  height: auto;
+  min-height: 84px;
+  padding: 16px 20px 32px 24px;
+}
+
+.scene-head.plain .landscape {
+  transform: translateY(24px);
+}
+
+.scene-head.plain .scene-head-title {
+  font-size: var(--text-lg);
+}
+
+.scene-head.plain .scene-head-meta {
+  display: block;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
+.scene-head.plain .scene-head-close {
+  align-self: flex-start;
+}
+
+.scene-head + .modal-body {
+  padding-top: 16px;
+}
+
+.scene-head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.scene-head-eyebrow {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--on-dark-faint);
+}
+
+.scene-head-title {
+  font-size: var(--text-xl);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.scene-head-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-sm);
+  color: var(--on-dark-muted);
+}
+
+.scene-head-meta .dot {
+  background: var(--on-dark-faint);
+}
+
+.scene-head-aside {
+  margin-top: 2px;
+  padding: 4px;
+  border-radius: var(--radius-xl);
+  background: var(--hero-edge);
+  line-height: 0;
+}
+
+.scene-head-close {
+  flex-shrink: 0;
+}
+
+/* The strip is the soil under the land: tabs sit on it in cream. */
+.scene-head-strip {
+  background: var(--t-strip, var(--t-dirt-dark));
+  border-top: 3px solid var(--t-grass-dark);
+}
+
+.scene-head-strip .tabs {
+  border-bottom: 0;
+  padding: 0 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.scene-head-strip .tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.scene-head-strip .tab {
+  flex: none;
+  white-space: nowrap;
+  height: 42px;
+  color: color-mix(in srgb, var(--on-dark) 68%, transparent);
+}
+
+.scene-head-strip .tab:hover,
+.scene-head-strip .tab[aria-selected="true"] {
+  color: var(--on-dark);
+}
+
+.tab-divider {
+  align-self: center;
+  width: 3px;
+  height: 12px;
+  margin: 0 6px;
+  background: var(--border-strong);
+  flex: none;
+}
+
+.scene-head-strip .tab-divider {
+  background: color-mix(in srgb, var(--on-dark) 22%, transparent);
+}
+
+.scene-head-strip .tab-indicator {
+  bottom: 0;
+  height: 4px;
+  background: var(--t-grass-light);
+}
+
+.tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--on-dark) 16%, transparent);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.scene-head .land .pixel {
+  transition: transform 1.4s var(--ease-out);
+}
+
+.scene-head:hover .land.far .pixel {
+  transform: translateX(-6px);
+}
+
+.scene-head:hover .land.near .pixel {
+  transform: translateX(-12px);
+}
+
+/* A crash: the same world at night, with a red seam where the ground broke. */
+.scene-head.danger .scene-head-strip {
+  background: var(--hero-edge);
+  border-top-color: var(--danger);
+  color: var(--on-dark-danger);
+}
+
+.scene-head.danger .scene-head-eyebrow {
+  color: var(--on-dark-danger);
+}
+
+/* ---------- command palette: a forest panel over everything ---------- */
+
+.sidebar-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  margin: 0 0 16px;
+  padding: 0 12px;
+  border: 1px solid var(--frame-line);
+  border-radius: var(--radius-lg);
+  background: var(--frame-2);
+  color: var(--on-dark-faint);
+  font-size: var(--text-sm);
+  transition: color var(--dur-fast), border-color var(--dur-fast);
+}
+
+.sidebar-search span {
+  flex: 1;
+  text-align: left;
+}
+
+.sidebar-search .kbd {
+  color: var(--on-dark-faint);
+}
+
+.sidebar-search:hover {
+  border-color: var(--frame-3);
+  color: var(--on-dark-muted);
+}
+
+.palette-root {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh 16px 16px;
+}
+
+.palette-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+}
+
+.palette {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(880px, 100%);
+  height: min(560px, 76vh);
+  border: 1px solid var(--frame-line);
+  border-radius: var(--radius-xl);
+  background: var(--frame);
+  box-shadow: 0 6px 0 var(--hero-edge);
+  color: var(--on-dark);
+  overflow: hidden;
+}
+
+.palette-input-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px;
+  height: 58px;
+  border-bottom: 1px solid var(--frame-line);
+  color: var(--on-dark-faint);
+}
+
+.palette-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--on-dark);
+  font: inherit;
+  font-size: var(--text-md);
+  outline: none;
+}
+
+.palette-input::placeholder {
+  color: var(--on-dark-faint);
+}
+
+.palette-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 264px;
+  flex: 1;
+  min-height: 0;
+}
+
+.palette-list {
+  min-height: 0;
+  padding: 4px 8px 12px;
+  overflow: auto;
+}
+
+.palette-group {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 12px 12px 6px;
+  font-family: var(--font-pixel);
+  font-size: var(--px-font);
+  -webkit-font-smoothing: none;
+  color: var(--on-dark-faint);
+}
+
+.palette-more {
+  margin-left: auto;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  -webkit-font-smoothing: antialiased;
+}
+
+.palette-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 12px 6px 16px;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--on-dark);
+  text-align: left;
+}
+
+.palette-item[aria-selected="true"] {
+  background: var(--frame-3);
+}
+
+/* The chosen row gets the grass-green bar the sidebar uses. */
+.palette-item[aria-selected="true"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 9px;
+  bottom: 9px;
+  width: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--on-dark-accent);
+}
+
+.palette-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-lg);
+  background: var(--frame-2);
+  color: var(--on-dark-accent);
+}
+
+.palette-icon .identicon {
+  border-radius: var(--radius) !important;
+}
+
+.palette-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.palette-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.palette-hint {
+  font-size: var(--text-xs);
+  color: var(--on-dark-faint);
+}
+
+.palette-current {
+  color: var(--on-dark-accent);
+}
+
+.palette-key {
+  flex: none;
+  padding: 2px 6px;
+  border: 1px solid var(--frame-line);
+  border-radius: var(--radius);
+  background: var(--frame-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--on-dark-muted);
+}
+
+.palette-empty {
+  padding: 40px 20px;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--on-dark-faint);
+}
+
+.palette-foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--frame-line);
+  background: var(--frame-2);
+  font-size: var(--text-xs);
+  color: var(--on-dark-faint);
+}
+
+.palette-foot > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Scope chips under the input: Tab walks through them. */
+.palette-scopes {
+  display: flex;
+  gap: 4px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--frame-line);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.palette-scope {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 26px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--on-dark-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.palette-scope:hover {
+  background: var(--frame-2);
+  color: var(--on-dark);
+}
+
+.palette-scope[aria-selected="true"] {
+  background: var(--frame-3);
+  color: var(--on-dark);
+  box-shadow: inset 0 -2px 0 var(--on-dark-accent);
+}
+
+.palette-scope-prefix {
+  font-family: var(--font-mono);
+  color: var(--on-dark-accent);
+}
+
+.palette-scope-pill {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--radius);
+  background: var(--frame-3);
+  color: var(--on-dark-accent);
+  font-size: var(--text-xs);
+  font-weight: 650;
+}
+
+/* The current world's start row stands out, as on the home stage. */
+.palette-item.hero {
+  min-height: 56px;
+  background: var(--frame-2);
+}
+
+.palette-item.hero .palette-label {
+  font-size: var(--text-md);
+}
+
+.palette-item.hero .palette-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.palette-hit {
+  background: transparent;
+  color: var(--on-dark-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.palette-value {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--frame-2);
+  color: var(--on-dark-muted);
+  font-size: var(--text-xs);
+}
+
+.palette-enter {
+  flex: none;
+  color: var(--on-dark-accent);
+  font-size: var(--text-xs);
+  font-weight: 650;
+}
+
+.palette-img {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius);
+  object-fit: cover;
+}
+
+.pixelated {
+  image-rendering: pixelated;
+}
+
+.palette-empty span {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--text-xs);
+}
+
+/* The preview pane: the chosen row's picture and facts. */
+.palette-preview {
+  min-height: 0;
+  padding: 16px;
+  border-left: 1px solid var(--frame-line);
+  background: var(--frame-2);
+  overflow: auto;
+}
+
+.pv {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pv-scene {
+  position: relative;
+  isolation: isolate;
+  height: 96px;
+  margin: -16px -16px 6px;
+  background: var(--hero);
+  overflow: hidden;
+}
+
+.pv-biome {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--hero-edge);
+  font-family: var(--font-pixel);
+  font-size: var(--px-font);
+  -webkit-font-smoothing: none;
+}
+
+.pv-figure {
+  display: grid;
+  place-items: start;
+  margin-bottom: 4px;
+}
+
+.pv-glyph {
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: var(--radius-lg);
+  background: var(--frame-3);
+  color: var(--on-dark-accent);
+}
+
+.pv-save {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius);
+}
+
+.pv-shot {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--radius);
+}
+
+.pv-title {
+  font-size: var(--text-md);
+  font-weight: 750;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.pv-sub {
+  font-size: var(--text-xs);
+  color: var(--on-dark-muted);
+  word-break: break-all;
+}
+
+.pv-motd {
+  min-height: 18px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: var(--frame);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--on-dark-muted);
+}
+
+.pv-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  margin: 6px 0 0;
+  font-size: var(--text-xs);
+}
+
+.pv-facts dt {
+  color: var(--on-dark-faint);
+}
+
+.pv-facts dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--on-dark);
+  word-break: break-all;
+}
+
+.pv-signal {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pv-note {
+  margin: 4px 0 0;
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--on-dark-faint);
+}
+
+@media (max-width: 760px) {
+  .palette-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .palette-preview {
+    display: none;
+  }
+}
+
+/* ---------- entering a world ----------
+   Shown between "start" and the game window: the world's sky over its land,
+   cut open to the stone, with the name in the middle like a loading screen. */
+
+.enter {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--hero);
+  color: var(--on-dark);
+}
+
+.enter .hero-stars,
+.enter .hero-sky {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+}
+
+.enter .hero-sky {
+  top: 36px;
+}
+
+.enter-celestial {
+  position: absolute;
+  top: 72px;
+  right: 14%;
+  z-index: -1;
+  line-height: 0;
+}
+
+.enter-land {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+
+.enter .land {
+  left: 0;
+}
+
+.enter-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: flex-end;
+  padding: 20px 24px;
+}
+
+.enter-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 120px;
+  max-width: min(720px, 86vw);
+  text-align: center;
+}
+
+.enter-eyebrow {
+  font-family: var(--font-pixel);
+  font-size: var(--px-font);
+  -webkit-font-smoothing: none;
+  color: var(--on-dark-muted);
+}
+
+.enter-name {
+  max-width: 100%;
+  font-size: var(--text-hero);
+  font-weight: 800;
+  line-height: 1.1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.enter-ready {
+  font-family: var(--font-pixel);
+  font-size: var(--px-font-2);
+  -webkit-font-smoothing: none;
+  color: var(--on-dark-accent);
+}
+
+.enter-loader {
+  display: grid;
+  grid-template-columns: repeat(12, 12px);
+  gap: 3px;
+  padding: 3px;
+  background: var(--hero-edge);
+}
+
+.enter-loader i {
+  height: 12px;
+  background: var(--hero-2);
+  animation: enter-block 1.08s steps(1) infinite;
+}
+
+@keyframes enter-block {
+  0% {
+    background: var(--on-dark-accent);
+  }
+  25% {
+    background: var(--accent);
+  }
+  50%,
+  100% {
+    background: var(--hero-2);
+  }
+}
+
+.enter-tip {
+  position: absolute;
+  left: 50%;
+  bottom: 30px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(760px, 90vw);
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  background: var(--hero-edge);
+  color: var(--on-dark);
+  font-size: var(--text-sm);
+}
+
+.enter-tip-label {
+  flex: none;
+  font-family: var(--font-pixel);
+  font-size: var(--px-font);
+  -webkit-font-smoothing: none;
+  color: var(--on-dark-accent);
+}
+
+html.reduce-motion .enter-loader i {
+  animation: none;
+  background: var(--accent);
+}
+
+/* ---------- logs: level gutter, quiet timestamps, follow switch ---------- */
+
+.console-line {
+  box-shadow: inset 3px 0 0 transparent;
+}
+
+.console-line.warn {
+  box-shadow: inset 3px 0 0 var(--on-dark-warn);
+}
+
+.console-line.err {
+  box-shadow: inset 3px 0 0 var(--on-dark-danger);
+}
+
+.console-line .ts {
+  color: var(--console-dim);
+}
+
+.console-line .src {
+  color: color-mix(in srgb, var(--console-text) 55%, var(--console-bg));
+}
+
+.logs-follow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+/* Files dragged over the window: the scrim of a dialog with one forest
+   panel on it. Below the Windows title bar, above everything else. */
+.drop-hint {
+  position: fixed;
+  inset: 0;
+  z-index: 84;
+  display: grid;
+  place-items: center;
+  background: var(--scrim);
+  pointer-events: none;
+}
+
+.drop-hint-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 40px 24px;
+  border: 3px solid var(--on-dark-accent);
+  border-radius: var(--radius-xl);
+  background: var(--frame);
+  color: var(--on-dark);
+  box-shadow: 0 4px 0 var(--hero-edge);
+}
+
+.drop-hint-card .icon {
+  margin-bottom: 4px;
+  color: var(--on-dark-accent);
+}
+
+.drop-hint-title {
+  font-size: var(--text-lg);
+  font-weight: 800;
+}
+
+.drop-hint-kinds {
+  color: var(--on-dark-muted);
+  font-size: var(--text-sm);
+}

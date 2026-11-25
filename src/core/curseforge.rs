@@ -228,6 +228,18 @@ impl CfFile {
     }
 }
 
+pub fn api_base() -> &'static str {
+    option_env!("MC_LAUNCHER_CURSEFORGE_URL")
+        .map(str::trim)
+        .filter(|url| url.starts_with("https://"))
+        .map(|url| url.trim_end_matches('/'))
+        .unwrap_or(API)
+}
+
+pub fn has_custom_api() -> bool {
+    api_base() != API
+}
+
 fn require_key(key: &str) -> AppResult<&str> {
     let key = key.trim();
     if key.is_empty() {
@@ -240,25 +252,25 @@ fn require_key(key: &str) -> AppResult<&str> {
 }
 
 async fn get<T: serde::de::DeserializeOwned>(client: &reqwest::Client, key: &str, path: &str, query: &[(&str, String)]) -> AppResult<T> {
-    let response = client
-        .get(format!("{API}{path}"))
-        .header("x-api-key", require_key(key)?)
+    let mut request = client
+        .get(format!("{}{path}", api_base()))
         .query(query)
-        .timeout(Duration::from_secs(30))
-        .send()
-        .await?;
-    check(response).await
+        .timeout(Duration::from_secs(30));
+    if !has_custom_api() || !key.trim().is_empty() {
+        request = request.header("x-api-key", require_key(key)?);
+    }
+    check(request.send().await?).await
 }
 
 async fn post<T: serde::de::DeserializeOwned>(client: &reqwest::Client, key: &str, path: &str, body: &serde_json::Value) -> AppResult<T> {
-    let response = client
-        .post(format!("{API}{path}"))
-        .header("x-api-key", require_key(key)?)
+    let mut request = client
+        .post(format!("{}{path}", api_base()))
         .json(body)
-        .timeout(Duration::from_secs(30))
-        .send()
-        .await?;
-    check(response).await
+        .timeout(Duration::from_secs(30));
+    if !has_custom_api() || !key.trim().is_empty() {
+        request = request.header("x-api-key", require_key(key)?);
+    }
+    check(request.send().await?).await
 }
 
 async fn check<T: serde::de::DeserializeOwned>(response: reqwest::Response) -> AppResult<T> {
@@ -581,11 +593,10 @@ pub async fn versions(client: &reqwest::Client, key: &str, instance: &Instance, 
 
 async fn files_for(client: &reqwest::Client, key: &str, instance: &Instance, mod_id: u64, kind: ContentKind) -> AppResult<Vec<CfFile>> {
     let mut params = vec![("gameVersion", instance.version_id.clone()), ("pageSize", "50".to_string())];
-    if kind == ContentKind::Mod {
-        if let Some(loader) = loader_type(&instance.loader) {
+    if kind == ContentKind::Mod
+        && let Some(loader) = loader_type(&instance.loader) {
             params.push(("modLoaderType", loader.to_string()));
         }
-    }
     let page: Page<Vec<CfFile>> = get(client, key, &format!("/mods/{mod_id}/files"), &params).await?;
     let mut files: Vec<CfFile> = page.data.into_iter().filter(|file| file.fits(instance, kind)).collect();
     files.sort_by(|a, b| b.file_date.cmp(&a.file_date));
@@ -622,6 +633,7 @@ fn safe_file_name(name: &str, kind: ContentKind) -> AppResult<()> {
 
 /// Installs chosen files (`cf:<mod>:<file>`) and, for mods, their required
 /// dependencies (newest file that fits). Files already present are left.
+#[allow(clippy::too_many_arguments)]
 pub async fn install(
     client: &reqwest::Client,
     key: &str,
@@ -885,6 +897,12 @@ pub fn read_manifest(source: &Path) -> AppResult<Option<PackManifest>> {
     Ok(Some(manifest))
 }
 
+pub async fn changelog(client: &reqwest::Client, key: &str, version: &str) -> AppResult<String> {
+    let Some((project, Some(file))) = parse_id(version) else { return Err(AppError::new("curseforge", "Invalid file id")); };
+    let page: Page<String> = get(client, key, &format!("/mods/{project}/files/{file}/changelog"), &[]).await?;
+    Ok(page.data)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -931,10 +949,4 @@ mod tests {
         assert!(file.fits(&forge, ContentKind::Mod));
         assert!(!file.fits(&fabric, ContentKind::Mod));
     }
-}
-
-pub async fn changelog(client: &reqwest::Client, key: &str, version: &str) -> AppResult<String> {
-    let Some((project, Some(file))) = parse_id(version) else { return Err(AppError::new("curseforge", "Invalid file id")); };
-    let page: Page<String> = get(client, key, &format!("/mods/{project}/files/{file}/changelog"), &[]).await?;
-    Ok(page.data)
 }

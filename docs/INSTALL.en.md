@@ -7,11 +7,11 @@ Packages are on the [Releases](https://github.com/saudademjj/islet-launcher/rele
 To make sure a download is intact, compare its SHA-256 with `SHA256SUMS.txt` on the release page:
 
 ```powershell
-Get-FileHash .\Islet-0.4.0-x64-setup.exe -Algorithm SHA256   # Windows
+Get-FileHash .\Islet-0.5.0-x64-setup.exe -Algorithm SHA256   # Windows
 ```
 
 ```bash
-shasum -a 256 Islet-0.4.0-arm64.dmg                        # macOS / Linux
+shasum -a 256 Islet-0.5.0-arm64.dmg                        # macOS / Linux
 ```
 
 ## Windows

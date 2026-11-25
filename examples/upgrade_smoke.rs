@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
     let rt = tokio::runtime::Runtime::new()?;
     if action == "java" {
-        let found = detect::find_all_in(&[paths.java.clone()], &[]);
+        let found = detect::find_all_in(std::slice::from_ref(&paths.java), &[]);
         for major in [17, 21] {
             let java = found
                 .iter()
@@ -109,7 +109,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 _ => std::thread::sleep(Duration::from_millis(50)),
             }
         }
-        let found = detect::find_all_in(&[paths.java.clone()], &[]);
+        let found = detect::find_all_in(std::slice::from_ref(&paths.java), &[]);
         assert!(!found.is_empty());
         for j in found {
             println!("JAVA {} {} {}", j.major, j.version, j.path);

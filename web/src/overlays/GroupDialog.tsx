@@ -20,6 +20,7 @@ export function GroupDialog({ id }: { id: string }) {
   const groups = worldGroups(s.instances);
   const name = group.trim();
   const save = async () => {
+    if (busy || name === (instance.group ?? "")) return;
     setBusy(true);
     const ok = await s.organize(id, instance.favorite, name || null);
     setBusy(false);

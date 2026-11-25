@@ -32,7 +32,7 @@ export function ExportServer({ id }: { id: string }) {
   const [address, setAddress] = useState("");
   if (!s.instance) return null;
   const project = s.instance.server;
-  const back = project ? s.closeModal : () => s.openModal({ kind: "manage", id, tab: "data" });
+  const back = project ? s.closeModal : () => s.openModal({ kind: "manage", id, tab: "tools" });
   const supported = SUPPORTED.includes(s.instance.loader);
   const plugins = s.instance.loader === "paper" || s.instance.loader === "purpur";
   // A project picks its loader version on the first export.
@@ -72,27 +72,27 @@ export function ExportServer({ id }: { id: string }) {
       }
     >
       <div className="col gap-16">
-        {!supported && <span className="field-hint bad">{t("这个加载器没有可以一键生成的服务端；原版、Fabric、Quilt、Forge、NeoForge、Paper 和 Purpur 可以。", "This loader has no server Islet can set up; vanilla, Fabric, Quilt, Forge, NeoForge, Paper and Purpur do.")}</span>}
+        {!supported && <span className="field-hint bad">{t("仅支持原版、Fabric、Quilt、Forge、NeoForge、Paper 和 Purpur。", "Supported for Vanilla, Fabric, Quilt, Forge, NeoForge, Paper, and Purpur.")}</span>}
         {supported && notInstalled && <span className="field-hint bad">{t("先安装一次这个世界，确定加载器版本后才能导出。", "Install this world once so its loader version is fixed, then export.")}</span>}
         <span className="field-hint">
           {project
             ? plugins
               ? t(
-                  "生成的文件夹里有服务端、plugins 里的插件、按机器内存自动调参的 start.sh / start.bat，以及一键部署脚本 islet.sh。上传到 Linux 服务器后运行 sh islet.sh setup 就能开服。",
-                  "The folder gets the server, your plugins in plugins/, start.sh / start.bat that size themselves to the machine, and the islet.sh deploy script. Upload it to a Linux server and run sh islet.sh setup.",
+                  "生成服务端、插件和启动脚本；上传到 Linux 后运行 sh islet.sh setup 即可开服。",
+                  "Generates the server, plugins, and start scripts; run sh islet.sh setup on Linux to launch.",
                 )
               : t(
-                  "生成的文件夹里有服务端、服务器需要的模组、按机器内存自动调参的 start.sh / start.bat，以及一键部署脚本 islet.sh。上传到 Linux 服务器后运行 sh islet.sh setup 就能开服。",
-                  "The folder gets the server, the mods a server needs, start.sh / start.bat that size themselves to the machine, and the islet.sh deploy script. Upload it to a Linux server and run sh islet.sh setup.",
+                  "生成服务端、模组和启动脚本；上传到 Linux 后运行 sh islet.sh setup 即可开服。",
+                  "Generates the server, mods, and start scripts; run sh islet.sh setup on Linux to launch.",
                 )
             : t(
-                "生成的文件夹里有官方服务端、服务器需要的模组和 config 等配置，以及 start.bat / start.sh。Modrinth 标明只在客户端运行的模组（小地图、光影类等）会自动去掉。",
-                "The folder gets the official server, the mods a server needs, config folders, and start.bat / start.sh. Mods Modrinth marks as client-only (minimaps, shaders and the like) are left out.",
+                "生成服务端、模组、配置和启动脚本，自动排除仅客户端模组。",
+                "Generates the server, mods, configs, and start scripts, excluding client-only mods.",
               )}
         </span>
         {!project && (
           <>
-            <Field label={t("服务器的世界", "The server's world")} hint={world ? t("复制这个存档当服务器的世界；你在单人里的背包和位置会跟着你进服务器", "A copy of this save becomes the server's world; your singleplayer inventory and spot come with you") : undefined}>
+            <Field label={t("服务器的世界", "The server's world")} hint={world ? t("复制该存档作为服务器世界，保留你的背包和位置", "Copies this save as the server world, keeping your inventory and spot") : undefined}>
               <WorldChoice instance={s.instance} value={world} onChange={setWorld} />
             </Field>
             <div className="row gap-16 items-start wrap">
@@ -106,7 +106,7 @@ export function ExportServer({ id }: { id: string }) {
             <div className="setting-row">
               <div className="col">
                 <span className="setting-name">{t("正版验证", "Online mode")}</span>
-                <span className="field-hint">{t("关闭后离线账号也能进，但名字可被冒用", "Off, offline accounts can join too, and names can be faked")}</span>
+                <span className="field-hint">{t("关闭后离线账号可加入，但名称无验证", "Off lets offline accounts join without name checks")}</span>
               </div>
               <Switch label={t("正版验证", "Online mode")} checked={onlineMode} onChange={setOnlineMode} />
             </div>
@@ -115,14 +115,14 @@ export function ExportServer({ id }: { id: string }) {
         {(!project || offerPack) && (
           <div className="setting-row">
             <div className="col">
-              <span className="setting-name">{t("同时生成朋友用的整合包", "Also make a pack for friends")}</span>
-              <span className="field-hint">{t("朋友导入后模组和服务器一致，服务器列表里已经填好地址；进服前启动器会检查模组，缺了能自动补", "Friends import it to get the server's mods and the address in their server list; before joining, the launcher checks mods and can fetch missing ones")}</span>
+              <span className="setting-name">{t("同时生成好友用的整合包", "Also make a pack for friends")}</span>
+              <span className="field-hint">{t("好友导入即可同步模组和服务器地址，进服缺模组可自动补齐", "Syncs mods and server address for friends, with automatic missing-mod install")}</span>
             </div>
-            <Switch label={t("生成朋友用的整合包", "Make a pack for friends")} checked={clientPack} onChange={setClientPack} />
+            <Switch label={t("生成好友用的整合包", "Make a pack for friends")} checked={clientPack} onChange={setClientPack} />
           </div>
         )}
         {(!project || offerPack) && clientPack && (
-          <Field label={t("朋友连接的地址（可不填）", "Address friends join (optional)")} hint={t("比如 mc.example.com 或 1.2.3.4:25565；写进朋友的服务器列表", "Like mc.example.com or 1.2.3.4:25565; goes into friends' server list")}>
+          <Field label={t("好友连接的地址（可不填）", "Address friends join (optional)")} hint={t("比如 mc.example.com 或 1.2.3.4:25565；写进好友的服务器列表", "Like mc.example.com or 1.2.3.4:25565; goes into friends' server list")}>
             <Input mono value={address} placeholder="mc.example.com" onChange={(e) => setAddress(e.target.value.slice(0, 255))} />
           </Field>
         )}
@@ -130,7 +130,7 @@ export function ExportServer({ id }: { id: string }) {
           <div className="col">
             <span className="setting-name">{t("我同意 Minecraft 最终用户许可协议（EULA）", "I agree to the Minecraft EULA")}</span>
             <span className="field-hint">
-              {t("服务端要先同意才能运行；不勾选的话，首次启动后在 eula.txt 里改成 true。", "The server only runs once it's agreed to; otherwise set it to true in eula.txt after the first start.")}{" "}
+              {t("需同意协议后服务端才能启动。", "Required before the server can start.")}{" "}
               <button type="button" className="link" onClick={() => void s.openUrl(EULA)}>
                 {t("阅读 EULA", "Read the EULA")}
               </button>

@@ -37,7 +37,12 @@ impl P2p {
     }
 
     pub fn has_activity(&self) -> bool {
-        self.is_preparing() || self.session.try_lock().map_or(true, |session| session.is_some())
+        self.is_preparing()
+            || self.session.try_lock().map_or(true, |mut session| {
+                session
+                    .as_mut()
+                    .is_some_and(|s| s.exited.is_none() && matches!(s.child.try_wait(), Ok(None)))
+            })
     }
 
     /// Leaves the room (and stops a component download); also called when
@@ -194,20 +199,24 @@ fn payload(error: AppError) -> ErrorPayload {
     error.to_payload()
 }
 
-struct Busy<'a>(&'a AtomicBool);
+struct Busy<'a>(&'a P2p);
 
 impl Drop for Busy<'_> {
     fn drop(&mut self) {
-        self.0.store(false, Ordering::SeqCst);
+        *lock(&self.0.cancel) = None;
+        self.0.busy.store(false, Ordering::SeqCst);
     }
 }
 
-/// Claims the setup slot and checks that no room is open.
-fn begin(state: &P2p) -> Result<Busy<'_>, ErrorPayload> {
+/// Claims the setup slot, installs a cancellation token for the whole setup
+/// sequence, and checks that no room is open.
+fn begin(state: &P2p) -> Result<(Busy<'_>, CancellationToken), ErrorPayload> {
     if state.busy.swap(true, Ordering::SeqCst) {
         return Err(fail(pick("正在准备房间，请稍候。", "A room is being set up; please wait.")));
     }
-    let busy = Busy(&state.busy);
+    let cancel = CancellationToken::new();
+    *lock(&state.cancel) = Some(cancel.clone());
+    let busy = Busy(state);
     let mut session = lock(&state.session);
     if let Some(open) = session.as_mut() {
         if open.exited.is_none() && matches!(open.child.try_wait(), Ok(None)) {
@@ -215,19 +224,20 @@ fn begin(state: &P2p) -> Result<Busy<'_>, ErrorPayload> {
         }
         *session = None;
     }
-    Ok(busy)
+    Ok((busy, cancel))
+}
+
+fn cancelled_error() -> ErrorPayload {
+    AppError::new("cancelled", pick("已取消联机准备。", "Multiplayer setup cancelled.")).to_payload()
 }
 
 /// The EasyTier programs, downloading them with progress on first use.
-async fn binaries(app: &tauri::AppHandle, state: &P2p) -> Result<easytier::Binaries, ErrorPayload> {
+async fn binaries(app: &tauri::AppHandle, state: &P2p, cancel: &CancellationToken) -> Result<easytier::Binaries, ErrorPayload> {
     let services = app.state::<crate::LauncherState>().services();
-    let cancel = CancellationToken::new();
-    *lock(&state.cancel) = Some(cancel.clone());
     let download = state.download.clone();
     let report: easytier::Progress = Arc::new(move |done, total| *lock(&download) = Some(Download { done, total }));
-    let result = services.ensure_easytier(&cancel, Some(report)).await;
+    let result = services.ensure_easytier(cancel, Some(report)).await;
     *lock(&state.download) = None;
-    *lock(&state.cancel) = None;
     result.map_err(payload)
 }
 
@@ -259,7 +269,8 @@ fn start(app: &tauri::AppHandle, start: Start) -> Result<Session, ErrorPayload> 
     let services = app.state::<crate::LauncherState>().services();
     let log = services.paths.logs.join(if start.role == Role::Host { "easytier-host.log" } else { "easytier-guest.log" });
     let child = easytier::spawn(start.binaries, &start.args, &log).map_err(payload)?;
-    let motd = Arc::new(Mutex::new(islet::tr!("房间 {}", "Room {}", start.code.trim_start_matches("U/").get(..9).unwrap_or_default())));
+    let short_code: String = start.code.trim_start_matches("U/").chars().take(9).collect();
+    let motd = Arc::new(Mutex::new(islet::tr!("房间 {}", "Room {}", short_code)));
     Ok(Session {
         role: start.role,
         code: start.code,
@@ -402,7 +413,7 @@ pub async fn p2p_defaults(app: tauri::AppHandle) -> Result<Defaults, ErrorPayloa
 /// ones; plus Terracotta's, which other launchers' rooms use.
 async fn room_nodes(app: &tauri::AppHandle, custom: &[String]) -> Vec<String> {
     let remote = app.state::<crate::LauncherState>().services().p2p_remote().await;
-    easytier::room_nodes(easytier::nodes(custom, &remote))
+    easytier::room_nodes_with(easytier::nodes(custom, &remote), &remote)
 }
 
 /// Games opened to LAN on this computer.
@@ -417,17 +428,28 @@ pub async fn p2p_host(app: tauri::AppHandle, state: State<'_, P2p>, port: u16, n
     if port == 0 {
         return Err(fail(pick("请填写游戏显示的局域网端口。", "Enter the LAN port the game shows.")));
     }
-    let _busy = begin(state)?;
+    let (_busy, cancel) = begin(state)?;
     if !lan::listening(port).await {
         return Err(fail(&islet::tr!(
             "本机端口 {port} 上没有游戏：先在游戏里“对局域网开放”，再填它显示的端口。",
             "No game on port {port}. Open the world to LAN in the game first, then enter the port it shows."
         )));
     }
-    let binaries = binaries(&app, state).await?;
-    let nodes = room_nodes(&app, &nodes).await;
+    let binaries = binaries(&app, state, &cancel).await?;
+    let nodes = tokio::select! {
+        () = cancel.cancelled() => return Err(cancelled_error()),
+        nodes = room_nodes(&app, &nodes) => nodes,
+    };
+    if cancel.is_cancelled() {
+        return Err(cancelled_error());
+    }
     let session = open_host(&app, port, &name, nodes, binaries).await?;
-    *lock(&state.session) = Some(session);
+    let mut slot = lock(&state.session);
+    if cancel.is_cancelled() {
+        drop(session);
+        return Err(cancelled_error());
+    }
+    *slot = Some(session);
     Ok(())
 }
 
@@ -437,15 +459,26 @@ pub async fn p2p_join(app: tauri::AppHandle, state: State<'_, P2p>, code: String
     // A U/ code is a Scaffolding room; anything else, an earlier Islet's.
     let scaffolding_room = scaffolding::Room::parse(&code).transpose().map_err(payload)?;
     let islet_room = if scaffolding_room.is_none() { Some(Room::parse(&code).map_err(payload)?) } else { None };
-    let _busy = begin(state)?;
-    let binaries = binaries(&app, state).await?;
-    let nodes = room_nodes(&app, &nodes).await;
+    let (_busy, cancel) = begin(state)?;
+    let binaries = binaries(&app, state, &cancel).await?;
+    let nodes = tokio::select! {
+        () = cancel.cancelled() => return Err(cancelled_error()),
+        nodes = room_nodes(&app, &nodes) => nodes,
+    };
+    if cancel.is_cancelled() {
+        return Err(cancelled_error());
+    }
     let session = match (&scaffolding_room, &islet_room) {
         (Some(room), _) => open_guest(&app, room, &name, nodes, binaries)?,
         (None, Some(room)) => open_islet_guest(&app, room, &name, nodes, binaries)?,
         (None, None) => unreachable!("one of the two parsed"),
     };
-    *lock(&state.session) = Some(session);
+    let mut slot = lock(&state.session);
+    if cancel.is_cancelled() {
+        drop(session);
+        return Err(cancelled_error());
+    }
+    *slot = Some(session);
     Ok(())
 }
 

@@ -115,8 +115,7 @@ pub async fn build_plan(
             .downloads
             .as_ref()
             .and_then(|downloads| downloads.artifact.as_ref())
-        {
-            if let Some(relative) = version::artifact_path(library) {
+            && let Some(relative) = version::artifact_path(library) {
                 let dest = paths.library_path(&relative);
                 if seen_dest.insert(dest.clone()) {
                     let official_url = artifact
@@ -140,7 +139,6 @@ pub async fn build_plan(
                     });
                 }
             }
-        }
 
         if let Some(native) = version::native_download_for(library, arch) {
             let relative = native
@@ -203,8 +201,7 @@ pub async fn build_plan(
         .logging
         .as_ref()
         .and_then(|logging| logging.client.as_ref())
-    {
-        if let Some(url) = logging.file.url.clone() {
+        && let Some(url) = logging.file.url.clone() {
             let file_name = version::log_config_name(logging);
             let dest = paths.assets.join("log_configs").join(file_name);
             let task = DownloadTask::new(
@@ -221,7 +218,6 @@ pub async fn build_plan(
                 task,
             });
         }
-    }
 
     check_cancel(cancel)?;
     Ok(InstallPlan {
@@ -254,13 +250,11 @@ async fn load_version_json(
     cancel: &CancellationToken,
 ) -> AppResult<VersionJson> {
     let dest = paths.version_json(&summary.id);
-    if let Ok(bytes) = std::fs::read(&dest) {
-        if summary.sha1.is_empty() || sha1_hex(&bytes).eq_ignore_ascii_case(&summary.sha1) {
-            if let Ok(version) = serde_json::from_slice::<VersionJson>(&bytes) {
+    if let Ok(bytes) = std::fs::read(&dest)
+        && (summary.sha1.is_empty() || sha1_hex(&bytes).eq_ignore_ascii_case(&summary.sha1))
+            && let Ok(version) = serde_json::from_slice::<VersionJson>(&bytes) {
                 return Ok(version);
             }
-        }
-    }
 
     check_cancel(cancel)?;
     let bytes = fetch_bytes(client, &summary.url, Some(&summary.sha1), cancel).await?;
@@ -282,17 +276,14 @@ async fn load_asset_index(
         .ok_or_else(|| AppError::new("asset_index", crate::core::i18n::pick("版本缺少资源索引信息。", "The version has no asset index.")))?;
     let dest = paths.asset_index(asset_index_id);
 
-    if let Ok(bytes) = std::fs::read(&dest) {
-        if index
+    if let Ok(bytes) = std::fs::read(&dest)
+        && index
             .sha1
             .as_ref()
             .is_none_or(|expected| sha1_hex(&bytes).eq_ignore_ascii_case(expected))
-        {
-            if let Ok(parsed) = serde_json::from_slice::<AssetIndexJson>(&bytes) {
+            && let Ok(parsed) = serde_json::from_slice::<AssetIndexJson>(&bytes) {
                 return Ok(parsed);
             }
-        }
-    }
 
     let url = index
         .url
@@ -326,14 +317,13 @@ async fn fetch_bytes(
         _ = cancel.cancelled() => return Err(AppError::new("cancelled", crate::core::i18n::pick("操作已取消。", "Cancelled."))),
         bytes = response.bytes() => bytes?,
     };
-    if let Some(expected) = expected_sha1 {
-        if !expected.is_empty() && !sha1_hex(&bytes).eq_ignore_ascii_case(expected) {
+    if let Some(expected) = expected_sha1
+        && !expected.is_empty() && !sha1_hex(&bytes).eq_ignore_ascii_case(expected) {
             return Err(AppError::new(
                 "metadata_hash",
                 crate::core::i18n::pick("Minecraft 元数据校验失败，请重试。", "Minecraft metadata failed verification; try again."),
             ));
         }
-    }
     Ok(bytes.to_vec())
 }
 

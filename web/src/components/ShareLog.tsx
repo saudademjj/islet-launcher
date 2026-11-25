@@ -17,7 +17,7 @@ export function ShareLogButton({ instanceId }: { instanceId: string }) {
       variant={confirm ? "primary" : "default"}
       icon="external"
       busy={busy}
-      title={t("上传到 mclo.gs 并复制链接，方便发给别人帮忙看；用户目录和登录令牌会被隐去", "Uploads to mclo.gs and copies the link to share with helpers; your home folder and sign-in tokens are hidden")}
+      title={t("上传日志到 mclo.gs 并复制链接，自动隐藏隐私信息", "Uploads log to mclo.gs and copies the link, hiding private info")}
       onBlur={() => setConfirm(false)}
       onClick={async () => {
         if (!confirm) return setConfirm(true);

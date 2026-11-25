@@ -20,6 +20,7 @@ const SCOPE: &str = "XboxLive.signin offline_access";
 const XBOX_USER_AUTH: &str = "https://user.auth.xboxlive.com/user/authenticate";
 const XSTS_AUTH: &str = "https://xsts.auth.xboxlive.com/xsts/authorize";
 const MINECRAFT_LOGIN: &str = "https://api.minecraftservices.com/authentication/login_with_xbox";
+const MINECRAFT_ENTITLEMENTS: &str = "https://api.minecraftservices.com/entitlements/mcstore";
 const MINECRAFT_PROFILE: &str = "https://api.minecraftservices.com/minecraft/profile";
 const LOOPBACK_TIMEOUT: Duration = Duration::from_secs(300);
 
@@ -192,7 +193,7 @@ pub fn validate_client_id(client_id: &str) -> AppResult<&str> {
     Uuid::parse_str(client_id).map_err(|_| {
         AppError::new(
             "client_id",
-            crate::core::i18n::pick("Client ID 格式不正确，应为 Azure 应用的 GUID。", "The Client ID format is wrong; it should be the Azure app's GUID."),
+            crate::core::i18n::pick("Client ID 格式不正确，请检查是否复制完整。", "Invalid Client ID format; check that the full ID was copied."),
         )
     })?;
     Ok(client_id)
@@ -459,6 +460,30 @@ async fn authenticate_xbox(
     })
 }
 
+fn map_minecraft_login_error(status: reqwest::StatusCode, body: &str) -> AppError {
+    let snippet: String = body.trim().chars().take(240).collect();
+    let detail = if snippet.is_empty() {
+        format!("HTTP {status}")
+    } else {
+        format!("HTTP {status}: {snippet}")
+    };
+    let message = match status.as_u16() {
+        403 => crate::core::i18n::pick(
+            "当前 Client ID 尚未通过 Mojang 应用审核（HTTP 403）；请等待审核通过，或在设置中填写已过审的 Client ID。",
+            "This Azure Client ID hasn't been approved by Mojang yet (HTTP 403); wait for approval, or enter an approved Client ID in Settings.",
+        ),
+        429 => crate::core::i18n::pick(
+            "Minecraft 登录请求过于频繁，请过一会儿再试。",
+            "Too many Minecraft sign-in requests; wait a moment and try again.",
+        ),
+        _ => crate::core::i18n::pick(
+            "Minecraft 登录失败，请重试。",
+            "Minecraft sign-in failed; try again.",
+        ),
+    };
+    AppError::detail("minecraft_auth", message, detail)
+}
+
 async fn login_with_xbox(client: &reqwest::Client, xbox: &XboxSession) -> AppResult<(String, Duration)> {
     let identity_token = format!("XBL3.0 x={};{}", xbox.uhs, xbox.xsts_token);
     let body = MinecraftLoginRequest {
@@ -468,11 +493,7 @@ async fn login_with_xbox(client: &reqwest::Client, xbox: &XboxSession) -> AppRes
     let status = response.status();
     let text = response.text().await?;
     if !status.is_success() {
-        return Err(AppError::detail(
-            "minecraft_auth",
-            crate::core::i18n::pick("Minecraft 登录失败，请重试。", "Minecraft sign-in failed; try again."),
-            format!("HTTP {status}"),
-        ));
+        return Err(map_minecraft_login_error(status, &text));
     }
     let login: MinecraftLoginResponse = serde_json::from_str(&text).map_err(|err| {
         AppError::detail(
@@ -483,6 +504,49 @@ async fn login_with_xbox(client: &reqwest::Client, xbox: &XboxSession) -> AppRes
     })?;
     let lifetime = login.expires_in.map(Duration::from_secs).unwrap_or(DEFAULT_TOKEN_LIFETIME);
     Ok((login.access_token, lifetime))
+}
+
+fn entitlement_owns_java(json_text: &str) -> bool {
+    #[derive(Deserialize)]
+    struct StoreEntitlements {
+        #[serde(default)]
+        items: Vec<StoreItem>,
+    }
+    #[derive(Deserialize)]
+    struct StoreItem {
+        #[serde(default)]
+        name: String,
+    }
+    serde_json::from_str::<StoreEntitlements>(json_text)
+        .map(|store| {
+            store.items.iter().any(|item| {
+                matches!(
+                    item.name.as_str(),
+                    "product_minecraft" | "game_minecraft"
+                )
+            })
+        })
+        .unwrap_or(false)
+}
+
+async fn has_java_entitlement(client: &reqwest::Client, minecraft_access_token: &str) -> bool {
+    let Ok(response) = client
+        .get(MINECRAFT_ENTITLEMENTS)
+        .bearer_auth(minecraft_access_token)
+        .timeout(Duration::from_secs(10))
+        .send()
+        .await
+    else {
+        return false;
+    };
+    if !response.status().is_success() {
+        return false;
+    }
+    response
+        .text()
+        .await
+        .map(|text| entitlement_owns_java(&text))
+        .unwrap_or(false)
 }
 
 async fn fetch_profile(
@@ -496,6 +560,17 @@ async fn fetch_profile(
         .await?;
     let status = response.status();
     if status == reqwest::StatusCode::NOT_FOUND {
+        // Players who own Java Edition (for example via PC Game Pass or a new
+        // purchase) also get 404 until they choose their Java profile name.
+        if has_java_entitlement(client, minecraft_access_token).await {
+            return Err(AppError::new(
+                "profile_missing",
+                crate::core::i18n::pick(
+                    "该微软账号已拥有 Minecraft Java 版，但还没有设置游戏角色名。请先前往 minecraft.net 创建 Java 版角色名后再登录。",
+                    "This Microsoft account owns Minecraft: Java Edition, but has no player name yet. Set your Java Edition profile name at minecraft.net first, then sign in again.",
+                ),
+            ));
+        }
         return Err(AppError::new(
             "not_owned",
             crate::core::i18n::pick("该微软账号未拥有 Minecraft Java 版，无法使用正版启动。", "This Microsoft account doesn't own Minecraft: Java Edition."),
@@ -822,5 +897,18 @@ mod tests {
         assert!(validate_client_id("00000000-0000-0000-0000-000000000000").is_ok());
         assert!(validate_client_id("not-a-guid").is_err());
         assert!(validate_client_id("").is_err());
+    }
+
+    #[test]
+    fn distinguishes_unapproved_app_and_java_entitlements() {
+        let forbidden = map_minecraft_login_error(
+            reqwest::StatusCode::FORBIDDEN,
+            r#"{"errorMessage":"Invalid app registration"}"#,
+        );
+        assert_eq!(forbidden.code(), "minecraft_auth");
+        assert!(forbidden.to_payload().detail.unwrap_or_default().contains("Invalid app registration"));
+        assert!(entitlement_owns_java(r#"{"items":[{"name":"product_minecraft"},{"name":"game_minecraft"}]}"#));
+        assert!(!entitlement_owns_java(r#"{"items":[{"name":"product_dungeons"}]}"#));
+        assert!(!entitlement_owns_java("{}"));
     }
 }

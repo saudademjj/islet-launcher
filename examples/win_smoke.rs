@@ -238,7 +238,7 @@ fn main() {
         let natives = paths.instance_natives_dir(&instance.id);
         println!(
             "  java dirs: {:?}",
-            std::fs::read_dir(&paths.java.join("adoptium"))
+            std::fs::read_dir(paths.java.join("adoptium"))
                 .map(|d| d.flatten().map(|e| e.file_name()).collect::<Vec<_>>())
                 .unwrap_or_default()
         );

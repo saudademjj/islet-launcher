@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { listen } from "@tauri-apps/api/event";
 import { call, inTauri, toError } from "../api/backend";
@@ -9,12 +9,19 @@ import { Modal } from "./overlay";
 import { Button } from "./ui";
 import { Icon } from "./Icon";
 
+const isJar = (p: string) => {
+  const ext = p.split(".").pop()?.toLowerCase();
+  return ext === "jar" || ext === "litemod";
+};
+
 type Pending = { paths: string[]; account?: string };
 export function FileDrop() {
   const [pending, setPending] = useState<Pending | null>(null);
   const [over, setOver] = useState(false);
   const [target, setTarget] = useState("");
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
+  busyRef.current = busy;
   const s = usePick(s => ({ instances: s.instances, accounts: s.accounts, activeAccount: s.settings.activeAccountId, fileBusy: s.fileBusy }));
   useEffect(() => {
     if (!inTauri) return;
@@ -24,7 +31,12 @@ export function FileDrop() {
     const receive = (paths: string[], account?: string) => {
       if (!paths.length || disposed) return;
       setTarget(useStore.getState().settings.activeInstanceId ?? "");
-      setPending(previous => ({ paths: [...new Set([...(previous?.paths ?? []), ...paths])], account }));
+      setPending(previous => {
+        if (previous && previous.paths.every(isJar) && paths.every(isJar)) {
+          return { paths: [...new Set([...previous.paths, ...paths])], account };
+        }
+        return { paths: [...new Set(paths)], account };
+      });
     };
     const drain = () => call<string[]>("take_open_files").then(receive, () => {});
     void register(listen("open-files-ready", () => { void drain(); }));
@@ -40,6 +52,17 @@ export function FileDrop() {
     }));
     return () => { disposed = true; cleanups.forEach(f => f()); };
   }, []);
+  useEffect(() => {
+    if (!pending) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.isComposing || e.keyCode === 229) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (!busyRef.current) setPending(null);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [pending != null]);
   if (!pending) return over ? (
     <div className="drop-hint">
       <div className="drop-hint-card">
@@ -50,7 +73,7 @@ export function FileDrop() {
     </div>
   ) : null;
   const suffix = (p: string) => p.split(".").pop()?.toLowerCase();
-  const jars = pending.paths.every(p => suffix(p) === "jar" || suffix(p) === "litemod");
+  const jars = pending.paths.every(isJar);
   const skin = pending.paths.length === 1 && suffix(pending.paths[0]) === "png";
   const pack = pending.paths.length === 1 && ["zip", "mrpack"].includes(suffix(pending.paths[0]) ?? "");
   const account = pending.account ?? s.activeAccount;
@@ -58,10 +81,13 @@ export function FileDrop() {
   const names = pending.paths.map(p => p.split(/[\\/]/).pop());
   const execute = async () => {
     const state = useStore.getState();
+    if (busy || state.fileBusy) return;
     setBusy(true);
     try {
-      if (skin) state.applySnapshot(await call<Snapshot>("change_skin", { id: account, path: pending.paths[0], slim: owner?.skinSlim ?? false }));
-      else if (jars) await state.fileOperation(target, { kind: "addMods", paths: pending.paths });
+      if (skin) {
+        state.applySnapshot(await call<Snapshot>("change_skin", { id: account, path: pending.paths[0], slim: owner?.skinSlim ?? false }));
+        state.toast(t("皮肤已更换，进游戏后生效", "Skin changed; it shows next time you play"), "success");
+      } else if (jars) await state.fileOperation(target, { kind: "addMods", paths: pending.paths });
       else if (pack) await state.fileOperation(null, { kind: "importPack", path: pending.paths[0] });
       setPending(null);
     } catch (e) { state.toast(toError(e).message, "error"); }
@@ -88,8 +114,8 @@ export function FileDrop() {
         </div>
       )}
       {skin && <span className="muted">{owner ? t(`设为「${owner.username}」的皮肤。`, `Set as ${owner.username}'s skin.`) : t("请先添加或选择一个账号。", "Add or choose an account first.")}</span>}
-      {pack && <span className="muted">{t("导入为独立的新世界，原有世界不受影响。", "Imports as a separate new world; your other worlds stay as they are.")}</span>}
-      {!jars && !skin && !pack && <span className="muted">{t("一次只能添加一批模组，或一个整合包 / PNG 皮肤。", "Only one batch of mods, or one modpack / PNG skin, at a time.")}</span>}
+      {pack && <span className="muted">{t("将导入为独立的新世界。", "Imports as a new world.")}</span>}
+      {!jars && !skin && !pack && <span className="muted">{t("每次仅支持拖入一批模组，或单个整合包 / 皮肤。", "Drop a batch of mods, or a single modpack / skin.")}</span>}
     </div>
   </Modal>;
 }

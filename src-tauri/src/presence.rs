@@ -38,11 +38,10 @@ pub fn set(id: &str, playing: Option<(&str, &str)>) {
                             }
                         }
                     }
-                    if let Some(stream) = &mut connection {
-                        if update(stream, &activity).is_err() {
+                    if let Some(stream) = &mut connection
+                        && update(stream, &activity).is_err() {
                             connection = None;
                         }
-                    }
                 }
             })
             .ok();
@@ -66,15 +65,20 @@ fn connect(id: &str) -> std::io::Result<Connection> {
     #[cfg(unix)]
     let mut stream = {
         let mut found = None;
-        let roots = [
-            std::env::var_os("XDG_RUNTIME_DIR"),
-            std::env::var_os("TMPDIR"),
-            Some("/tmp".into()),
-        ];
-        for root in roots.into_iter().flatten() {
+        let mut roots: Vec<std::path::PathBuf> = Vec::new();
+        if let Some(xdg) = std::env::var_os("XDG_RUNTIME_DIR").map(std::path::PathBuf::from) {
+            roots.push(xdg.join("app/com.discordapp.Discord"));
+            roots.push(xdg.join("snap.discord"));
+            roots.push(xdg);
+        }
+        if let Some(tmp) = std::env::var_os("TMPDIR").map(std::path::PathBuf::from) {
+            roots.push(tmp);
+        }
+        roots.push(std::path::PathBuf::from("/tmp"));
+        for root in roots {
             for i in 0..10 {
                 if let Ok(s) = std::os::unix::net::UnixStream::connect(
-                    std::path::PathBuf::from(&root).join(format!("discord-ipc-{i}")),
+                    root.join(format!("discord-ipc-{i}")),
                 ) {
                     found = Some(s);
                     break;

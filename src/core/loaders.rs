@@ -37,20 +37,25 @@ pub async fn list_with_source(
     if loader == "vanilla" {
         return Ok(vec![]);
     }
-    let mut versions = if loader == "neoforge" {
-        // BMCLAPI publishes an exact Minecraft-to-NeoForge mapping, including
-        // the newer year-based Minecraft versions. Fall back to upstream.
+    let mut versions = if ["neoforge", "forge"].contains(&loader) && source == crate::core::settings::DownloadSource::Bmclapi {
+        // BMCLAPI publishes exact Minecraft-to-Forge/NeoForge mappings with low
+        // domestic latency; fall back to upstream Maven metadata on any error.
         #[derive(Deserialize)]
         struct Entry {
             version: String,
             mcversion: String,
+            #[serde(default)]
+            branch: Option<String>,
         }
+        let endpoint = if loader == "neoforge" {
+            format!("https://bmclapi2.bangbang93.com/neoforge/list/{minecraft}")
+        } else {
+            format!("https://bmclapi2.bangbang93.com/forge/minecraft/{minecraft}")
+        };
         let mirror = async {
             client
-                .get(format!(
-                    "https://bmclapi2.bangbang93.com/neoforge/list/{minecraft}"
-                ))
-                .timeout(Duration::from_secs(15))
+                .get(endpoint)
+                .timeout(Duration::from_secs(12))
                 .send()
                 .await?
                 .error_for_status()?
@@ -62,25 +67,21 @@ pub async fn list_with_source(
             Ok(entries) => entries
                 .into_iter()
                 .filter(|e| e.mcversion == minecraft)
-                .map(|e| LoaderVersion {
-                    stable: !e.version.contains("beta") && !e.version.contains("alpha"),
-                    version: e.version,
+                .map(|e| {
+                    let version = if loader == "forge" {
+                        format_bmclapi_forge_version(&e.version, e.branch.as_deref())
+                    } else {
+                        e.version
+                    };
+                    LoaderVersion {
+                        stable: !version.contains("beta")
+                            && !version.contains("alpha")
+                            && !version.contains("rc"),
+                        version,
+                    }
                 })
                 .collect(),
-            Err(_) => {
-                let prefix = neo_prefix(minecraft)
-                    .ok_or_else(|| AppError::new("loader", crate::core::i18n::pick("没有匹配的 NeoForge 版本。", "No matching NeoForge version.")))?;
-                let xml = client.get("https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml")
-                    .timeout(Duration::from_secs(15)).send().await?.error_for_status()?.text().await?;
-                parse_versions(&xml)
-                    .into_iter()
-                    .filter(|v| v.starts_with(&prefix))
-                    .map(|version| LoaderVersion {
-                        stable: !version.contains("beta"),
-                        version,
-                    })
-                    .collect()
-            }
+            Err(_) => upstream_maven_versions(client, loader, minecraft).await?,
         }
     } else if let Some(flavor) = crate::core::fabric::Flavor::of(loader) {
         #[derive(Deserialize)]
@@ -101,44 +102,7 @@ pub async fn list_with_source(
             })
             .collect::<Vec<_>>()
     } else {
-        let (url, prefix) = match loader {
-            "forge" => (
-                "https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml",
-                format!("{minecraft}-"),
-            ),
-            "neoforge" => (
-                "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml",
-                neo_prefix(minecraft).ok_or_else(|| {
-                    AppError::new("loader", crate::core::i18n::pick("NeoForge 支持 Minecraft 1.20.2 及更新版本。", "NeoForge supports Minecraft 1.20.2 and later."))
-                })?,
-            ),
-            _ => return Err(AppError::new("loader", crate::core::i18n::pick("未知的加载器。", "Unknown loader."))),
-        };
-        let xml = client
-            .get(url)
-            .timeout(Duration::from_secs(30))
-            .send()
-            .await?
-            .error_for_status()?
-            .text()
-            .await?;
-        parse_versions(&xml)
-            .into_iter()
-            .filter(|v| v.starts_with(&prefix))
-            .map(|v| {
-                let version = if loader == "forge" {
-                    v.strip_prefix(&prefix).unwrap().to_string()
-                } else {
-                    v
-                };
-                LoaderVersion {
-                    stable: !version.contains("beta")
-                        && !version.contains("alpha")
-                        && !version.contains("rc"),
-                    version,
-                }
-            })
-            .collect()
+        upstream_maven_versions(client, loader, minecraft).await?
     };
     versions.retain(|v| valid_version(&v.version));
     versions.sort_by(|a, b| {
@@ -150,6 +114,62 @@ pub async fn list_with_source(
     versions.dedup_by(|a, b| a.version == b.version);
     Ok(versions)
 }
+async fn upstream_maven_versions(
+    client: &reqwest::Client,
+    loader: &str,
+    minecraft: &str,
+) -> AppResult<Vec<LoaderVersion>> {
+    let (url, prefix) = match loader {
+        "forge" => (
+            "https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml",
+            format!("{minecraft}-"),
+        ),
+        "neoforge" => (
+            "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml",
+            neo_prefix(minecraft).ok_or_else(|| {
+                AppError::new(
+                    "loader",
+                    crate::core::i18n::pick(
+                        "NeoForge 支持 Minecraft 1.20.2 及更新版本。",
+                        "NeoForge supports Minecraft 1.20.2 and later.",
+                    ),
+                )
+            })?,
+        ),
+        _ => {
+            return Err(AppError::new(
+                "loader",
+                crate::core::i18n::pick("未知的加载器。", "Unknown loader."),
+            ));
+        }
+    };
+    let xml = client
+        .get(url)
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await?
+        .error_for_status()?
+        .text()
+        .await?;
+    Ok(parse_versions(&xml)
+        .into_iter()
+        .filter(|v| v.starts_with(&prefix))
+        .map(|v| {
+            let version = if loader == "forge" {
+                v.strip_prefix(&prefix).unwrap().to_string()
+            } else {
+                v
+            };
+            LoaderVersion {
+                stable: !version.contains("beta")
+                    && !version.contains("alpha")
+                    && !version.contains("rc"),
+                version,
+            }
+        })
+        .collect())
+}
+
 fn numeric_key(v: &str) -> Vec<u32> {
     v.split(|c: char| !c.is_ascii_digit())
         .filter_map(|s| s.parse().ok())
@@ -201,9 +221,31 @@ pub fn installer_url(loader: &str, mc: &str, version: &str) -> AppResult<String>
     }
 }
 
+/// BMCLAPI separates legacy Forge branch suffixes (e.g. `branch: "1.7.10"` or
+/// `"1.8.9"`) from `version`; Maven's installer path requires `<version>-<branch>`.
+fn format_bmclapi_forge_version(version: &str, branch: Option<&str>) -> String {
+    let version = version.trim();
+    match branch.map(str::trim).filter(|b| !b.is_empty()) {
+        Some(b) if !version.ends_with(&format!("-{b}")) => format!("{version}-{b}"),
+        _ => version.to_string(),
+    }
+}
+
 /// The official Forge or NeoForge installer in the shared cache, checked
 /// against the SHA-1 its maven (or the mirror) publishes.
 pub async fn fetch_installer(client: &reqwest::Client, paths: &AppPaths, loader: &str, mc: &str, version: &str, cancel: &CancellationToken) -> AppResult<std::path::PathBuf> {
+    fetch_installer_with_source(client, paths, loader, mc, version, cancel, crate::core::settings::DownloadSource::Bmclapi).await
+}
+
+pub async fn fetch_installer_with_source(
+    client: &reqwest::Client,
+    paths: &AppPaths,
+    loader: &str,
+    mc: &str,
+    version: &str,
+    cancel: &CancellationToken,
+    source: crate::core::settings::DownloadSource,
+) -> AppResult<std::path::PathBuf> {
     let url = installer_url(loader, mc, version)?;
     let official_hash = async {
         client
@@ -245,10 +287,18 @@ pub async fn fetch_installer(client: &reqwest::Client, paths: &AppPaths, loader:
         .cache
         .join("installers")
         .join(format!("{loader}-{mc}-{version}.jar"));
+    let (primary, fallbacks) = if source == crate::core::settings::DownloadSource::Bmclapi {
+        (
+            mirror_attempt(&mirror),
+            vec![mirror_attempt(&mirror), mirror_attempt(&mirror), url],
+        )
+    } else {
+        (url, vec![mirror_attempt(&mirror)])
+    };
     let task = DownloadTask::new(
         crate::core::i18n::pick("加载器安装器", "Loader installer"),
-        mirror_attempt(&mirror),
-        vec![mirror_attempt(&mirror), mirror_attempt(&mirror), url],
+        primary,
+        fallbacks,
         installer.clone(),
         Some(hash),
         None,
@@ -265,6 +315,7 @@ pub async fn fetch_installer(client: &reqwest::Client, paths: &AppPaths, loader:
 }
 
 /// Run the official installer in the shared cache, where no user saves live.
+#[allow(clippy::too_many_arguments)]
 pub async fn install(
     client: &reqwest::Client,
     paths: &AppPaths,
@@ -275,7 +326,34 @@ pub async fn install(
     cancel: &CancellationToken,
     report: crate::core::java::runtime::JavaProgress,
 ) -> AppResult<(VersionJson, String)> {
-    let versions = list(client, loader, &base.id).await?;
+    install_with_source(
+        client,
+        paths,
+        base,
+        loader,
+        pinned,
+        java,
+        cancel,
+        report,
+        crate::core::settings::DownloadSource::Bmclapi,
+    )
+    .await
+}
+
+/// Run the official installer in the shared cache, respecting the chosen download source.
+#[allow(clippy::too_many_arguments)]
+pub async fn install_with_source(
+    client: &reqwest::Client,
+    paths: &AppPaths,
+    base: &VersionJson,
+    loader: &str,
+    pinned: Option<&str>,
+    java: &JavaInstallation,
+    cancel: &CancellationToken,
+    report: crate::core::java::runtime::JavaProgress,
+    source: crate::core::settings::DownloadSource,
+) -> AppResult<(VersionJson, String)> {
+    let versions = list_with_source(client, loader, &base.id, source).await?;
     let selected = match pinned {
         Some(v) if versions.iter().any(|e| e.version == v) => v.to_string(),
         Some(_) => {
@@ -291,7 +369,7 @@ pub async fn install(
             .clone(),
     };
     report(crate::core::i18n::pick("正在下载并校验加载器安装器", "Downloading and verifying the loader installer"), 0, 0);
-    let installer = fetch_installer(client, paths, loader, &base.id, &selected, cancel).await?;
+    let installer = fetch_installer_with_source(client, paths, loader, &base.id, &selected, cancel, source).await?;
     let (profile_id, dependency_tasks) = {
         let mut archive = zip::ZipArchive::new(std::fs::File::open(&installer)?)
             .map_err(|e| AppError::detail("loader", crate::core::i18n::pick("安装器损坏。", "The installer is damaged."), e.to_string()))?;
@@ -314,84 +392,31 @@ pub async fn install(
             return Ok((merged, selected));
         }
         let mut dependencies = Vec::new();
-        if loader == "neoforge" {
+        if ["forge", "neoforge"].contains(&loader) {
             let json = value
                 .get("json")
                 .and_then(|v| v.as_str())
                 .unwrap_or("/version.json")
                 .trim_start_matches('/');
-            let overlay: serde_json::Value = serde_json::from_reader(
-                archive
-                    .by_name(json)
-                    .map_err(|e| AppError::detail("loader", crate::core::i18n::pick("缺少加载器配置。", "The loader profile is missing."), e.to_string()))?,
-            )?;
-            let mut seen = std::collections::HashSet::new();
-            for library in value
-                .get("libraries")
-                .and_then(|v| v.as_array())
-                .into_iter()
-                .flatten()
-                .chain(
-                    overlay
-                        .get("libraries")
-                        .and_then(|v| v.as_array())
-                        .into_iter()
-                        .flatten(),
-                )
-            {
-                let Some(artifact) = library.pointer("/downloads/artifact") else {
-                    continue;
-                };
-                let Some(url) = artifact
-                    .get("url")
-                    .and_then(|v| v.as_str())
-                    .filter(|s| !s.is_empty())
-                else {
-                    continue;
-                };
-                let path = artifact
-                    .get("path")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| AppError::new("loader", crate::core::i18n::pick("加载器库路径缺失。", "A loader library path is missing.")))?;
-                crate::core::java::runtime::safe_archive_path(path)?;
-                if !seen.insert(path.to_string()) {
-                    continue;
-                }
-                let hash = artifact
-                    .get("sha1")
-                    .and_then(|v| v.as_str())
-                    .filter(|s| s.len() == 40 && s.bytes().all(|b| b.is_ascii_hexdigit()))
-                    .ok_or_else(|| AppError::new("loader", crate::core::i18n::pick("加载器依赖缺少校验值。", "A loader dependency has no hash.")))?;
-                let mirror = mirror_url(url);
-                dependencies.push(DownloadTask::new(
-                    path,
-                    format!("https://repo.maven.apache.org/maven2/{path}"),
-                    vec![
-                        mirror_attempt(&mirror),
-                        mirror_attempt(&mirror),
-                        mirror_attempt(&mirror),
-                        mirror_attempt(&mirror),
-                        url.to_string(),
-                    ],
-                    paths.library_path(path),
-                    Some(hash.to_string()),
-                    artifact.get("size").and_then(|v| v.as_u64()),
-                ));
-            }
+            let overlay: Option<serde_json::Value> = archive
+                .by_name(json)
+                .ok()
+                .and_then(|entry| serde_json::from_reader(entry).ok());
+            dependencies = collect_installer_dependencies(paths, &value, overlay.as_ref(), source)?;
         }
         (profile_id, dependencies)
     };
     if !dependency_tasks.is_empty() {
-        report(crate::core::i18n::pick("正在下载并校验 NeoForge 依赖库", "Downloading and verifying NeoForge libraries"), 0, 0);
+        let progress_msg = crate::core::i18n::pick(
+            "正在下载并校验加载器依赖库",
+            "Downloading and verifying loader libraries",
+        );
+        report(progress_msg, 0, 0);
         let progress = Arc::new(DownloadProgress::new(&dependency_tasks));
         let download = download::download_all(
             dependency_tasks,
-            crate::core::net::builder()
-                .connect_timeout(Duration::from_secs(10))
-                .read_timeout(Duration::from_secs(20))
-                .timeout(Duration::from_secs(180))
-                .build()?,
-            4,
+            client.clone(),
+            16,
             cancel.clone(),
             progress.clone(),
         );
@@ -400,7 +425,7 @@ pub async fn install(
         loop {
             tokio::select! {
                 result = &mut download => { result?; break; },
-                _ = tick.tick() => { let p = progress.snapshot(); report(crate::core::i18n::pick("正在下载并校验 NeoForge 依赖库", "Downloading and verifying NeoForge libraries"), p.bytes_done, p.bytes_total); }
+                _ = tick.tick() => { let p = progress.snapshot(); report(progress_msg, p.bytes_done, p.bytes_total); }
             }
         }
     }
@@ -413,10 +438,10 @@ pub async fn install(
         &serde_json::to_vec_pretty(base)?,
     )?;
     let vanilla_jar = base_dir.join(format!("{}.jar", base.id));
-    if !vanilla_jar.exists() {
-        if std::fs::hard_link(paths.client_jar(&base.id), &vanilla_jar).is_err() {
-            std::fs::copy(paths.client_jar(&base.id), &vanilla_jar)?;
-        }
+    if !vanilla_jar.exists()
+        && std::fs::hard_link(paths.client_jar(&base.id), &vanilla_jar).is_err()
+    {
+        std::fs::copy(paths.client_jar(&base.id), &vanilla_jar)?;
     }
     let profiles = paths.cache.join("launcher_profiles.json");
     if !profiles.exists() {
@@ -470,6 +495,87 @@ pub async fn install(
     }
     let overlay: VersionJson = serde_json::from_slice(&std::fs::read(installed)?)?;
     Ok((merge(base, overlay)?, selected))
+}
+
+/// Collects remote library downloads from a modern Forge or NeoForge
+/// `install_profile.json` and embedded `version.json`, so Islet can fetch and
+/// verify them concurrently before running the Java installer.
+fn collect_installer_dependencies(
+    paths: &AppPaths,
+    profile: &serde_json::Value,
+    overlay: Option<&serde_json::Value>,
+    source: crate::core::settings::DownloadSource,
+) -> AppResult<Vec<DownloadTask>> {
+    let mut dependencies = Vec::new();
+    let mut seen = HashSet::new();
+    let profile_libs = profile
+        .get("libraries")
+        .and_then(|v| v.as_array())
+        .into_iter()
+        .flatten();
+    let overlay_libs = overlay
+        .and_then(|o| o.get("libraries"))
+        .and_then(|v| v.as_array())
+        .into_iter()
+        .flatten();
+    for library in profile_libs.chain(overlay_libs) {
+        let Some(artifact) = library.pointer("/downloads/artifact") else {
+            continue;
+        };
+        // Processor outputs and jars embedded under maven/ inside the installer
+        // carry an empty URL and are materialized locally by the installer.
+        let Some(url) = artifact
+            .get("url")
+            .and_then(|v| v.as_str())
+            .filter(|s| s.starts_with("https://"))
+        else {
+            continue;
+        };
+        let Some(path) = artifact.get("path").and_then(|v| v.as_str()).filter(|s| !s.is_empty()) else {
+            continue;
+        };
+        crate::core::java::runtime::safe_archive_path(path)?;
+        if !seen.insert(path.to_string()) {
+            continue;
+        }
+        // Only pre-download entries with a valid SHA-1; leave anything else to the official installer.
+        let Some(hash) = artifact
+            .get("sha1")
+            .and_then(|v| v.as_str())
+            .filter(|s| s.len() == 40 && s.bytes().all(|b| b.is_ascii_hexdigit()))
+        else {
+            continue;
+        };
+        let mirror = mirror_url(url);
+        let maven_central = format!("https://repo.maven.apache.org/maven2/{path}");
+        let (primary, fallbacks) = if source == crate::core::settings::DownloadSource::Bmclapi && mirror != url {
+            (
+                mirror_attempt(&mirror),
+                vec![
+                    mirror_attempt(&mirror),
+                    mirror_attempt(&mirror),
+                    maven_central,
+                    url.to_string(),
+                ],
+            )
+        } else if mirror != url {
+            (
+                url.to_string(),
+                vec![maven_central, mirror_attempt(&mirror)],
+            )
+        } else {
+            (url.to_string(), vec![maven_central])
+        };
+        dependencies.push(DownloadTask::new(
+            path,
+            primary,
+            fallbacks,
+            paths.library_path(path),
+            Some(hash.to_string()),
+            artifact.get("size").and_then(|v| v.as_u64()),
+        ));
+    }
+    Ok(dependencies)
 }
 
 /// Profiles extracted from the old GUI-only installer still need their
@@ -681,5 +787,54 @@ mod tests {
             vec!["47.1.0"]
         );
         assert!(installer_url("forge", "../x", "47.1.0").is_err());
+    }
+
+    #[test]
+    fn modern_forge_and_neoforge_dependencies_use_mirror_and_skip_processor_outputs() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = AppPaths::from_root(dir.path()).unwrap();
+        let sha = "0123456789abcdef0123456789abcdef01234567";
+        let profile = serde_json::json!({
+            "libraries": [
+                {
+                    "name": "net.minecraftforge:forge:1.20.1-47.2.0:client",
+                    "downloads": { "artifact": { "path": "net/minecraftforge/forge/1.20.1-47.2.0/forge-1.20.1-47.2.0-client.jar", "url": "", "sha1": sha } }
+                },
+                {
+                    "name": "net.minecraftforge:unsafe:0.2.0",
+                    "downloads": { "artifact": { "path": "net/minecraftforge/unsafe/0.2.0/unsafe-0.2.0.jar", "url": "https://maven.minecraftforge.net/net/minecraftforge/unsafe/0.2.0/unsafe-0.2.0.jar", "sha1": sha, "size": 42 } }
+                }
+            ]
+        });
+        let overlay = serde_json::json!({
+            "libraries": [
+                {
+                    "name": "org.ow2.asm:asm:9.6",
+                    "downloads": { "artifact": { "path": "org/ow2/asm/asm/9.6/asm-9.6.jar", "url": "https://libraries.minecraft.net/org/ow2/asm/asm/9.6/asm-9.6.jar", "sha1": sha, "size": 99 } }
+                }
+            ]
+        });
+        let tasks = collect_installer_dependencies(
+            &paths,
+            &profile,
+            Some(&overlay),
+            crate::core::settings::DownloadSource::Bmclapi,
+        )
+        .unwrap();
+        assert_eq!(tasks.len(), 2);
+        assert!(tasks[0].url.starts_with("https://bmclapi2.bangbang93.com/maven/net/minecraftforge/"));
+        assert!(tasks[1].url.starts_with("https://bmclapi2.bangbang93.com/maven/org/ow2/asm/"));
+
+        let official = collect_installer_dependencies(
+            &paths,
+            &profile,
+            Some(&overlay),
+            crate::core::settings::DownloadSource::Official,
+        )
+        .unwrap();
+        assert_eq!(official[0].url, "https://maven.minecraftforge.net/net/minecraftforge/unsafe/0.2.0/unsafe-0.2.0.jar");
+        assert_eq!(format_bmclapi_forge_version("10.13.4.1614", Some("1.7.10")), "10.13.4.1614-1.7.10");
+        assert_eq!(format_bmclapi_forge_version("11.15.1.2318-1.8.9", Some("1.8.9")), "11.15.1.2318-1.8.9");
+        assert_eq!(format_bmclapi_forge_version("47.2.0", None), "47.2.0");
     }
 }

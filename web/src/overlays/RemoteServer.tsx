@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { call, toError } from "../api/backend";
 import type { ErrorPayload, Instance, RemoteInfo, RemoteProbe, RemoteStatus, RemoteTarget } from "../api/types";
@@ -107,13 +107,28 @@ export function RemoteServer({ id }: { id: string }) {
   const [log, setLog] = useState<string | null>(null);
   const [command, setCommand] = useState("");
 
+  const mountedRef = useRef(true);
+  const busyRef = useRef(false);
+  const refreshingRef = useRef(false);
+  const loadSeqRef = useRef(0);
+  const logSeqRef = useRef(0);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const load = useCallback(async () => {
+    const seq = ++loadSeqRef.current;
     try {
       const value = await call<RemoteInfo>("remote_info", { id });
+      if (!mountedRef.current || loadSeqRef.current !== seq) return;
       setInfo(value);
       setForm((old) => old ?? formFrom(value, findInstance(useStore.getState(), id)));
     } catch (e) {
-      setError(toError(e));
+      if (mountedRef.current && loadSeqRef.current === seq) setError(toError(e));
     }
   }, [id]);
   useEffect(() => {
@@ -124,17 +139,24 @@ export function RemoteServer({ id }: { id: string }) {
   const deployed = !!info?.target?.deployedAt && !editing;
 
   const refresh = useCallback(async () => {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
     try {
-      setStatus(await call<RemoteStatus>("remote_status", { id }));
+      const next = await call<RemoteStatus>("remote_status", { id });
+      if (mountedRef.current) setStatus(next);
     } catch (e) {
-      setError(toError(e));
+      if (mountedRef.current) setError(toError(e));
+    } finally {
+      refreshingRef.current = false;
     }
   }, [id]);
   const readLog = useCallback(async () => {
+    const seq = ++logSeqRef.current;
     try {
-      setLog(await call<string>("remote_log", { id, lines: 300 }));
+      const next = await call<string>("remote_log", { id, lines: 300 });
+      if (mountedRef.current && logSeqRef.current === seq) setLog(next);
     } catch (e) {
-      setError(toError(e));
+      if (mountedRef.current && logSeqRef.current === seq) setError(toError(e));
     }
   }, [id]);
   useEffect(() => {
@@ -149,18 +171,21 @@ export function RemoteServer({ id }: { id: string }) {
 
   if (!s.instance || !info || !form) return null;
   const instance = s.instance;
-  const set = (patch: Partial<Form>) => setForm({ ...form, ...patch });
+  const set = (patch: Partial<Form>) => setForm((old) => (old ? { ...old, ...patch } : old));
   // A project's dialog opens from the server page and goes back to it.
-  const back = () => (instance.server ? s.closeModal() : s.openModal({ kind: "manage", id, tab: "data" }));
+  const back = () => (instance.server ? s.closeModal() : s.openModal({ kind: "manage", id, tab: "tools" }));
   const run = async (label: string, work: () => Promise<void>) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(label);
     setError(null);
     try {
       await work();
     } catch (e) {
-      setError(toError(e));
+      if (mountedRef.current) setError(toError(e));
     } finally {
-      setBusy(null);
+      busyRef.current = false;
+      if (mountedRef.current) setBusy(null);
     }
   };
 
@@ -281,15 +306,15 @@ export function RemoteServer({ id }: { id: string }) {
               <span className="field-hint">
                 {instance.server
                   ? t(
-                      "需要 Linux 云服务器（2 核 4G 起）。会上传服务端和模组、插件，安装 Java，按内存调好参数后启动；直连，不经第三方中转。",
-                      "Needs a Linux cloud server (2 cores and 4 GB or more). Uploads the server with its mods or plugins, installs Java, tunes it to the memory and starts it; direct, with nothing in between.",
+                      "需 Linux 云服务器（建议 2 核 4G 起），直连上传服务端并自动配置 Java 与内存。",
+                      "Requires a Linux server (2+ cores, 4+ GB RAM). Uploads directly and configures Java and memory.",
                     )
                   : t(
-                      "需要 Linux 云服务器（2 核 4G 起）。会上传这个世界的服务端、模组和存档，安装 Java 后启动；直连，不经第三方中转。",
-                      "Needs a Linux cloud server (2 cores and 4 GB or more). Uploads this world's server, mods and save, installs Java and starts it; direct, with nothing in between.",
+                      "需 Linux 云服务器（建议 2 核 4G 起），直连上传服务端、模组与存档并自动配置 Java。",
+                      "Requires a Linux server (2+ cores, 4+ GB RAM). Uploads server, mods, and save directly.",
                     )}
               </span>
-              {!supported && <span className="field-hint bad">{t("这个加载器没有可以一键生成的服务端；原版、Fabric、Quilt、Forge 和 NeoForge 可以。", "This loader has no server Islet can set up; vanilla, Fabric, Quilt, Forge and NeoForge do.")}</span>}
+              {!supported && <span className="field-hint bad">{t("仅支持原版、Fabric、Quilt、Forge、NeoForge、Paper 和 Purpur。", "Supported for Vanilla, Fabric, Quilt, Forge, NeoForge, Paper, and Purpur.")}</span>}
               {errorNotice}
               <div className="row gap-12 wrap items-start">
                 <Field label={t("服务器 IP 或域名", "Server IP or domain")}>
@@ -313,7 +338,7 @@ export function RemoteServer({ id }: { id: string }) {
                 />
               </Field>
               {form.auth === "password" ? (
-                <Field label={t("密码", "Password")} hint={info.hasSecret ? t("已保存在系统钥匙串里；留空就用保存的", "Saved in the system keychain; leave empty to use it") : t("保存在系统钥匙串里，不写进任何文件", "Kept in the system keychain, never in a file")}>
+                <Field label={t("密码", "Password")} hint={info.hasSecret ? t("已安全保存，留空使用已存密码", "Saved securely; leave blank to reuse") : t("安全保存于系统钥匙串，不写入配置文件", "Stored in the system keychain, never in config files")}>
                   <Input type="password" autoComplete="off" value={form.secret} placeholder={info.hasSecret ? "••••••••" : ""} style={{ width: 260 }} onChange={(e) => set({ secret: e.target.value })} />
                 </Field>
               ) : (
@@ -349,13 +374,13 @@ export function RemoteServer({ id }: { id: string }) {
                       probe.java ? t(`Java ${probe.java[1]}`, `Java ${probe.java[1]}`) : t("没有 Java（会自动装上）", "No Java (it'll be installed)"),
                       probe.freeMb != null ? t(`剩余 ${formatBytes(probe.freeMb * 1024 * 1024)}`, `${formatBytes(probe.freeMb * 1024 * 1024)} free`) : null,
                       probe.deployed ? t("这个文件夹里已有服务器：会更新模组并保留世界", "A server is already in this folder: mods are updated and the world kept") : null,
-                      probe.root ? null : t("非 root 用户：开机自启用 crontab", "Not root: starting at boot uses crontab"),
+                      probe.root ? null : t("普通用户，将使用定时任务自启", "Standard user; autostart uses scheduled tasks"),
                     ]
                       .filter(Boolean)
                       .join(" · ")}
                   </Notice>
                   {first && !instance.server && (
-                    <Field label={t("服务器的世界", "The server's world")} hint={world ? t("复制这个存档上传；你在单人里的背包和位置会跟着你进服务器", "A copy of this save is uploaded; your singleplayer inventory and spot come with you") : undefined}>
+                    <Field label={t("服务器的世界", "The server's world")} hint={world ? t("复制该存档上传，保留你的背包和位置", "Uploads a copy of this save, keeping your inventory and spot") : undefined}>
                       <WorldChoice instance={instance} value={world} onChange={setWorld} />
                     </Field>
                   )}
@@ -405,7 +430,7 @@ export function RemoteServer({ id }: { id: string }) {
           </Button>
           {info.pack && (
             <Button variant="primary" icon="folder" onClick={() => void s.open({ kind: "serverPack", id })}>
-              {t("朋友用的整合包", "Pack for friends")}
+              {t("好友用的整合包", "Pack for friends")}
             </Button>
           )}
         </>
@@ -427,7 +452,7 @@ export function RemoteServer({ id }: { id: string }) {
                 {status.ping.players.length > 0 && ` · ${status.ping.players.join(", ")}`}
               </span>
             )}
-            {st?.running && st.ready && !status?.ping && <span className="field-hint bad">{t(`从这里连不上：请在云服务器的安全组里放行 TCP ${info.target?.gamePort}`, `Unreachable from here: allow TCP ${info.target?.gamePort} in the cloud security group`)}</span>}
+            {st?.running && st.ready && !status?.ping && <span className="field-hint bad">{t(`无法从本机连通，请在防火墙放行 TCP ${info.target?.gamePort}`, `Unreachable: allow TCP ${info.target?.gamePort} in firewall`)}</span>}
           </div>
           <div className="row gap-6">
             {st?.running ? (
@@ -482,7 +507,7 @@ export function RemoteServer({ id }: { id: string }) {
               <span className="field-hint">
                 {info.target?.dailyBackup
                   ? st?.scheduled === "none"
-                    ? t("这台服务器没有 cron 也不是 root，自动备份没法设置", "This host has no cron and you're not root, so automatic backups can't be set up")
+                    ? t("当前服务器不支持定时任务，无法开启自动备份", "Scheduled tasks unavailable on this host; automatic backups disabled")
                     : t(`每天 5:17 自动备份，保留最近 ${info.target.keepBackups} 份`, `Backed up daily at 5:17, the newest ${info.target.keepBackups} kept`)
                   : t("自动备份已关闭", "Automatic backups are off")}
               </span>
@@ -525,8 +550,8 @@ export function RemoteServer({ id }: { id: string }) {
             </div>
             <span className="field-hint">
               {t(
-                `上次上传：${formatRelative(info.target?.deployedAt ?? null)}。「忘记」只删掉启动器里的连接信息和密码，服务器上的文件和世界不动。`,
-                `Last upload: ${formatRelative(info.target?.deployedAt ?? null)}. "Forget" only removes the connection and password here; files and the world on the host stay.`,
+                `上次上传：${formatRelative(info.target?.deployedAt ?? null)}；仅移除本机连接信息，不影响服务器文件。`,
+                `Last upload: ${formatRelative(info.target?.deployedAt ?? null)}. Only removes local connection info; server files remain untouched.`,
               )}
             </span>
           </div>
@@ -545,7 +570,7 @@ export function MemoryField({ value, onChange }: { value: string; onChange: (val
     <Field
       label={t("内存", "Memory")}
       tone={ok ? undefined : "bad"}
-      hint={auto ? t("每次启动按机器内存分配，留出 1/4 给系统，视距也随之调整", "Sized to the machine at each start, leaving a quarter for the system; view distance follows") : ok ? t("单位 MB；比机器总内存少 1G 左右", "In MB; about 1 GB under the machine's total") : t("512 到 32768 MB", "512 to 32768 MB")}
+      hint={auto ? t("启动时按服务器内存自动分配，并同步调整视距", "Sized automatically to host RAM on start, tuning view distance too") : ok ? t("单位 MB，建议比机器总内存少 1G 以上", "In MB; leave at least 1 GB for the OS") : t("512 到 32768 MB", "512 to 32768 MB")}
     >
       <div className="row gap-8">
         <Segmented
@@ -568,25 +593,25 @@ function ServerSettings({ form, set }: { form: Form; set: (patch: Partial<Form>)
   return (
     <>
       <div className="row gap-12 wrap items-start">
-        <Field label={t("游戏端口", "Game port")} tone={portOk(form.gamePort) ? undefined : "bad"} hint={t("记得在安全组里放行", "Allow it in the security group")}>
+        <Field label={t("游戏端口", "Game port")} tone={portOk(form.gamePort) ? undefined : "bad"} hint={t("需在防火墙放行", "Open in firewall")}>
           <Input mono inputMode="numeric" value={form.gamePort} style={{ width: 100 }} invalid={!portOk(form.gamePort)} onChange={(e) => set({ gamePort: digits(e.target.value, 5) })} />
         </Field>
         <MemoryField value={form.memory} onChange={(memory) => set({ memory })} />
-        <Field label={t("朋友连接的地址（可不填）", "Address friends join (optional)")} hint={t("有域名就填域名；不填用 IP 和端口", "A domain if you have one; else the IP and port")}>
+        <Field label={t("好友连接的地址（可不填）", "Address friends join (optional)")} hint={t("有域名就填域名；不填用 IP 和端口", "A domain if you have one; else the IP and port")}>
           <Input mono value={form.address} placeholder="mc.example.com" style={{ width: 220 }} onChange={(e) => set({ address: e.target.value.trim().slice(0, 255) })} />
         </Field>
       </div>
       <div className="setting-row">
         <div className="col">
           <span className="setting-name">{t("正版验证", "Online mode")}</span>
-          <span className="field-hint">{t("关闭后离线账号也能进，但名字可被冒用", "Off, offline accounts can join too, and names can be faked")}</span>
+          <span className="field-hint">{t("关闭后离线账号可加入，但名称无验证", "Off lets offline accounts join without name checks")}</span>
         </div>
         <Switch label={t("正版验证", "Online mode")} checked={form.onlineMode} onChange={(onlineMode) => set({ onlineMode })} />
       </div>
       <div className="setting-row">
         <div className="col">
           <span className="setting-name">{t("开机自动启动", "Start when the host boots")}</span>
-          <span className="field-hint">{t("云服务器重启后，Minecraft 服务器自己起来", "The Minecraft server comes back up after the host restarts")}</span>
+          <span className="field-hint">{t("服务器重启后自动拉起 Minecraft", "Automatically restarts Minecraft after host reboot")}</span>
         </div>
         <Switch label={t("开机自动启动", "Start at boot")} checked={form.autostart} onChange={(autostart) => set({ autostart })} />
       </div>

@@ -129,6 +129,32 @@ impl Settings {
         }
     }
 
+    fn builtin_curseforge_key() -> &'static str {
+        option_env!("MC_LAUNCHER_CURSEFORGE_KEY")
+            .unwrap_or("")
+            .trim()
+    }
+
+    /// Whether this build includes a compile-time CurseForge API key or custom HTTPS proxy.
+    pub fn has_builtin_curseforge() -> bool {
+        !Self::builtin_curseforge_key().is_empty()
+            || crate::core::curseforge::has_custom_api()
+    }
+
+    pub fn effective_curseforge_key(&self) -> String {
+        let user = self.curseforge_key.trim();
+        if user.is_empty() {
+            Self::builtin_curseforge_key().to_string()
+        } else {
+            user.to_string()
+        }
+    }
+
+    pub fn curseforge_configured(&self) -> bool {
+        !self.effective_curseforge_key().is_empty()
+            || crate::core::curseforge::has_custom_api()
+    }
+
     pub fn normalize(&mut self) {
         // Schema 1 defaulted to 8 parallel downloads; move untouched values
         // to the new default.

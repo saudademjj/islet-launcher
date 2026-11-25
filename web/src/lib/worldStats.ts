@@ -16,13 +16,17 @@ export interface WorldStats {
   modsOn: number | null;
 }
 
+const loadSeq: Record<string, number> = {};
+
 const useStats = create<{ stats: Record<string, WorldStats & { key: string }>; load(instance: Instance, key: string): Promise<void> }>((set) => ({
   stats: {},
   async load(instance, key) {
+    const seq = (loadSeq[instance.id] = (loadSeq[instance.id] ?? 0) + 1);
     const [saves, mods] = await Promise.all([
       call<WorldList>("list_worlds", { id: instance.id }).then((list) => list.worlds.length).catch(() => 0),
       instance.loader === "vanilla" ? Promise.resolve(null) : call<LocalMod[]>("list_mods", { id: instance.id }).catch(() => null),
     ]);
+    if (loadSeq[instance.id] !== seq) return;
     const counts = { mods: mods?.length ?? null, modsOn: mods ? mods.filter((mod) => mod.enabled).length : null };
     set((s) => ({ stats: { ...s.stats, [instance.id]: { saves, ...counts, key } } }));
   },

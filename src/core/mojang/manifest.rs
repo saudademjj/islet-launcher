@@ -76,17 +76,15 @@ pub async fn load_manifest(
         None
     };
 
-    if !force_refresh {
-        if let Some(cache) = &cached {
-            if now_millis() - cache.fetched_at < CACHE_TTL_MS {
+    if !force_refresh
+        && let Some(cache) = &cached
+            && now_millis() - cache.fetched_at < CACHE_TTL_MS {
                 return Ok(VersionList {
                     latest: cache.manifest.latest.clone(),
                     versions: cache.manifest.versions.clone(),
                     from_cache: true,
                 });
             }
-        }
-    }
 
     match fetch_manifest(client).await {
         Ok(manifest) => {
@@ -118,6 +116,24 @@ pub async fn load_manifest(
     }
 }
 
+async fn fetch_manifest(client: &reqwest::Client) -> AppResult<VersionManifest> {
+    let response = client
+        .get(MANIFEST_URL)
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await?;
+    let status = response.status();
+    if !status.is_success() {
+        return Err(AppError::new(
+            "manifest",
+            format!("获取 Minecraft 版本列表失败（HTTP {status}）。"),
+        ));
+    }
+    response.json::<VersionManifest>().await.map_err(|err| {
+        AppError::detail("manifest", "解析 Minecraft 版本列表失败。", err.to_string())
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::VersionSummary;
@@ -138,22 +154,4 @@ mod tests {
         assert_eq!(value["versionType"], "release");
         assert!(value.get("type").is_none());
     }
-}
-
-async fn fetch_manifest(client: &reqwest::Client) -> AppResult<VersionManifest> {
-    let response = client
-        .get(MANIFEST_URL)
-        .timeout(Duration::from_secs(30))
-        .send()
-        .await?;
-    let status = response.status();
-    if !status.is_success() {
-        return Err(AppError::new(
-            "manifest",
-            format!("获取 Minecraft 版本列表失败（HTTP {status}）。"),
-        ));
-    }
-    response.json::<VersionManifest>().await.map_err(|err| {
-        AppError::detail("manifest", "解析 Minecraft 版本列表失败。", err.to_string())
-    })
 }

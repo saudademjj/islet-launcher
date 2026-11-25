@@ -62,9 +62,69 @@ fn safe_name(name: &str) -> bool {
         && name.bytes().all(|b| b.is_ascii_alphanumeric() || b"._-+".contains(&b))
 }
 
-/// Puts the newest suitable OptiFine into the world's `mods`. Returns its
-/// file name. Fabric and Quilt also need OptiFabric, installed by the caller.
-pub async fn install(client: &reqwest::Client, paths: &AppPaths, instance: &Instance, cancel: &CancellationToken) -> AppResult<String> {
+fn version_numbers(s: &str) -> Vec<u32> {
+    s.split(|c: char| !c.is_ascii_digit())
+        .filter_map(|part| part.parse().ok())
+        .collect()
+}
+
+/// Whether an OptiFine build's recommended Forge label (such as `"Forge 47.2.0"`
+/// or `"Forge #2859"`) exactly matches `forge_version` (such as `"47.2.0"` or
+/// `"14.23.5.2859"`).
+pub fn forge_matches(recommended: &str, forge_version: &str) -> bool {
+    let wanted_nums = version_numbers(forge_version);
+    if wanted_nums.is_empty() {
+        return false;
+    }
+    let rec = recommended.trim();
+    if let Some(hash_num) = rec.strip_prefix("Forge #").and_then(|n| n.trim().parse::<u32>().ok()) {
+        wanted_nums.last().copied() == Some(hash_num)
+    } else {
+        version_numbers(rec) == wanted_nums
+    }
+}
+
+/// Picks the best OptiFine build for `forge_version` (e.g. `"47.1.0"` or
+/// `"14.23.5.2847"`): an exact Forge match first, else a non-preview build
+/// targeting an older/equal Forge build on the same branch, else the newest.
+pub fn select_build<'a>(list: &'a [OptiFineBuild], forge_version: Option<&str>) -> Option<&'a OptiFineBuild> {
+    let Some(forge_ver) = forge_version.map(str::trim).filter(|s| !s.is_empty()) else {
+        return list.first();
+    };
+    let wanted_nums = version_numbers(forge_ver);
+    let wanted_build = wanted_nums.last().copied();
+
+    // 1. Exact version or #build match (builds() already puts non-preview first).
+    if let Some(exact) = list
+        .iter()
+        .find(|b| b.forge.as_deref().is_some_and(|f| forge_matches(f, forge_ver)))
+    {
+        return Some(exact);
+    }
+
+    // 2. Closest non-preview build whose target Forge <= current Forge.
+    if !wanted_nums.is_empty()
+        && let Some(compatible) = list.iter().filter(|b| !b.preview()).find(|b| {
+            b.forge.as_deref().is_some_and(|f| {
+                if let Some(hash_num) = f.trim().strip_prefix("Forge #").and_then(|n| n.trim().parse::<u32>().ok()) {
+                    wanted_build.is_some_and(|w| hash_num <= w)
+                } else {
+                    let b_nums = version_numbers(f);
+                    !b_nums.is_empty() && b_nums <= wanted_nums
+                }
+            })
+        })
+    {
+        return Some(compatible);
+    }
+
+    list.first()
+}
+
+/// Puts the best matching OptiFine into the world's `mods`. Returns the
+/// installed build metadata. Fabric and Quilt also need OptiFabric, installed
+/// by the caller.
+pub async fn install_matched(client: &reqwest::Client, paths: &AppPaths, instance: &Instance, cancel: &CancellationToken) -> AppResult<OptiFineBuild> {
     if !["forge", "fabric", "quilt"].contains(&instance.loader.as_str()) {
         return Err(AppError::new(
             "optifine",
@@ -72,14 +132,17 @@ pub async fn install(client: &reqwest::Client, paths: &AppPaths, instance: &Inst
         ));
     }
     let list = builds(client, &instance.version_id).await?;
-    let build = list
-        .first()
-        .ok_or_else(|| AppError::new("optifine", crate::tr!("OptiFine 还没有适配 {} 的版本。", "OptiFine has no version for {} yet.", instance.version_id)))?;
+    let forge_ver = (instance.loader == "forge")
+        .then_some(instance.loader_version.as_deref())
+        .flatten();
+    let build = select_build(&list, forge_ver)
+        .ok_or_else(|| AppError::new("optifine", crate::tr!("OptiFine 还没有适配 {} 的版本。", "OptiFine has no version for {} yet.", instance.version_id)))?
+        .clone();
     let mods = paths.instance_game_dir(&instance.id).join("mods");
     std::fs::create_dir_all(&mods)?;
     let target = mods.join(&build.filename);
     if target.is_file() {
-        return Ok(build.filename.clone());
+        return Ok(build);
     }
     let stage = paths.instance_dir(&instance.id).join(".optifine-download");
     std::fs::create_dir_all(&stage)?;
@@ -112,7 +175,11 @@ pub async fn install(client: &reqwest::Client, paths: &AppPaths, instance: &Inst
             crate::core::manage::recycle_item(paths, &instance.id, crate::core::manage::ItemKind::Mod, &entry.file_name().to_string_lossy(), None)?;
         }
     }
-    Ok(build.filename.clone())
+    Ok(build)
+}
+
+pub async fn install(client: &reqwest::Client, paths: &AppPaths, instance: &Instance, cancel: &CancellationToken) -> AppResult<String> {
+    Ok(install_matched(client, paths, instance, cancel).await?.filename)
 }
 
 /// No checksum is published, so at least make sure it is a zip with
@@ -122,23 +189,6 @@ fn looks_like_jar(path: &Path) -> bool {
         .ok()
         .and_then(|file| zip::ZipArchive::new(file).ok())
         .is_some_and(|mut zip| zip.by_name("optifine/Config.class").is_ok() || zip.by_name("net/optifine/Config.class").is_ok() || (zip.by_name("Config.class").is_ok() && zip.by_name("optifine/Installer.class").is_ok()))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn mirror_entries_parse_and_names_are_checked() {
-        let json = r#"[{"mcversion":"1.20.1","type":"HD_U","patch":"I6","filename":"OptiFine_1.20.1_HD_U_I6.jar","forge":"Forge 47.1.0"},
-                       {"mcversion":"1.20.1","type":"HD_U","patch":"pre1_I7","filename":"preview_OptiFine_1.20.1_HD_U_I7_pre1.jar"}]"#;
-        let list: Vec<OptiFineBuild> = serde_json::from_str(json).unwrap();
-        assert_eq!(list[0].edition, "HD_U");
-        assert!(!list[0].preview());
-        assert!(list[1].preview());
-        assert!(safe_name(&list[0].filename));
-        assert!(!safe_name("../evil.jar"));
-    }
 }
 
 /// Use the distribution's own patcher for a vanilla profile. This produces
@@ -173,4 +223,29 @@ pub async fn install_vanilla(client: &reqwest::Client, paths: &AppPaths, instanc
     crate::core::util::atomic_write(&paths.instance_dir(&instance.id).join("launch-version.json"), &serde_json::to_vec_pretty(&merged)?)?;
     crate::core::util::atomic_write(&paths.instance_dir(&instance.id).join("optifine.json"), &serde_json::to_vec(&serde_json::json!({"minecraft": instance.version_id}))?)?;
     Ok(build.filename)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mirror_entries_parse_and_names_are_checked() {
+        let json = r#"[{"mcversion":"1.20.1","type":"HD_U","patch":"I6","filename":"OptiFine_1.20.1_HD_U_I6.jar","forge":"Forge 47.2.0"},
+                       {"mcversion":"1.20.1","type":"HD_U","patch":"I5","filename":"OptiFine_1.20.1_HD_U_I5.jar","forge":"Forge 47.1.0"},
+                       {"mcversion":"1.20.1","type":"HD_U","patch":"pre1_I7","filename":"preview_OptiFine_1.20.1_HD_U_I7_pre1.jar"}]"#;
+        let list: Vec<OptiFineBuild> = serde_json::from_str(json).unwrap();
+        assert_eq!(list[0].edition, "HD_U");
+        assert!(!list[0].preview());
+        assert!(list[2].preview());
+        assert!(safe_name(&list[0].filename));
+        assert!(!safe_name("../evil.jar"));
+        assert_eq!(select_build(&list, Some("47.1.0")).unwrap().patch, "I5");
+        assert_eq!(select_build(&list, Some("47.2.0")).unwrap().patch, "I6");
+        assert_eq!(select_build(&list, Some("47.3.0")).unwrap().patch, "I6");
+        assert_eq!(select_build(&list, None).unwrap().patch, "I6");
+        assert!(forge_matches("Forge #2859", "14.23.5.2859"));
+        assert!(!forge_matches("Forge #2859", "14.23.5.2860"));
+        assert!(forge_matches("Forge 47.2.0", "47.2.0"));
+    }
 }

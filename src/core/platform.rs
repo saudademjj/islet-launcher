@@ -118,18 +118,28 @@ pub fn adoptium_arch_for(arch: &str) -> &'static str {
     }
 }
 
-/// Whether Intel programs can run here: always on Intel, and on Apple
-/// Silicon once Rosetta 2 is installed.
+/// Whether Intel programs can run here: always on Intel, on Apple Silicon
+/// once Rosetta 2 is installed, on Windows 11 ARM via its built-in x64
+/// emulator, and on Linux ARM64 when a user-mode x86_64 translator is registered.
 pub fn can_run_arch(arch: &str) -> bool {
     let host = normalize_arch(std::env::consts::ARCH);
     let wanted = normalize_arch(arch);
     if wanted == host {
         return true;
     }
-    cfg!(target_os = "macos")
-        && host == "aarch64"
-        && wanted == "x86_64"
-        && std::path::Path::new("/Library/Apple/usr/libexec/oah/libRosettaRuntime").exists()
+    if host == "aarch64" && wanted == "x86_64" {
+        if cfg!(target_os = "macos") {
+            return std::path::Path::new("/Library/Apple/usr/libexec/oah/libRosettaRuntime").exists();
+        }
+        if cfg!(windows) {
+            return true;
+        }
+        if cfg!(target_os = "linux") {
+            return std::path::Path::new("/proc/sys/fs/binfmt_misc/qemu-x86_64").exists()
+                || std::path::Path::new("/proc/sys/fs/binfmt_misc/box64").exists();
+        }
+    }
+    false
 }
 
 /// `fs::canonicalize` returns verbatim `\\?\C:\...` paths on Windows. Java 8

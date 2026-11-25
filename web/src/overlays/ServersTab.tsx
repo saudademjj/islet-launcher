@@ -76,7 +76,7 @@ export function ServersTab({ instance, busy }: { instance: Instance; busy: boole
               </span>
             )}
           </div>
-          <span className="pane-hint">{t("和游戏里「多人游戏」是同一份列表。1.20 及以上直接进入服务器，更早的版本启动后自动连接。", "The same list as Multiplayer in game. 1.20 and later join directly; older versions connect after starting.")}</span>
+          <span className="pane-hint">{t("与游戏内多人列表同步，点「加入」直接进服。", "Synced with in-game Multiplayer; click Join to connect directly.")}</span>
         </div>
         <div className="spacer" />
         {list && list.length > 0 && (

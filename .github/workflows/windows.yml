@@ -41,6 +41,8 @@ jobs:
         shell: pwsh
         env:
           MC_LAUNCHER_CLIENT_ID: ${{ vars.MC_LAUNCHER_CLIENT_ID }}
+          MC_LAUNCHER_CURSEFORGE_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
+          MC_LAUNCHER_CURSEFORGE_URL: ${{ vars.MC_LAUNCHER_CURSEFORGE_URL }}
           # The manifest release.yml attaches to the latest release.
           MC_LAUNCHER_UPDATE_URL: ${{ vars.MC_LAUNCHER_UPDATE_URL || format('https://github.com/{0}/releases/latest/download/latest.json', github.repository) }}
           WINDOWS_SIGN_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}

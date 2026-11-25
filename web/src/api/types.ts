@@ -216,6 +216,7 @@ export interface AppInfo {
   dataDir: string;
   platform: string;
   arch: string;
+  curseforgeConfigured?: boolean;
 }
 
 export interface Snapshot {
@@ -321,6 +322,8 @@ export interface ModMeta {
   name: string | null;
   description: string | null;
   version: string | null;
+  /** Loaders declared inside the jar ("fabric", "quilt", "forge", "neoforge", "liteloader"). */
+  loaders?: string[];
   /** Required mod ids; the game, Java and the loader left out. */
   depends: string[];
   /** Other ids it answers to, bundled jars included. */
@@ -369,6 +372,7 @@ export type CrashFix =
   | { kind: "raiseMemory"; mb: number }
   | { kind: "installMod"; query: string }
   | { kind: "openMods" }
+  | { kind: "openTools" }
   | { kind: "repair" }
   | { kind: "none" };
 

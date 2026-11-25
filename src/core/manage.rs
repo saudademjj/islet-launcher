@@ -211,7 +211,7 @@ pub fn datapacks(paths: &AppPaths, id: &str, save: &str) -> AppResult<Vec<Datapa
             })
         })
         .collect();
-    list.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    list.sort_by_key(|a| a.name.to_lowercase());
     Ok(list)
 }
 
@@ -252,11 +252,17 @@ fn write_level(world: &Path, name: &str, root: &Tag) -> AppResult<()> {
     encoder.write_all(&nbt::write(name, root))?;
     let bytes = encoder.finish()?;
     let path = world.join("level.dat");
-    let temporary = world.join("level.dat.launcher-tmp");
-    fs::write(&temporary, bytes)?;
+    let temporary = world.join(format!(".level.dat.tmp-{}", uuid::Uuid::new_v4().simple()));
+    {
+        let mut file = fs::File::create(&temporary)?;
+        file.write_all(&bytes)?;
+        file.sync_all()?;
+    }
     // The game keeps the previous level.dat as level.dat_old; so do we.
     let _ = fs::copy(&path, world.join("level.dat_old"));
-    fs::rename(&temporary, &path)?;
+    crate::core::util::replace_file(&temporary, &path).inspect_err(|_| {
+        let _ = fs::remove_file(&temporary);
+    })?;
     Ok(())
 }
 
@@ -380,7 +386,7 @@ pub fn save_backups(paths: &AppPaths, id: &str, folder: &str) -> AppResult<Vec<S
             })
         })
         .collect();
-    list.sort_by(|a, b| b.created_ms.cmp(&a.created_ms));
+    list.sort_by_key(|b| std::cmp::Reverse(b.created_ms));
     Ok(list)
 }
 
@@ -646,7 +652,7 @@ fn java_runtimes(paths: &AppPaths, needs: &HashSet<u32>) -> Vec<JavaUsage> {
             }
         }
     }
-    list.sort_by(|a, b| b.major.cmp(&a.major));
+    list.sort_by_key(|b| std::cmp::Reverse(b.major));
     list
 }
 
@@ -826,7 +832,7 @@ mod tests {
         let pack = dir.path().join("tools");
         fs::create_dir_all(&pack).unwrap();
         fs::write(pack.join("pack.mcmeta"), r#"{"pack":{"pack_format":48,"description":"§a好用的工具"}}"#).unwrap();
-        assert_eq!(add_datapacks(&paths, &instance.id, "w", &[pack.clone()]).unwrap(), 1);
+        assert_eq!(add_datapacks(&paths, &instance.id, "w", std::slice::from_ref(&pack)).unwrap(), 1);
         let list = datapacks(&paths, &instance.id, "w").unwrap();
         assert_eq!(list[0].name, "tools");
         assert_eq!(list[0].description.as_deref(), Some("好用的工具"));
@@ -842,7 +848,7 @@ mod tests {
         fs::write(paths.version_cache_dir("1.8.9").join("client.jar"), b"jar").unwrap();
         let used = usage(&paths, std::slice::from_ref(&instance), &[], &HashSet::new());
         assert_eq!(used.unused_versions, vec!["1.8.9".to_string()]);
-        assert_eq!(clean(&paths, &[instance.clone()], &[], &Cleanup::UnusedVersions).unwrap(), 3);
+        assert_eq!(clean(&paths, std::slice::from_ref(&instance), &[], &Cleanup::UnusedVersions).unwrap(), 3);
         assert!(paths.version_cache_dir("1.21").is_dir());
         let outside = Cleanup::Java { path: paths.root.to_string_lossy().into_owned() };
         assert!(clean(&paths, &[instance], &[], &outside).is_err());

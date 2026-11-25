@@ -44,27 +44,24 @@ impl RuleEnv<'static> {
 }
 
 fn os_matches(os: &OsRule, env: RuleEnv) -> bool {
-    if let Some(name) = &os.name {
-        if name != current_os_name() {
+    if let Some(name) = &os.name
+        && name != current_os_name() {
             return false;
         }
-    }
-    if let Some(arch) = &os.arch {
-        if arch != mojang_arch(env.arch) {
+    if let Some(arch) = &os.arch
+        && arch != mojang_arch(env.arch) {
             return false;
         }
-    }
     // os.version rules are rare; ignoring them is safer than rejecting a
     // library that would otherwise work on the current macOS.
     true
 }
 
 fn rule_matches(rule: &Rule, env: RuleEnv) -> bool {
-    if let Some(os) = &rule.os {
-        if !os_matches(os, env) {
+    if let Some(os) = &rule.os
+        && !os_matches(os, env) {
             return false;
         }
-    }
     if let Some(features) = &rule.features {
         // Demo mode and the quick play arguments stay off (quick play is
         // added by hand when asked for); a custom window size is optional.

@@ -7,11 +7,11 @@
 想确认下载的文件完整无误，可以和 Release 页 `SHA256SUMS.txt` 里的 SHA-256 核对：
 
 ```powershell
-Get-FileHash .\Islet-0.4.0-x64-setup.exe -Algorithm SHA256   # Windows
+Get-FileHash .\Islet-0.5.0-x64-setup.exe -Algorithm SHA256   # Windows
 ```
 
 ```bash
-shasum -a 256 Islet-0.4.0-arm64.dmg                        # macOS / Linux
+shasum -a 256 Islet-0.5.0-arm64.dmg                        # macOS / Linux
 ```
 
 ## Windows

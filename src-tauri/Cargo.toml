@@ -1,6 +1,6 @@
 [package]
 name = "islet-app"
-version = "0.4.0"
+version = "0.5.0"
 description = "Islet desktop shell: Tauri window around the launcher core"
 authors = ["saudade"]
 license = "GPL-3.0-only"

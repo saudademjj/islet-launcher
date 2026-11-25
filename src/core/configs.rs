@@ -44,7 +44,7 @@ pub fn list(paths: &AppPaths, id: &str) -> AppResult<Vec<ConfigFile>> {
     for root in ROOTS {
         walk(&game.join(root), root, 0, &mut found);
     }
-    found.sort_by(|a, b| a.path.to_lowercase().cmp(&b.path.to_lowercase()));
+    found.sort_by_key(|a| a.path.to_lowercase());
     Ok(found)
 }
 
@@ -101,7 +101,7 @@ pub fn read(paths: &AppPaths, id: &str, relative: &str) -> AppResult<String> {
     if meta.len() > MAX_BYTES {
         return Err(AppError::new("config_large", crate::core::i18n::pick("这个文件超过 1 MB，不适合在这里编辑。", "This file is over 1 MB, too big to edit here.")));
     }
-    String::from_utf8(fs::read(&path)?).map_err(|_| AppError::new("config_binary", crate::core::i18n::pick("这个文件不是 UTF-8 文本，不能在这里编辑。", "This file isn't UTF-8 text, so it can't be edited here.")))
+    String::from_utf8(fs::read(&path)?).map_err(|_| AppError::new("config_binary", crate::core::i18n::pick("该文件不是纯文本格式，无法在此编辑。", "This file isn't plain text and can't be edited here.")))
 }
 
 /// Replaces a config file's text. Only existing files are edited; the old
@@ -120,9 +120,16 @@ pub fn write(paths: &AppPaths, id: &str, relative: &str, text: &str) -> AppResul
         fs::create_dir_all(parent)?;
     }
     fs::write(&backup, &old)?;
-    let temporary = path.with_extension(format!("{}.islet-tmp", path.extension().and_then(|e| e.to_str()).unwrap_or("")));
-    fs::write(&temporary, text)?;
-    fs::rename(&temporary, &path).inspect_err(|_| {
+    let mut tmp_os = path.as_os_str().to_os_string();
+    tmp_os.push(format!(".islet-tmp-{}", uuid::Uuid::new_v4().simple()));
+    let temporary = PathBuf::from(tmp_os);
+    {
+        use std::io::Write;
+        let mut file = fs::File::create(&temporary)?;
+        file.write_all(text.as_bytes())?;
+        file.sync_all()?;
+    }
+    crate::core::util::replace_file(&temporary, &path).inspect_err(|_| {
         let _ = fs::remove_file(&temporary);
     })?;
     Ok(())

@@ -131,9 +131,9 @@ function ErrorBanner({ error, instance }: { error: LastError; instance: Instance
         }
       >
         {cause === "network"
-          ? t("连不上下载源，或者速度太慢。已下载的部分会保留，重试会接着下载。", "The download source couldn't be reached or was too slow. What arrived is kept, and a retry resumes.")
+          ? t("无法连接下载源或速度过慢，重试会继续下载。", "Can't reach the download source or it's too slow. Retry resumes progress.")
           : cause === "damaged"
-            ? t("有文件没通过校验，多半是下载源上的副本坏了。重新获取会丢掉坏文件再下载。", "A file failed its check, most likely a damaged copy on the source. Fetching again drops it and downloads anew.")
+            ? t("部分文件损坏，重新获取会替换受损文件。", "Some files were corrupted. Fetching again will replace them.")
             : <span className="selectable">{error.message}</span>}
       </Notice>
     </motion.div>
@@ -157,6 +157,15 @@ const reducedMotion = () =>
 function useParallax() {
   const ref = useRef<HTMLElement>(null);
   const frame = useRef(0);
+  useEffect(
+    () => () => {
+      if (frame.current) {
+        cancelAnimationFrame(frame.current);
+        frame.current = 0;
+      }
+    },
+    [],
+  );
   const onMouseMove = (e: React.MouseEvent) => {
     const el = ref.current;
     if (!el || frame.current || reducedMotion()) return;
@@ -164,10 +173,16 @@ function useParallax() {
     frame.current = requestAnimationFrame(() => {
       frame.current = 0;
       const box = el.getBoundingClientRect();
-      el.style.setProperty("--px", ((x - box.left) / box.width - 0.5).toFixed(3));
+      if (box.width > 0) el.style.setProperty("--px", ((x - box.left) / box.width - 0.5).toFixed(3));
     });
   };
-  const onMouseLeave = () => ref.current?.style.setProperty("--px", "0");
+  const onMouseLeave = () => {
+    if (frame.current) {
+      cancelAnimationFrame(frame.current);
+      frame.current = 0;
+    }
+    ref.current?.style.setProperty("--px", "0");
+  };
   return { ref, onMouseMove, onMouseLeave };
 }
 
@@ -197,7 +212,7 @@ function StageBar() {
   return (
     <header className="stage-bar" data-tauri-drag-region>
       <div className="col" data-tauri-drag-region>
-        <span className="stage-greeting" data-tauri-drag-region>
+        <span className="stage-greeting truncate" data-tauri-drag-region>
           {greeting()}{t("，", ", ")}{account?.username ?? t("玩家", "player")}
         </span>
         <span className="stage-date" data-tauri-drag-region>
@@ -205,11 +220,13 @@ function StageBar() {
         </span>
       </div>
       <div className="spacer" data-tauri-drag-region />
-      <Button variant="hero" icon="download" onClick={() => useStore.getState().openModal({ kind: "modpacks" })}>{t("浏览整合包", "Browse modpacks")}</Button>
-      <ImportPackButton variant="hero" disabled={s.fileBusy} />
-      <Button variant="hero" icon="plus" onClick={s.openCreate}>
-        {t("新建世界 ", "New world ")}<Kbd>{MOD_KEY}N</Kbd>
-      </Button>
+      <div className="row gap-8 wrap">
+        <Button variant="hero" icon="download" onClick={() => useStore.getState().openModal({ kind: "modpacks" })}>{t("浏览整合包", "Browse modpacks")}</Button>
+        <ImportPackButton variant="hero" disabled={s.fileBusy} />
+        <Button variant="hero" icon="plus" onClick={s.openCreate}>
+          {t("新建世界 ", "New world ")}<Kbd>{MOD_KEY}N</Kbd>
+        </Button>
+      </div>
     </header>
   );
 }
@@ -558,14 +575,14 @@ function Facts({ instance, worlds }: { instance: Instance; worlds: WorldList | n
   const autoMemory = useAutoMemory(instance);
   const automatic = instance.memoryMb == null && s.settings.memoryAuto;
   const memory = instance.memoryMb ?? (automatic ? (autoMemory ?? s.settings.memoryMb) : s.settings.memoryMb);
-  const memorySub = instance.memoryMb != null ? t("世界单独设置", "Set for this world") : automatic ? t("自动 · 按本机内存与模组数", "Auto · from this computer's memory and mod count") : t("使用全局设置", "Global setting");
+  const memorySub = instance.memoryMb != null ? t("世界单独设置", "Set for this world") : automatic ? t("自动分配", "Automatic") : t("使用全局设置", "Global setting");
   const javaCustom = instance.javaPath && instance.javaPath !== "auto" ? instance.javaPath : !instance.javaPath && s.settings.javaPath ? s.settings.javaPath : null;
   const javaMajor = javaCustom?.match(/(?:jdk|jre|java)[-_]?(\d+)/i)?.[1];
   const javaName = javaCustom ? (javaMajor ? `Java ${javaMajor}` : t("指定路径", "Custom path")) : t("自动", "Auto");
 
   return (
     <motion.div className="facts" variants={item}>
-      <button type="button" className="fact" onClick={() => s.openManage(instance.id, "data")}>
+      <button type="button" className="fact" onClick={() => s.openManage(instance.id, "saves")}>
         <span className="fact-label">{t("存档", "Saves")}</span>
         <div className="row items-baseline gap-6">
           <Roll className="fact-number" value={worlds ? worlds.worlds.length : "··"} />
@@ -596,7 +613,7 @@ function Facts({ instance, worlds }: { instance: Instance; worlds: WorldList | n
         <button type="button" className="fact" onClick={() => s.openManage(instance.id)}>
           <span className="fact-label">Java</span>
           <span className="fact-number fact-word">{javaName}</span>
-          <span className="fact-sub truncate">{javaCustom ? javaCustom : t("按游戏版本匹配，缺少时自动下载", "Matched to the game version, downloaded if missing")}</span>
+          <span className="fact-sub truncate">{javaCustom ? javaCustom : t("按版本自动匹配与下载", "Auto-matched & downloaded")}</span>
           <Icon name="chevronRight" className="fact-go" />
         </button>
       )}
@@ -642,7 +659,7 @@ function ModsFact({ instance, stats, insights }: { instance: Instance; stats: Wo
               : stats.mods === 0
                 ? t("还没有模组", "No mods yet")
                 : off > 0
-                  ? t(`${off} 个已停用`, `${off} disabled`)
+                  ? t(`${off} 个已禁用`, `${off} disabled`)
                   : t("全部已启用", "All enabled")}
       </span>
       <Icon name="chevronRight" className="fact-go" />
@@ -725,7 +742,7 @@ function News() {
               <Button size="sm" variant="ghost" icon="external" onClick={() => void s.openUrl(wikiUrl(note.version))}>
                 {t("更新内容", "Changelog")}
               </Button>
-              <Button size="sm" variant="ghost" icon="plus" onClick={() => useStore.setState({ modal: { kind: "create", version: note.version } })}>
+              <Button size="sm" variant="ghost" icon="plus" onClick={() => useStore.getState().openCreate(note.version)}>
                 {t("用这个版本新建", "New world on it")}
               </Button>
             </div>
@@ -759,7 +776,7 @@ function NewWorlds() {
           </span>
           <span className="col fill gap-4">
             <span className="start-title">{t("导入", "Import")}</span>
-            <span className="start-text">{t("整合包，或官方启动器、HMCL、PCL、Prism 里已有的游戏", "A modpack, or games you already have in the official launcher, HMCL, PCL or Prism")}</span>
+            <span className="start-text">{t("导入整合包或其他启动器的游戏", "Modpacks or games from other launchers")}</span>
           </span>
           <Icon name="chevronRight" className="faint" />
         </button>
@@ -792,7 +809,7 @@ function Welcome({ hasInstances }: { hasInstances: boolean }) {
   const steps = [
     {
       title: t("登录微软账号", "Sign in with Microsoft"),
-      text: t("离线账号在验证过拥有 Java 版后才能添加", "Offline accounts open after a sign-in that owns Java Edition"),
+      text: t("需先登录正版账号才可添加离线账号", "Required before adding offline accounts"),
       done: account !== null,
       action: <FirstSignIn onMore={() => s.setPage("accounts")} />,
     },
@@ -808,7 +825,7 @@ function Welcome({ hasInstances }: { hasInstances: boolean }) {
     },
     {
       title: t("开始游戏", "Play"),
-      text: t("首次启动会自动下载游戏文件和所需的 Java", "The first start downloads the game files and the Java it needs"),
+      text: t("首次启动自动下载游戏与 Java", "Downloads game files and Java automatically"),
       done: false,
       action: null,
     },
@@ -826,7 +843,7 @@ function Welcome({ hasInstances }: { hasInstances: boolean }) {
           <BrandMark size={52} />
           <div className="col gap-6">
             <h1 className="stage-title">{t("三步开始游戏", "Three steps to play")}</h1>
-            <span className="stage-meta">{t("每个世界的版本、存档、模组和内存设置互相独立。", "Each world has its own version, saves, mods and memory.")}</span>
+            <span className="stage-meta">{t("每个世界的版本、存档和模组互相独立", "Each world keeps its own version, saves, and mods")}</span>
           </div>
         </div>
         <motion.div className="steps" variants={stagger} initial="initial" animate="animate">

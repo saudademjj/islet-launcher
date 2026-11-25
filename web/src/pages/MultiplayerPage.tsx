@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 
+import { toError } from "../api/backend";
 import type { LanGame, P2pLevel, P2pStatus } from "../api/types";
 import { Icon } from "../components/Icon";
 import { Landscape, PX } from "../components/Pixel";
@@ -45,7 +46,7 @@ export function MultiplayerPage() {
     <>
       <Toolbar
         title={t("联机", "Multiplayer")}
-        meta={live && level ? `${status?.role === "host" ? t("房主", "Host") : t("访客", "Guest")} · ${LEVELS[level].label}` : t("P2P 直连，无需公网 IP 和虚拟网卡", "Peer-to-peer, no public IP or virtual adapter needed")}
+        meta={live && level ? `${status?.role === "host" ? t("房主", "Host") : t("访客", "Guest")} · ${LEVELS[level].label}` : t("用房间码和好友联机", "Play with friends using a room code")}
       >
         {(live || preparing) && (
           <Button variant="danger-ghost" icon="close" onClick={() => void s.stop()}>
@@ -140,12 +141,12 @@ function Start({ downloadSize }: { downloadSize: number | null }) {
     <>
       <RoomHero seed="p2p-start">
         <div className="room-hero-body">
-          <span className="room-eyebrow">{t("P2P 联机", "P2P MULTIPLAYER")}</span>
-          <h2 className="room-title">{t("和好友一起玩，不用公网 IP", "Play with friends, no public IP needed")}</h2>
+          <span className="room-eyebrow">{t("好友联机", "MULTIPLAYER")}</span>
+          <h2 className="room-title">{t("和好友一起玩", "Play with friends")}</h2>
           <p className="room-text">
             {t(
-              "能直连时直连，否则经共享节点中转；全程加密。",
-              "Direct when possible, otherwise relayed through shared nodes; encrypted end to end.",
+              "输入房间码即可加入，自动选择最快线路",
+              "Join with a room code; automatically picks the fastest route",
             )}
           </p>
           <Bridge level="none" left={<PlayerFace account={account} size={32} />} right={<span className="bridge-ghost">?</span>} />
@@ -157,14 +158,14 @@ function Start({ downloadSize }: { downloadSize: number | null }) {
       </motion.div>
       <motion.div className="col gap-12" variants={item} style={{ marginTop: 16 }}>
         {downloadSize != null && (
-          <Notice icon="download" title={t(`首次联机会下载约 ${formatBytes(downloadSize)} 的联机组件`, `The first room downloads about ${formatBytes(downloadSize)} of networking`)}>
-            {t("EasyTier 开源组网核心（LGPL-3.0），从官方发布页下载并校验，只需下载一次。", "EasyTier, an open-source networking core (LGPL-3.0), downloaded from its official releases and verified, once.")}
+          <Notice icon="download" title={t(`首次联机需下载约 ${formatBytes(downloadSize)} 联机组件`, `First room downloads a ${formatBytes(downloadSize)} networking component`)}>
+            {t("仅需下载一次，下载完成后即可开房或加入房间。", "Downloaded once; then you can host or join rooms right away.")}
           </Notice>
         )}
         {isWindows && (
           <p className="room-hint">
             <Icon name="shield" />
-            {t("Windows 可能弹出防火墙提示，请选「允许」；否则只能通过中转连接，延迟会高一些。", "Windows may ask about the firewall; choose Allow, or connections can only go through a relay, with more delay.")}
+            {t("若弹出 Windows 防火墙提示请选择「允许」，连接更流畅。", "If Windows asks about the firewall, choose Allow for lower latency.")}
           </p>
         )}
       </motion.div>
@@ -181,6 +182,7 @@ function HostCard({ name }: { name: string }) {
   const busy = useP2p((s) => s.busy);
   const [games, setGames] = useState<LanGame[] | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
   const [port, setPort] = useState("");
   const portRef = useRef<HTMLInputElement>(null);
   useIntent("host", portRef);
@@ -197,10 +199,13 @@ function HostCard({ name }: { name: string }) {
     try {
       const found = await detect();
       if (!live.current) return;
+      setScanError(null);
       setGames(found);
       if (found.length) setPort((current) => current || String(found[0].port));
-    } catch {
-      if (live.current && !quiet) setGames([]);
+    } catch (error) {
+      if (!live.current) return;
+      setScanError(toError(error).message);
+      setGames((prev) => prev ?? []);
     } finally {
       inFlight.current = false;
       if (live.current) setScanning(false);
@@ -227,14 +232,14 @@ function HostCard({ name }: { name: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // While nothing is found, look again every few seconds, only while the
-  // launcher is on screen.
+  // launcher is on screen and UDP 4445 is actually listenable.
   const empty = games !== null && games.length === 0;
   useEffect(() => {
-    if (!empty) return;
+    if (!empty || scanError) return;
     const timer = window.setInterval(() => document.visibilityState === "visible" && void scan(true), RESCAN_MS);
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [empty]);
+  }, [empty, scanError]);
   const valid = /^\d{1,5}$/.test(port) && Number(port) > 0 && Number(port) < 65536;
   return (
     <section className="card room-card">
@@ -273,6 +278,15 @@ function HostCard({ name }: { name: string }) {
             {t("重新检测", "Scan again")}
           </Button>
         </div>
+        {scanError ? (
+          <span className="field-hint bad" role="alert">
+            {scanError}
+          </span>
+        ) : empty ? (
+          <span className="room-card-text">
+            {t("未自动发现时，可直接输入游戏里显示的端口号。", "If not found automatically, enter the port shown in game chat.")}
+          </span>
+        ) : null}
       </div>
       <div className="room-card-foot">
         <Button variant="primary" icon="play" busy={busy} disabled={!valid} onClick={() => void host(Number(port), name)}>
@@ -309,7 +323,7 @@ function JoinCard({ name }: { name: string }) {
         />
       </div>
       <div className="room-card-foot">
-        <span className="room-card-text">{t("加入后，房间会出现在游戏的局域网世界列表里。", "Once joined, the room shows up in the game's LAN worlds.")}</span>
+        <span className="room-card-text">{t("加入后在游戏「多人游戏」列表直接进入", "Appears in the game's Multiplayer list")}</span>
         <Button variant="primary" icon="link" busy={busy} disabled={!ready} onClick={go}>
           {t("加入", "Join")}
         </Button>
@@ -405,8 +419,35 @@ function RoomView({ status, onNodes }: { status: P2pStatus; onNodes: () => void 
         <motion.p className="room-hint" variants={item}>
           <Icon name="info" />
           {t(
-            `在游戏的「多人游戏」里，局域网世界会出现${status.world?.motd ? `「${status.world.motd} · P2P」` : "这个房间"}；也可以「直接连接」上面的地址。`,
-            `In the game's Multiplayer screen the room shows up as a LAN world${status.world?.motd ? ` ("${status.world.motd} · P2P")` : ""}; or use Direct Connection with the address above.`,
+            `在游戏「多人游戏」选择${status.world?.motd ? `「${status.world.motd} · P2P」` : "局域网房间"}，或直接连接上方地址。`,
+            `Join ${status.world?.motd ? `"${status.world.motd} · P2P"` : "the LAN world"} in Multiplayer, or Direct Connect to the address above.`,
+          )}
+        </motion.p>
+      )}
+      {host && account?.provider === "microsoft" && (
+        <motion.p className="room-hint" variants={item}>
+          <Icon name="shield" />
+          {t(
+            "好友用外置或离线账号若提示「无效的会话」，可安装 CustomLAN 模组或改用「开服」建服。",
+            "If friends on third-party or offline accounts see \"Invalid session\", install CustomLAN or host via the Server page.",
+          )}
+        </motion.p>
+      )}
+      {host && account && account.provider !== "microsoft" && (
+        <motion.p className="room-hint" variants={item}>
+          <Icon name="shield" />
+          {t(
+            "用外置或离线账号开房间时，若好友进服提示「无效的会话」，可安装 CustomLAN 模组或改用「开服」并关闭正版验证。",
+            "When hosting with a third-party or offline account, if friends see \"Invalid session\", install CustomLAN or host via the Server page with online mode off.",
+          )}
+        </motion.p>
+      )}
+      {!host && account && account.provider !== "microsoft" && (
+        <motion.p className="room-hint" variants={item}>
+          <Icon name="shield" />
+          {t(
+            "若进服提示「无效的会话」，请让房主安装 CustomLAN 模组关闭局域网正版验证。",
+            "If you see \"Invalid session\", ask the host to install CustomLAN to disable LAN verification.",
           )}
         </motion.p>
       )}
@@ -478,21 +519,21 @@ function RoomView({ status, onNodes }: { status: P2pStatus; onNodes: () => void 
 
 function Advanced({ open, onToggle, defaults }: { open: boolean; onToggle: (open: boolean) => void; defaults: string[] }) {
   const [text, setText] = useState(() => (loadNodes() ?? []).join("\n"));
+  const [customCount, setCustomCount] = useState<number | null>(() => loadNodes()?.length ?? null);
   const [saved, setSaved] = useState(false);
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
   const invalid = lines.filter((l) => !validNode(l));
-  const custom = loadNodes() !== null;
   const activeId = useStore((s) => s.settings.activeInstanceId);
   return (
     <motion.details className="room-advanced" variants={item} open={open} onToggle={(e) => onToggle((e.currentTarget as HTMLDetailsElement).open)}>
       <summary>
-        {t("高级：共享节点、自己的服务器", "Advanced: shared nodes, your own server")}
-        <span className="faint">{custom ? t(`自定义 ${loadNodes()!.length} 个`, `${loadNodes()!.length} custom`) : t(`内置 ${defaults.length} 个`, `${defaults.length} built in`)}</span>
+        {t("高级：联机节点与自建隧道", "Advanced: relay nodes & SSH tunnel")}
+        <span className="faint">{customCount !== null ? t(`自定义 ${customCount} 个`, `${customCount} custom`) : t(`内置 ${defaults.length} 个`, `${defaults.length} built in`)}</span>
       </summary>
       <p className="room-card-text">
         {t(
-          "共享节点只负责让双方互相找到，以及不能直连时转发加密数据。双方至少要有一个相同的节点。每行一个地址，例如 tcp://example.com:11010；留空就用内置列表。",
-          "Shared nodes only introduce the two sides and relay encrypted traffic when a direct link fails. Both sides need at least one node in common. One address per line, e.g. tcp://example.com:11010; leave empty for the built-in list.",
+          "留空使用内置节点；自定义时每行一个地址（如 tcp://example.com:11010），双方需至少有一个相同节点。",
+          "Leave empty for built-in nodes. Enter one address per line (e.g. tcp://example.com:11010); both sides need one in common.",
         )}
       </p>
       <textarea
@@ -516,6 +557,7 @@ function Advanced({ open, onToggle, defaults }: { open: boolean; onToggle: (open
           onClick={() => {
             setText("");
             saveNodes(null);
+            setCustomCount(null);
             setSaved(true);
           }}
         >
@@ -524,7 +566,9 @@ function Advanced({ open, onToggle, defaults }: { open: boolean; onToggle: (open
         <Button
           size="sm"
           onClick={() => {
-            saveNodes(lines.filter(validNode));
+            const valid = lines.filter(validNode);
+            saveNodes(valid);
+            setCustomCount(valid.length > 0 ? valid.length : null);
             setSaved(true);
           }}
         >
@@ -537,7 +581,7 @@ function Advanced({ open, onToggle, defaults }: { open: boolean; onToggle: (open
           <div className="col gap-2 fill">
             <span className="room-advanced-title">{t("用自己的服务器转发", "Forward through your own server")}</span>
             <span className="room-card-text">
-              {t("有公网服务器时，可以用 SSH 反向隧道把当前世界开到服务器上，好友直接连服务器地址，不需要房间码。", "With a public server of your own, an SSH reverse tunnel puts the current world on it; friends connect to the server's address, no room code needed.")}
+              {t("有公网服务器时，可通过 SSH 隧道让好友直接连接服务器地址。", "With your own public server, forward the world over SSH so friends can connect directly.")}
             </span>
           </div>
           <Button size="sm" onClick={() => useStore.getState().openModal({ kind: "tunnel", id: activeId })}>

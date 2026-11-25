@@ -44,13 +44,13 @@ impl Account {
     }
 }
 
-/// Offline accounts need a Microsoft account that owns the game first.
+/// Non-Microsoft accounts need a Microsoft account that owns the game first.
 pub fn owner_required() -> AppError {
     AppError::new(
         "owner_required",
         crate::core::i18n::pick(
-            "离线账号需要先登录一个拥有 Minecraft Java 版的微软账号。",
-            "Offline accounts need a Microsoft account that owns Minecraft: Java Edition signed in first.",
+            "需要先登录一个拥有 Minecraft Java 版的微软账号。",
+            "Sign in with a Microsoft account that owns Minecraft: Java Edition first.",
         ),
     )
 }

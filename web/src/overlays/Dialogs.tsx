@@ -47,7 +47,7 @@ export function RecycleBin() {
     >
       {s.recycled.length === 0 ? (
         <Empty icon="trash" title={t("回收站里没有世界", "No worlds in the recycle bin")}>
-          {t("删除的模组、资源包、存档和截图也在回收站目录里，清空时一并删除。", "Removed mods, resource packs, saves and screenshots are in the recycle folder too and go when you empty it.")}
+          {t("删除的模组、资源包、存档和截图也会在清空时一起移除。", "Removed mods, packs, saves, and screenshots are also cleared when emptied.")}
         </Empty>
       ) : (
         <div className="list">
@@ -86,6 +86,14 @@ export function RecycleBin() {
 
 export function DeleteInstance({ instance }: { instance: Instance }) {
   const s = usePick((s) => ({ closeModal: s.closeModal, mutate: s.mutate }));
+  const [busy, setBusy] = useState(false);
+  const confirmDelete = async () => {
+    if (busy) return;
+    setBusy(true);
+    const ok = await s.mutate("delete_instance", { id: instance.id }, t("已移入回收站，可随时恢复", "Moved to the recycle bin; restore it any time"));
+    setBusy(false);
+    if (ok) s.closeModal();
+  };
   return (
     <Modal
       scene={
@@ -117,20 +125,14 @@ export function DeleteInstance({ instance }: { instance: Instance }) {
           <Button variant="ghost" onClick={s.closeModal}>
             {t("取消", "Cancel")}
           </Button>
-          <Button
-            variant="danger"
-            icon="trash"
-            onClick={async () => {
-              if (await s.mutate("delete_instance", { id: instance.id }, t("已移入回收站，可随时恢复", "Moved to the recycle bin; restore it any time"))) s.closeModal();
-            }}
-          >
+          <Button variant="danger" icon="trash" busy={busy} onClick={() => void confirmDelete()}>
             {t("移入回收站", "Move to recycle bin")}
           </Button>
         </>
       }
     >
       <ul className="facts-list">
-        <li>{t("存档、模组和设置会一起移进回收站，不会删除任何文件", "Saves, mods and settings move to the recycle bin together; nothing is deleted")}</li>
+        <li>{t("存档、模组和设置会移入回收站，不会立即删除", "Saves, mods, and settings move to the recycle bin without being deleted")}</li>
         <li>{t("随时可以在「世界」页的回收站里恢复", "Restore it any time from the recycle bin on the Worlds page")}</li>
       </ul>
     </Modal>
@@ -140,6 +142,7 @@ export function DeleteInstance({ instance }: { instance: Instance }) {
 export function AddOffline() {
   const s = usePick((s) => ({ closeModal: s.closeModal, mutate: s.mutate }));
   const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
   const value = name.trim();
   const tooLong = value.length > 16 || /\s/.test(value);
   const strict = /^[A-Za-z0-9_]{3,16}$/.test(value);
@@ -149,10 +152,13 @@ export function AddOffline() {
       ? t("不能超过 16 个字符，也不能包含空格", "At most 16 characters, without spaces")
       : strict
         ? t("可以使用", "Good to go")
-        : t("可以使用，但部分服务器和模组只接受 3–16 位字母、数字或下划线", "Usable, but some servers and mods accept only 3–16 letters, digits or underscores");
+        : t("部分服务器仅支持 3–16 位字母、数字或下划线", "Some servers require 3–16 letters, digits, or underscores");
   const add = async () => {
-    if (!value || tooLong) return;
-    if (await s.mutate("add_offline_account", { username: value }, t(`已添加离线账号 ${value}`, `Added offline account ${value}`))) s.closeModal();
+    if (busy || !value || tooLong) return;
+    setBusy(true);
+    const ok = await s.mutate("add_offline_account", { username: value }, t(`已添加离线账号 ${value}`, `Added offline account ${value}`));
+    setBusy(false);
+    if (ok) s.closeModal();
   };
   return (
     <Modal
@@ -171,7 +177,7 @@ export function AddOffline() {
           <Button variant="ghost" onClick={s.closeModal}>
             {t("取消", "Cancel")}
           </Button>
-          <Button variant="primary" icon="plus" disabled={!value || tooLong} onClick={() => void add()}>
+          <Button variant="primary" icon="plus" busy={busy} disabled={!value || tooLong} onClick={() => void add()}>
             {t("添加", "Add")}
           </Button>
         </>
@@ -189,7 +195,7 @@ export function AddOffline() {
           <Input autoFocus value={name} invalid={tooLong} placeholder={t("3–16 位字母、数字或下划线", "3–16 letters, digits or underscores")} onChange={(e) => setName(e.target.value)} />
         </Field>
         <span className="faint" style={{ fontSize: "var(--text-xs)" }}>
-          {t("离线账号无法进入开启正版验证的服务器，UUID 按 Minecraft 标准算法生成。", "Offline accounts can't join servers that verify accounts; the UUID follows Minecraft's standard algorithm.")}
+          {t("仅用于单人游戏、局域网和非正版服务器。", "For singleplayer, LAN, and offline-mode servers only.")}
         </span>
       </form>
     </Modal>
@@ -250,13 +256,13 @@ export function StopGame({ id }: { id: string }) {
     >
       {s.stopping ? (
         <ul className="facts-list">
-          <li>{t("游戏正在保存并退出；存档大或模组多时，可能要等半分钟", "The game is saving and quitting; with a big save or many mods this can take half a minute")}</li>
-          <li>{t("强制结束会立刻关掉游戏，没保存的进度会丢失，存档也可能损坏", "Force quitting closes the game at once: unsaved progress is lost and the save may be damaged")}</li>
+          <li>{t("游戏正在保存并退出，大存档可能需要稍等片刻", "The game is saving and exiting; large saves may take a moment")}</li>
+          <li>{t("强制结束会立即关闭游戏，未保存的进度可能丢失", "Force quitting closes immediately and may lose unsaved progress")}</li>
         </ul>
       ) : (
         <ul className="facts-list">
-          <li>{t("最稳妥的是在游戏里按 Esc，选「保存并退出」，再关掉游戏窗口", "The safest way is Esc → Save and Quit in the game, then close its window")}</li>
-          <li>{t("从这里停止时，游戏会先自己保存；30 秒后还没关掉才会强制结束", "Stopping from here lets the game save first; it is only forced to close if it is still open after 30 seconds")}</li>
+          <li>{t("建议先在游戏内「保存并退出」再关闭窗口", "Best to use Save and Quit in-game first")}</li>
+          <li>{t("点击停止会先正常保存退出，30 秒无响应后强制结束", "Stopping lets the game save first, forcing close after 30 seconds")}</li>
         </ul>
       )}
     </Modal>
@@ -305,13 +311,13 @@ export function QuitConfirm() {
     >
       {playing ? (
         <ul className="facts-list">
-          <li>{t("游戏运行时，启动器要继续记录日志", "While a game runs, the launcher keeps recording its log")}</li>
-          <li>{t("可以等游戏和后台任务都结束后自动退出，也可以从托盘菜单停止游戏", "Quit automatically once games and background work finish, or stop the game from the tray menu")}</li>
+          <li>{t("游戏仍在运行中，建议等待游戏退出后再关闭启动器", "A game is still running; wait for it to finish before quitting")}</li>
+          <li>{t("可选择「任务完成后退出」自动关闭，或在托盘菜单停止游戏", "Choose \"Quit when work finishes\" or stop the game from the tray")}</li>
         </ul>
       ) : (
         <ul className="facts-list">
-          <li>{t("下载、文件操作或联机连接还在进行", "Downloads, file work or multiplayer connections are still active")}</li>
-          <li>{t("「任务完成后退出」会等它们结束；「立即退出」会中断任务并断开联机", "\"Quit when work finishes\" waits for them; \"Quit now\" interrupts the work and disconnects multiplayer")}</li>
+          <li>{t("仍有下载、文件操作或联机连接在进行", "Downloads, file operations, or multiplayer rooms are still active")}</li>
+          <li>{t("选择「立即退出」会中断当前任务并断开联机", "\"Quit now\" will cancel active tasks and disconnect multiplayer")}</li>
         </ul>
       )}
     </Modal>
@@ -320,7 +326,15 @@ export function QuitConfirm() {
 
 export function DeleteAccount({ account }: { account: Account }) {
   const s = usePick((s) => ({ closeModal: s.closeModal, mutate: s.mutate }));
+  const [busy, setBusy] = useState(false);
   const kind = account.provider === "microsoft" ? t("微软账号", "Microsoft account") : account.provider === "yggdrasil" ? (account.serverName ?? t("外置账号", "Third-party account")) : t("离线账号", "Offline account");
+  const confirmDelete = async () => {
+    if (busy) return;
+    setBusy(true);
+    const ok = await s.mutate("remove_account", { id: account.id }, t("账号已删除", "Account removed"));
+    setBusy(false);
+    if (ok) s.closeModal();
+  };
   return (
     <Modal
       scene={
@@ -340,13 +354,7 @@ export function DeleteAccount({ account }: { account: Account }) {
           <Button variant="ghost" onClick={s.closeModal}>
             {t("取消", "Cancel")}
           </Button>
-          <Button
-            variant="danger"
-            icon="trash"
-            onClick={async () => {
-              if (await s.mutate("remove_account", { id: account.id }, t("账号已删除", "Account removed"))) s.closeModal();
-            }}
-          >
+          <Button variant="danger" icon="trash" busy={busy} onClick={() => void confirmDelete()}>
             {t("删除账号", "Remove account")}
           </Button>
         </>
@@ -356,7 +364,7 @@ export function DeleteAccount({ account }: { account: Account }) {
         {account.provider === "offline" ? (
           <li>{t("只删除这个离线账号，之后可以随时用同一个名字再添加", "Only this offline account goes; you can add the same name again any time")}</li>
         ) : (
-          <li>{t("保存在系统凭据里的登录令牌会一起删除，之后要重新登录", "Its sign-in token in the system keychain goes too; you'll need to sign in again")}</li>
+          <li>{t("会清除本机登录状态，之后需重新登录", "Clears local sign-in state; you'll need to sign in again")}</li>
         )}
         <li>{t("存档保存在各个世界里，不受影响", "Saves live in the worlds and are not affected")}</li>
       </ul>
@@ -377,7 +385,7 @@ export function LoginOverlay() {
       footer={
         <>
           <span className="faint" style={{ fontSize: "var(--text-xs)", marginRight: "auto", maxWidth: 330 }}>
-            {t("密码只在微软官方页面输入。登录令牌保存在系统凭据存储中，不会写入配置文件或日志。", "Your password is entered only on Microsoft's own page. Sign-in tokens go to the system keychain, never to config files or logs.")}
+            {t("密码仅在微软官方页面输入，启动器不会保存密码。", "Your password is only entered on Microsoft's page and never stored.")}
           </span>
           <Button variant="ghost" onClick={s.cancel}>
             {t("取消登录", "Cancel sign-in")}
